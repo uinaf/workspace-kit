@@ -29,6 +29,16 @@ The kit checks presence and link integrity only — never prose.
   indexes from the raw layer (tag pages materialize at two or more sources;
   stale tag pages are purged). `wiki stale` reports pages whose sources have
   newer commits than their `updated:` stamp — informational, never a gate.
+- **llm-wiki enforcement (opt-in)** — for workspaces adopting the full
+  LLM-maintained-wiki discipline: `wiki.indexCoverage` requires every
+  non-exempt page to be cataloged directly in `index.md` (the index is a
+  content catalog, not just a landing page); `wiki.logChronology` requires
+  `log.md` entry dates to never decrease (append-only proxy);
+  `wiki.requiredFields` lets a workspace extend the frontmatter atom (e.g.
+  add `created`); top-level `limits` enforces the convention's soft size
+  limits as warnings that never fail a run — the audit flags, the human
+  decides. Contradiction and duplicate detection remain agentic maintenance
+  work by design: a deterministic linter cannot judge semantics.
 
 ## 3. Operations (optional)
 
@@ -60,7 +70,16 @@ The kit checks presence and link integrity only — never prose.
                "optional": ["branch"] }
   },
   "dailyLogs": { "root": "memory", "contexts": "memory/contexts" },
-  "wiki": { "root": "memory/wiki" },
+  "wiki": {
+    "root": "memory/wiki",
+    "requiredFields": ["title", "type", "status", "updated", "tags", "sources"],
+    "indexCoverage": false,          // every page cataloged in index.md
+    "logChronology": false           // log.md dates never decrease (append-only proxy)
+  },
+  "limits": [                        // soft limits: warnings, never failures
+    { "pattern": "MEMORY.md", "maxLines": 200 },
+    { "pattern": "memory/????-??-??.md", "maxLines": 80 }
+  ],
   "contract": { "file": "workspace.contract.json" },
   "handoff": { "paths": ["AGENTS.md"], "prefixes": ["memory/"] },
   "docsLinks": { "enabled": false, "exclude": [] }

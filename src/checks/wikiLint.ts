@@ -21,9 +21,29 @@ function stripFencedCode(text: string): string {
   return text.replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]+`/g, "");
 }
 
+export type WikiLintOptions = {
+  root: string;
+  // Legacy defaults; workspaces may add e.g. "created" per the convention.
+  requiredFields?: string[];
+  // Karpathy llm-wiki rules, opt-in: every non-exempt page must be cataloged
+  // in index.md; log entries must be appended in chronological order.
+  indexCoverage?: boolean;
+  logChronology?: boolean;
+};
+
 export type WikiLintResult = { errors: string[]; fatal?: string };
 
-export function wikiLintErrors(root: string): WikiLintResult {
+export function wikiLintErrors(options: string | WikiLintOptions): WikiLintResult {
+  const opts: WikiLintOptions = typeof options === "string" ? { root: options } : options;
+  const root = opts.root;
+  const requiredFields = opts.requiredFields ?? [
+    "title",
+    "type",
+    "status",
+    "updated",
+    "tags",
+    "sources",
+  ];
   let pages: string[];
   try {
     pages = walk(root);
@@ -69,7 +89,7 @@ export function wikiLintErrors(root: string): WikiLintResult {
     if (!text.startsWith("---\n")) bad.push(`${path}: missing frontmatter`);
     if (!text.slice(4).includes("\n---\n")) bad.push(`${path}: unterminated frontmatter`);
     const fm = parseFrontmatter(text);
-    for (const key of ["title", "type", "status", "updated", "tags", "sources"]) {
+    for (const key of requiredFields) {
       if (!(key in fm)) bad.push(`${path}: missing frontmatter field ${key}`);
     }
     for (const key of ["tags", "sources"]) {
@@ -124,6 +144,18 @@ export function wikiLintErrors(root: string): WikiLintResult {
     if ((inbound.get(page)?.size ?? 0) === 0) bad.push(`${root}/${page}.md: no inbound wiki links`);
   }
 
+  if (opts.indexCoverage) {
+    // The index is a content catalog: every non-exempt page must be linked
+    // from it directly, not merely reachable somewhere in the graph.
+    const indexPath = join(root, "index.md");
+    for (const page of inbound.keys()) {
+      if (isOrphanExempt(page)) continue;
+      if (!inbound.get(page)?.has(indexPath)) {
+        bad.push(`${root}/${page}.md: not cataloged in ${root}/index.md`);
+      }
+    }
+  }
+
   const logPath = join(root, "log.md");
   if (!existsSync(logPath)) {
     // Recorded fix: legacy crashed here with a stack trace.
@@ -134,6 +166,20 @@ export function wikiLintErrors(root: string): WikiLintResult {
     for (const heading of logHeadings) {
       if (!/^\[\d{4}-\d{2}-\d{2}\]\s+\S+\s+\|\s+.+$/.test(heading)) {
         bad.push(`${root}/log.md: unparseable log heading ${heading}`);
+      }
+    }
+    if (opts.logChronology) {
+      // Append-only proxy: entry dates must never decrease down the file.
+      let previous = "";
+      for (const heading of logHeadings) {
+        const date = heading.match(/^\[(\d{4}-\d{2}-\d{2})\]/)?.[1];
+        if (!date) continue;
+        if (previous && date < previous) {
+          bad.push(
+            `${root}/log.md: log entries out of chronological order (${date} after ${previous})`,
+          );
+        }
+        previous = date;
       }
     }
   }

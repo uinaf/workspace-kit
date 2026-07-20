@@ -7,7 +7,13 @@ export type RegistryConfig = {
   entry: { required: string[]; optional: string[] };
 };
 export type DailyLogsConfig = { root: string; contexts: string };
-export type WikiConfig = { root: string };
+export type WikiConfig = {
+  root: string;
+  requiredFields: string[];
+  indexCoverage: boolean;
+  logChronology: boolean;
+};
+export type LimitRule = { pattern: string; maxLines: number };
 export type ContractConfig = { file: string };
 export type HandoffConfig = { paths: string[]; prefixes: string[] };
 export type DocsLinksConfig = { enabled: boolean; exclude: string[] };
@@ -20,6 +26,7 @@ export type WorkspaceConfig = {
   registry?: RegistryConfig;
   dailyLogs?: DailyLogsConfig;
   wiki?: WikiConfig;
+  limits?: LimitRule[];
   contract?: ContractConfig;
   handoff?: HandoffConfig;
   docsLinks?: DocsLinksConfig;
@@ -58,6 +65,7 @@ const KNOWN_KEYS = new Set([
   "registry",
   "dailyLogs",
   "wiki",
+  "limits",
   "contract",
   "handoff",
   "docsLinks",
@@ -121,7 +129,35 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
 
   if ("wiki" in value) {
     if (!isRecord(value.wiki)) fail("wiki must be an object");
-    out.wiki = { root: text(value.wiki.root, "wiki.root") };
+    const wiki = value.wiki;
+    for (const flag of ["indexCoverage", "logChronology"]) {
+      if (flag in wiki && typeof wiki[flag] !== "boolean") {
+        fail(`wiki.${flag} must be a boolean`);
+      }
+    }
+    out.wiki = {
+      root: text(wiki.root, "wiki.root"),
+      requiredFields:
+        "requiredFields" in wiki
+          ? stringList(wiki.requiredFields, "wiki.requiredFields")
+          : ["title", "type", "status", "updated", "tags", "sources"],
+      indexCoverage: wiki.indexCoverage === true,
+      logChronology: wiki.logChronology === true,
+    };
+  }
+
+  if ("limits" in value) {
+    if (!Array.isArray(value.limits)) fail("limits must be an array");
+    out.limits = value.limits.map((entry, index) => {
+      if (!isRecord(entry)) fail(`limits[${index}] must be an object`);
+      if (typeof entry.maxLines !== "number" || !Number.isInteger(entry.maxLines) || entry.maxLines < 1) {
+        fail(`limits[${index}].maxLines must be a positive integer`);
+      }
+      return {
+        pattern: text(entry.pattern, `limits[${index}].pattern`),
+        maxLines: entry.maxLines,
+      };
+    });
   }
 
   if ("contract" in value) {

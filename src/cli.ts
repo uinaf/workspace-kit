@@ -25,6 +25,7 @@ import {
   workspaceErrors,
 } from "./checks/contract.ts";
 import { docsLinkErrors } from "./checks/docsLinks.ts";
+import { limitWarnings } from "./checks/limits.ts";
 import { initWorkspace } from "./init.ts";
 import { kitVersion } from "./version.ts";
 
@@ -35,6 +36,7 @@ commands:
   wiki lint                lint the wiki layer
   wiki stale               report wiki pages older than their sources
   wiki backfill [--dry-run]  regenerate the wiki source/tag catalogs
+  limits                   report soft size-limit warnings (never fails)
   contract check           validate this repository's workspace contract
   contract peer <path>     validate both contracts and history separation
   contract handoff <path...>  screen proposed handoff paths
@@ -93,8 +95,8 @@ function requireSection<T>(value: T | undefined, section: string): T {
 
 // Runs wiki lint exactly like the legacy standalone script: errors to
 // stderr + exit-style status, "wiki-lint ok" on stdout when green.
-function runWikiLint(root: string): number {
-  const result = wikiLintErrors(root);
+function runWikiLint(wiki: import("./config.ts").WikiConfig): number {
+  const result = wikiLintErrors(wiki);
   if (result.fatal) {
     console.error(result.fatal);
     return 1;
@@ -142,7 +144,7 @@ function doctor(config: WorkspaceConfig, json: boolean): never {
   };
 
   if (config.wiki) {
-    const result = wikiLintErrors(config.wiki.root);
+    const result = wikiLintErrors(config.wiki);
     const errors = result.fatal ? [result.fatal] : result.errors;
     if (errors.length > 0) {
       stderr(errors);
@@ -185,12 +187,17 @@ function doctor(config: WorkspaceConfig, json: boolean): never {
     }
   }
 
+  // Soft limits are warnings by design: printed, counted, never fatal.
+  const warnings = config.limits ? limitWarnings(config.limits) : [];
+  if (warnings.length > 0 && !json) console.error(warnings.join("\n"));
+
   if (json) {
     const failed = Object.values(checks).filter((v) => v === "fail").length;
     console.log(
       JSON.stringify({
         status: bad.length > 0 ? "fail" : "pass",
         failed,
+        warnings: warnings.length,
         checks,
         errors: detail,
       }),
@@ -259,7 +266,7 @@ function main(): void {
     const config = loadConfigOrFail();
     const wiki = requireSection(config.wiki, "wiki");
     if (mode === "lint" && args.length === 0) {
-      process.exit(runWikiLint(wiki.root));
+      process.exit(runWikiLint(wiki));
     }
     if (mode === "stale" && args.length === 0) {
       const report = wikiStaleReport(wiki.root);
@@ -387,6 +394,16 @@ function main(): void {
       process.exit(1);
     }
     console.log("docs-links ok");
+    process.exit(0);
+  }
+
+  if (command === "limits") {
+    if (rest.length > 0) usageExit();
+    const config = loadConfigOrFail();
+    const rules = requireSection(config.limits, "limits");
+    const warnings = limitWarnings(rules);
+    if (warnings.length > 0) console.error(warnings.join("\n"));
+    else console.log("limits ok");
     process.exit(0);
   }
 
