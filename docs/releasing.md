@@ -10,12 +10,13 @@ repository, its secrets, or any maintainer machine's dotfiles.
 1. **Scope**: ensure the `uinaf` organization exists on npmjs.com (or the
    `@uinaf` scope is otherwise controlled by the owner account). Enable 2FA
    on the account.
-2. **Register the trusted publisher** with the npm CLI (`npm trust`
-   requires npm >= 11.10.0, so pin the operator command):
+2. **Register the trusted publisher** with the npm CLI (`npm trust` needs
+   npm >= 11.10.0 — any current npm qualifies; on an older machine, prefix
+   with `npx -y npm@latest`):
 
    ```
-   npx -y npm@^11.10.0 login
-   npx -y npm@^11.10.0 trust github @uinaf/workspace-kit \
+   npm login
+   npm trust github @uinaf/workspace-kit \
      --repo uinaf/workspace-kit --file release.yml --env release --yes
    ```
 
