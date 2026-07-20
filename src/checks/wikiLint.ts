@@ -2,20 +2,14 @@
 // (page-relative -> root-relative -> unique-leaf fallback) are parity-locked
 // to parity/goldens. One recorded fix vs legacy: a missing log file is a
 // clean error instead of an uncaught crash.
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { basename, dirname, join, normalize, relative } from "node:path";
+import { basename, dirname, join, normalize, posix, relative } from "node:path";
 import { asList, isExternal, parseFrontmatter } from "../lib/frontmatter.ts";
-
-function walk(dir: string): string[] {
-  return readdirSync(dir)
-    .flatMap((name) => {
-      const path = join(dir, name);
-      const stat = statSync(path);
-      if (stat.isDirectory()) return walk(path);
-      return path.endsWith(".md") ? [path] : [];
-    })
-    .sort();
-}
+import {
+  normalizeWorkspacePath,
+  readWorkspaceText,
+  walkWorkspaceMarkdown,
+  workspaceLstat,
+} from "../lib/workspaceFs.ts";
 
 function stripFencedCode(text: string): string {
   return text.replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]+`/g, "");
@@ -35,7 +29,12 @@ export type WikiLintResult = { errors: string[]; fatal?: string };
 
 export function wikiLintErrors(options: string | WikiLintOptions): WikiLintResult {
   const opts: WikiLintOptions = typeof options === "string" ? { root: options } : options;
-  const root = opts.root;
+  let root: string;
+  try {
+    root = normalizeWorkspacePath(opts.root, "wiki.root");
+  } catch (error) {
+    return { errors: [], fatal: error instanceof Error ? error.message : String(error) };
+  }
   const requiredFields = opts.requiredFields ?? [
     "title",
     "type",
@@ -46,9 +45,9 @@ export function wikiLintErrors(options: string | WikiLintOptions): WikiLintResul
   ];
   let pages: string[];
   try {
-    pages = walk(root);
-  } catch {
-    return { errors: [], fatal: `missing ${root}` };
+    pages = walkWorkspaceMarkdown(".", root);
+  } catch (error) {
+    return { errors: [], fatal: error instanceof Error ? error.message : String(error) };
   }
 
   const known = new Set<string>();
@@ -85,7 +84,7 @@ export function wikiLintErrors(options: string | WikiLintOptions): WikiLintResul
   }
 
   for (const path of pages) {
-    const text = readFileSync(path, "utf8");
+    const text = readWorkspaceText(".", path);
     if (!text.startsWith("---\n")) bad.push(`${path}: missing frontmatter`);
     if (!text.slice(4).includes("\n---\n")) bad.push(`${path}: unterminated frontmatter`);
     const fm = parseFrontmatter(text);
@@ -105,7 +104,12 @@ export function wikiLintErrors(options: string | WikiLintOptions): WikiLintResul
     }
     for (const source of asList(fm.sources)) {
       if (isExternal(source) || source.startsWith("[[")) continue;
-      if (!existsSync(source)) bad.push(`${path}: missing source ${source}`);
+      try {
+        const stat = workspaceLstat(".", source, "wiki source");
+        if (!stat || stat.isSymbolicLink()) bad.push(`${path}: missing source ${source}`);
+      } catch {
+        bad.push(`${path}: missing source ${source}`);
+      }
     }
 
     const linkText = stripFencedCode(text);
@@ -123,8 +127,15 @@ export function wikiLintErrors(options: string | WikiLintOptions): WikiLintResul
       if (/^[a-z][a-z0-9+.-]*:/i.test(rawHref) || rawHref.startsWith("#")) continue;
       const href = rawHref.replace(/%20/g, " ").split("#")[0];
       if (!href) continue;
-      const target = normalize(join(dirname(path), href));
-      if (!existsSync(target)) bad.push(`${path}: broken markdown link (${rawHref})`);
+      const target = posix.normalize(posix.join(posix.dirname(path), href.replaceAll("\\", "/")));
+      let targetExists = false;
+      try {
+        const stat = workspaceLstat(".", target, "markdown link target");
+        targetExists = stat !== undefined && !stat.isSymbolicLink();
+      } catch {
+        targetExists = false;
+      }
+      if (!targetExists) bad.push(`${path}: broken markdown link (${rawHref})`);
       if (target.startsWith(root) && target.endsWith(".md")) {
         const rel = relative(root, target).replace(/\.md$/, "").replaceAll("\\\\", "/");
         inbound.get(rel)?.add(path);
@@ -157,11 +168,11 @@ export function wikiLintErrors(options: string | WikiLintOptions): WikiLintResul
   }
 
   const logPath = join(root, "log.md");
-  if (!existsSync(logPath)) {
+  if (!workspaceLstat(".", logPath)) {
     // Recorded fix: legacy crashed here with a stack trace.
     bad.push(`missing ${logPath}`);
   } else {
-    const logText = readFileSync(logPath, "utf8");
+    const logText = readWorkspaceText(".", logPath);
     const logHeadings = [...logText.matchAll(/^##\s+(.+)$/gm)].map((m) => m[1]!);
     for (const heading of logHeadings) {
       if (!/^\[\d{4}-\d{2}-\d{2}\]\s+\S+\s+\|\s+.+$/.test(heading)) {

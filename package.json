@@ -21,10 +21,9 @@
   "scripts": {
     "test": "vp test run",
     "build": "vp pack",
-    "smoke": "node dist/cli.mjs --version",
-    "verify": "vp check && vp test run && vp pack && node dist/cli.mjs --version",
-    "prepack": "vp run verify",
-    "prepare": "vp config --no-agent || true"
+    "smoke": "node scripts/smoke-package.mjs",
+    "verify": "vp check && vp test run && vp pack && node scripts/smoke-package.mjs",
+    "prepack": "vp run verify"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

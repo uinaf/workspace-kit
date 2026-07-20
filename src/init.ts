@@ -1,9 +1,9 @@
 // Workspace scaffolder. Writes structural skeletons only — instruction
 // content is owner-authored; the kit never writes behavioral prose. Existing
 // files are never overwritten.
-import { chmodSync, lstatSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { mkdirSync, realpathSync } from "node:fs";
 import { kitVersion } from "./version.ts";
+import { createWorkspaceLink, workspaceLstat, writeWorkspaceText } from "./lib/workspaceFs.ts";
 
 export type Profile = "personal" | "runtime" | "work";
 export type InitResult = { created: string[]; skipped: string[] };
@@ -59,35 +59,31 @@ export function initWorkspace(dir: string, profile: Profile): InitResult {
       `${dir} is not a usable directory: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
+  const root = realpathSync(dir);
 
   const put = (rel: string, content: string, mode?: number): void => {
-    const path = join(dir, rel);
     // lstat-based existence: a pre-existing dangling symlink must count as
-    // occupied, or writeFileSync would write THROUGH it to an
+    // occupied, or a normal file write would write THROUGH it to an
     // attacker-chosen location in a hostile checkout.
-    try {
-      lstatSync(path);
+    if (workspaceLstat(root, rel)) {
       skipped.push(rel);
       return;
-    } catch {
-      // absent: create below
     }
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, content, { flag: "wx" });
-    if (mode !== undefined) chmodSync(path, mode);
+    writeWorkspaceText(
+      root,
+      rel,
+      content,
+      mode === undefined ? { exclusive: true } : { exclusive: true, mode },
+    );
     created.push(rel);
   };
 
   const link = (rel: string, target: string): void => {
-    const path = join(dir, rel);
-    try {
-      lstatSync(path);
+    if (workspaceLstat(root, rel)) {
       skipped.push(rel);
       return;
-    } catch {
-      // absent: create below
     }
-    symlinkSync(target, path);
+    createWorkspaceLink(root, rel, target);
     created.push(rel);
   };
 

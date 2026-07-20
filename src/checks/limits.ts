@@ -2,8 +2,8 @@
 // lines, daily logs under 80). These are WARNINGS by design — "the audit
 // flags them, the human decides" — so they never fail a run.
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import type { LimitRule } from "../config.ts";
+import { readWorkspaceText, workspaceLstat } from "../lib/workspaceFs.ts";
 
 // Tiny glob: * matches within a path segment, ? matches one character,
 // ** crosses segments. Enough for "memory/????-??-??.md" style rules.
@@ -42,7 +42,9 @@ export function limitWarnings(rules: LimitRule[]): string[] {
     const regex = globToRegExp(rule.pattern);
     for (const file of tracked) {
       if (!regex.test(file)) continue;
-      const content = readFileSync(file, "utf8");
+      const stat = workspaceLstat(".", file, "tracked file");
+      if (stat?.isSymbolicLink()) continue;
+      const content = readWorkspaceText(".", file, "tracked file");
       const lines = content.split("\n").length - (content.endsWith("\n") ? 1 : 0);
       if (lines > rule.maxLines) {
         warnings.push(`warning: ${file}: ${lines} lines exceeds soft limit ${rule.maxLines}`);

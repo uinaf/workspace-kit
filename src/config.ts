@@ -1,5 +1,8 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import {
+  normalizeLinkTarget,
+  normalizeWorkspacePath,
+  readWorkspaceText,
+} from "./lib/workspaceFs.ts";
 
 export type LinkRule = { path: string; target: string };
 export type RegistryConfig = {
@@ -49,6 +52,12 @@ function stringList(value: unknown, field: string): string[] {
   return value as string[];
 }
 
+function workspacePathList(value: unknown, field: string): string[] {
+  return stringList(value, field).map((path, index) =>
+    normalizeWorkspacePath(path, `${field}[${index}]`),
+  );
+}
+
 function text(value: unknown, field: string): string {
   if (typeof value !== "string" || value.length === 0) {
     fail(`${field} must be a non-empty string`);
@@ -56,26 +65,52 @@ function text(value: unknown, field: string): string {
   return value;
 }
 
-const KNOWN_KEYS = new Set([
-  "$schema",
-  "minVersion",
-  "required",
-  "forbidden",
-  "links",
-  "registry",
-  "dailyLogs",
-  "wiki",
-  "limits",
-  "contract",
-  "handoff",
-  "docsLinks",
-]);
+type ConfigShape = true | { readonly [key: string]: ConfigShape } | readonly [ConfigShape];
+
+const CONFIG_SHAPE: ConfigShape = {
+  $schema: true,
+  minVersion: true,
+  required: true,
+  forbidden: true,
+  links: [{ path: true, target: true }],
+  registry: {
+    file: true,
+    entry: { required: true, optional: true },
+  },
+  dailyLogs: { root: true, contexts: true },
+  wiki: { root: true, requiredFields: true, indexCoverage: true, logChronology: true },
+  limits: [{ pattern: true, maxLines: true }],
+  contract: { file: true },
+  handoff: { paths: true, prefixes: true },
+  docsLinks: { enabled: true, exclude: true },
+};
+
+function collectUnknownKeys(value: unknown, shape: ConfigShape, path: string, out: string[]): void {
+  if (shape === true) return;
+  if (Array.isArray(shape)) {
+    if (!Array.isArray(value)) return;
+    value.forEach((entry, index) => collectUnknownKeys(entry, shape[0], `${path}[${index}]`, out));
+    return;
+  }
+  if (!isRecord(value)) return;
+
+  const fields = shape as { readonly [key: string]: ConfigShape };
+  for (const [key, child] of Object.entries(value)) {
+    const childPath = path ? `${path}.${key}` : key;
+    if (!Object.hasOwn(fields, key)) {
+      out.push(childPath);
+      continue;
+    }
+    collectUnknownKeys(child, fields[key] as ConfigShape, childPath, out);
+  }
+}
 
 // Unknown keys are tolerated at load (additive schema evolution across
 // staggered kit versions); `config validate` surfaces them as warnings.
 export function unknownConfigKeys(value: unknown): string[] {
-  if (!isRecord(value)) return [];
-  return Object.keys(value).filter((key) => !KNOWN_KEYS.has(key));
+  const out: string[] = [];
+  collectUnknownKeys(value, CONFIG_SHAPE, "", out);
+  return out;
 }
 
 export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
@@ -89,16 +124,30 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
     }
     out.minVersion = minVersion;
   }
-  if ("required" in value) out.required = stringList(value.required, "required");
-  if ("forbidden" in value) out.forbidden = stringList(value.forbidden, "forbidden");
+  if ("required" in value) out.required = workspacePathList(value.required, "required");
+  if ("forbidden" in value) out.forbidden = workspacePathList(value.forbidden, "forbidden");
 
   if ("links" in value) {
     if (!Array.isArray(value.links)) fail("links must be an array");
+    const linkPaths = new Map<string, number>();
     out.links = value.links.map((entry, index) => {
       if (!isRecord(entry)) fail(`links[${index}] must be an object`);
+      const path = normalizeWorkspacePath(
+        text(entry.path, `links[${index}].path`),
+        `links[${index}].path`,
+      );
+      const previous = linkPaths.get(path);
+      if (previous !== undefined) {
+        fail(`links[${index}].path duplicates links[${previous}].path`);
+      }
+      linkPaths.set(path, index);
       return {
-        path: text(entry.path, `links[${index}].path`),
-        target: text(entry.target, `links[${index}].target`),
+        path,
+        target: normalizeLinkTarget(
+          path,
+          text(entry.target, `links[${index}].target`),
+          `links[${index}].target`,
+        ),
       };
     });
   }
@@ -108,7 +157,7 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
     const entry = value.registry.entry;
     if (!isRecord(entry)) fail("registry.entry must be an object");
     out.registry = {
-      file: text(value.registry.file, "registry.file"),
+      file: normalizeWorkspacePath(text(value.registry.file, "registry.file"), "registry.file"),
       entry: {
         required: stringList(entry.required, "registry.entry.required"),
         optional: "optional" in entry ? stringList(entry.optional, "registry.entry.optional") : [],
@@ -119,8 +168,11 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
   if ("dailyLogs" in value) {
     if (!isRecord(value.dailyLogs)) fail("dailyLogs must be an object");
     out.dailyLogs = {
-      root: text(value.dailyLogs.root, "dailyLogs.root"),
-      contexts: text(value.dailyLogs.contexts, "dailyLogs.contexts"),
+      root: normalizeWorkspacePath(text(value.dailyLogs.root, "dailyLogs.root"), "dailyLogs.root"),
+      contexts: normalizeWorkspacePath(
+        text(value.dailyLogs.contexts, "dailyLogs.contexts"),
+        "dailyLogs.contexts",
+      ),
     };
   }
 
@@ -133,7 +185,7 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
       }
     }
     out.wiki = {
-      root: text(wiki.root, "wiki.root"),
+      root: normalizeWorkspacePath(text(wiki.root, "wiki.root"), "wiki.root"),
       requiredFields:
         "requiredFields" in wiki
           ? stringList(wiki.requiredFields, "wiki.requiredFields")
@@ -163,15 +215,20 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
 
   if ("contract" in value) {
     if (!isRecord(value.contract)) fail("contract must be an object");
-    out.contract = { file: text(value.contract.file, "contract.file") };
+    out.contract = {
+      file: normalizeWorkspacePath(text(value.contract.file, "contract.file"), "contract.file"),
+    };
   }
 
   if ("handoff" in value) {
     if (!isRecord(value.handoff)) fail("handoff must be an object");
     out.handoff = {
-      paths: "paths" in value.handoff ? stringList(value.handoff.paths, "handoff.paths") : [],
+      paths:
+        "paths" in value.handoff ? workspacePathList(value.handoff.paths, "handoff.paths") : [],
       prefixes:
-        "prefixes" in value.handoff ? stringList(value.handoff.prefixes, "handoff.prefixes") : [],
+        "prefixes" in value.handoff
+          ? workspacePathList(value.handoff.prefixes, "handoff.prefixes")
+          : [],
     };
   }
 
@@ -184,7 +241,7 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
       enabled: value.docsLinks.enabled === true,
       exclude:
         "exclude" in value.docsLinks
-          ? stringList(value.docsLinks.exclude, "docsLinks.exclude")
+          ? workspacePathList(value.docsLinks.exclude, "docsLinks.exclude")
           : [],
     };
   }
@@ -195,9 +252,11 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
 export function readRawConfig(repoRoot = "."): unknown {
   let raw: string;
   try {
-    raw = readFileSync(join(repoRoot, CONFIG_FILE), "utf8");
-  } catch {
-    fail(`missing ${CONFIG_FILE}`);
+    raw = readWorkspaceText(repoRoot, CONFIG_FILE, "config file");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message === `${CONFIG_FILE}: file is missing`) fail(`missing ${CONFIG_FILE}`);
+    fail(message);
   }
   try {
     return JSON.parse(raw);

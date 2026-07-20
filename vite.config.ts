@@ -1,4 +1,5 @@
 import { defineConfig } from "vite-plus";
+import { kitVersion } from "./src/version.ts";
 
 export default defineConfig({
   test: {
@@ -16,6 +17,9 @@ export default defineConfig({
   pack: {
     entry: ["src/cli.ts"],
     dts: false,
+    define: {
+      __WORKSPACE_KIT_VERSION__: JSON.stringify(kitVersion()),
+    },
   },
   staged: {
     "*.{js,mjs,cjs,ts,mts,cts}": "vp check --fix",

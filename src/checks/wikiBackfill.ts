@@ -1,17 +1,17 @@
 // Port of the legacy wiki-backfill generator. Generated content, the
 // date-only-diff idempotency suppression, and the stale tag-page purge are
 // parity-locked to parity/goldens. Adds --dry-run (no legacy counterpart).
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  statSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs";
-import { basename, dirname, join, relative } from "node:path";
+import { basename, dirname, posix, relative } from "node:path";
 import { parseFrontmatter } from "../lib/frontmatter.ts";
+import {
+  normalizeWorkspacePath,
+  readWorkspaceDirectory,
+  readWorkspaceText,
+  unlinkWorkspaceFile,
+  walkWorkspaceMarkdown,
+  workspaceLstat,
+  writeWorkspaceText,
+} from "../lib/workspaceFs.ts";
 
 type Source = {
   path: string;
@@ -21,20 +21,9 @@ type Source = {
   date: string | undefined;
 };
 
-function walk(dir: string): string[] {
-  try {
-    return readdirSync(dir)
-      .flatMap((name) => {
-        const path = join(dir, name);
-        const stat = statSync(path);
-        if (stat.isDirectory()) return walk(path);
-        return path.endsWith(".md") ? [path] : [];
-      })
-      .sort();
-  } catch {
-    return [];
-  }
-}
+type WriteOperation = { path: string; content: string };
+
+const WORKSPACE_ROOT = ".";
 
 function firstHeading(text: string): string | undefined {
   return text.match(/^#\s+(.+)$/m)?.[1]?.trim();
@@ -78,14 +67,35 @@ function tagsFor(path: string, fm: Record<string, unknown>): string[] {
   return [...derived].sort();
 }
 
+function directDailyLogs(): string[] {
+  return readWorkspaceDirectory(WORKSPACE_ROOT, "memory", "empty")
+    .flatMap((entry) => {
+      if (!/^\d{4}-\d{2}-\d{2}\.md$/.test(entry.name)) return [];
+      const path = posix.join("memory", entry.name);
+      if (entry.isSymbolicLink()) {
+        throw new Error(`${path}: symbolic-link file is not allowed`);
+      }
+      return entry.isFile() ? [path] : [];
+    })
+    .sort();
+}
+
+function optionalRootFile(path: string): boolean {
+  const stat = workspaceLstat(WORKSPACE_ROOT, path, "source path");
+  if (!stat) return false;
+  if (stat.isSymbolicLink()) throw new Error(`${path}: symbolic-link file is not allowed`);
+  if (!stat.isFile()) throw new Error(`${path}: expected a regular file`);
+  return true;
+}
+
 function allSources(root: string): Source[] {
   const paths = [
-    ...walk("memory/intake"),
-    ...walk("memory/notes"),
-    ...walk("docs"),
-    ...walk("user"),
-    ...walk("memory/contexts"),
-    ...walk("memory").filter((p) => /^memory\/\d{4}-\d{2}-\d{2}\.md$/.test(p)),
+    ...walkWorkspaceMarkdown(WORKSPACE_ROOT, "memory/intake", "empty"),
+    ...walkWorkspaceMarkdown(WORKSPACE_ROOT, "memory/notes", "empty"),
+    ...walkWorkspaceMarkdown(WORKSPACE_ROOT, "docs", "empty"),
+    ...walkWorkspaceMarkdown(WORKSPACE_ROOT, "user", "empty"),
+    ...walkWorkspaceMarkdown(WORKSPACE_ROOT, "memory/contexts", "empty"),
+    ...directDailyLogs(),
     "AGENTS.md",
     "MEMORY.md",
     "USER.md",
@@ -96,11 +106,12 @@ function allSources(root: string): Source[] {
   ].filter(
     // Root convention files are optional: a scaffold without SOUL.md et al.
     // must not crash the generator (recorded fix vs legacy).
-    (p, i, a) => a.indexOf(p) === i && !p.startsWith(`${root}/`) && existsSync(p),
+    (p, i, a) =>
+      a.indexOf(p) === i && p !== root && !p.startsWith(`${root}/`) && optionalRootFile(p),
   );
 
   return paths.sort().map((path) => {
-    const text = readFileSync(path, "utf8");
+    const text = readWorkspaceText(WORKSPACE_ROOT, path, "source path");
     const fm = parseFrontmatter(text);
     return {
       path,
@@ -119,14 +130,22 @@ function yamlList(items: string[]): string {
 export type BackfillResult = { out: string[]; planned: string[] };
 
 export function wikiBackfill(options: { root: string; dryRun: boolean }): BackfillResult {
-  const root = options.root;
+  const root = normalizeWorkspacePath(options.root, "wiki.root");
   const today = new Date().toLocaleDateString("sv-SE");
   const planned: string[] = [];
+  const writes: WriteOperation[] = [];
+  const deletes: string[] = [];
 
-  function write(path: string, content: string): void {
+  function planWrite(path: string, content: string): void {
+    const outputPath = normalizeWorkspacePath(path, "generated path");
     const next = content.endsWith("\n") ? content : `${content}\n`;
-    if (existsSync(path)) {
-      const current = readFileSync(path, "utf8");
+    const stat = workspaceLstat(WORKSPACE_ROOT, outputPath, "generated path");
+    if (stat) {
+      if (stat.isSymbolicLink()) {
+        throw new Error(`${outputPath}: refusing to write through a symlink`);
+      }
+      if (!stat.isFile()) throw new Error(`${outputPath}: expected a regular file`);
+      const current = readWorkspaceText(WORKSPACE_ROOT, outputPath, "generated path");
       const stripDates = (value: string) =>
         value
           .split("\n")
@@ -134,17 +153,31 @@ export function wikiBackfill(options: { root: string; dryRun: boolean }): Backfi
           .join("\n");
       if (stripDates(current) === stripDates(next)) {
         if (!options.dryRun) {
-          writeFileSync(path, current.endsWith("\n") ? current : `${current}\n`);
+          writes.push({
+            path: outputPath,
+            content: current.endsWith("\n") ? current : `${current}\n`,
+          });
         }
         return;
       }
     }
     if (options.dryRun) {
-      planned.push(`would write ${path}`);
-      return;
+      planned.push(`would write ${outputPath}`);
     }
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, next);
+    writes.push({ path: outputPath, content: next });
+  }
+
+  function preflightWrite(path: string): void {
+    const stat = workspaceLstat(WORKSPACE_ROOT, path, "generated path");
+    if (stat?.isSymbolicLink()) throw new Error(`${path}: refusing to write through a symlink`);
+    if (stat && !stat.isFile()) throw new Error(`${path}: expected a regular file`);
+  }
+
+  function preflightDelete(path: string): void {
+    const stat = workspaceLstat(WORKSPACE_ROOT, path, "generated path");
+    if (!stat) throw new Error(`${path}: file is missing`);
+    if (stat.isSymbolicLink()) throw new Error(`${path}: refusing to delete a symlink`);
+    if (!stat.isFile()) throw new Error(`${path}: expected a regular file`);
   }
 
   function table(sources: Source[]): string {
@@ -179,7 +212,7 @@ export function wikiBackfill(options: { root: string; dryRun: boolean }): Backfi
   const materializedTagEntries = tagEntries.filter(([, list]) => list.length >= 2);
   const kindEntries = [...byKind.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 
-  write(
+  planWrite(
     `${root}/sources/index.md`,
     `---
 title: "Source Catalog"
@@ -214,7 +247,7 @@ ${kindEntries
 `,
   );
 
-  write(
+  planWrite(
     `${root}/tags/index.md`,
     `---
 title: "Tag Index"
@@ -238,23 +271,22 @@ ${tagEntries.map(([tag, list]) => (list.length >= 2 ? `- [[${tag}]] — ${list.l
 
   // Purge stale tag pages (tags that no longer materialize)
   const keepTags = new Set(materializedTagEntries.map(([tag]) => tag));
-  const tagsDir = `${root}/tags`;
-  try {
-    for (const name of readdirSync(tagsDir)) {
-      if (!name.endsWith(".md") || name === "index.md") continue;
-      const tag = name.replace(/\.md$/, "");
-      if (!keepTags.has(tag)) {
-        if (options.dryRun) {
-          planned.push(`would delete ${join(tagsDir, name)}`);
-        } else {
-          unlinkSync(join(tagsDir, name));
-        }
+  const tagsDir = posix.join(root, "tags");
+  for (const entry of readWorkspaceDirectory(WORKSPACE_ROOT, tagsDir, "empty")) {
+    const name = entry.name;
+    if (!name.endsWith(".md") || name === "index.md") continue;
+    const tag = name.replace(/\.md$/, "");
+    if (!keepTags.has(tag)) {
+      const path = posix.join(tagsDir, name);
+      deletes.push(path);
+      if (options.dryRun) {
+        planned.push(`would delete ${path}`);
       }
     }
-  } catch {}
+  }
 
   for (const [tag, list] of materializedTagEntries) {
-    write(
+    planWrite(
       `${root}/tags/${tag}.md`,
       `---
 title: "Tag: ${tag}"
@@ -279,7 +311,7 @@ ${table(list)}
   }
 
   const daily = sources.filter((s) => s.kind === "daily-log");
-  write(
+  planWrite(
     `${root}/sources/daily-log.md`,
     `---
 title: "Daily Log Backfill"
@@ -301,6 +333,20 @@ Raw daily logs are the chronological evidence stream. Durable facts should be pr
 ${table(daily)}
 `,
   );
+
+  // Inventory, current-output reads, and destructive candidates are complete
+  // before the first mutation. Re-check every leaf immediately before apply so
+  // an unsafe output shape cannot leave a partially refreshed catalog.
+  for (const operation of writes) preflightWrite(operation.path);
+  for (const path of deletes) preflightDelete(path);
+  if (!options.dryRun) {
+    for (const operation of writes) {
+      writeWorkspaceText(WORKSPACE_ROOT, operation.path, operation.content);
+    }
+    // Deletions are deliberately last: a purge error must surface, but should
+    // never prevent a newly computed catalog from being fully materialized.
+    for (const path of deletes) unlinkWorkspaceFile(WORKSPACE_ROOT, path);
+  }
 
   const out = [
     `backfilled ${sources.length} sources, ${tagEntries.length} tags (${materializedTagEntries.length} materialized pages)`,

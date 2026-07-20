@@ -7,19 +7,22 @@ Node >= 24.18 (see `.node-version`) and git. The repo runs on the
 
 ```
 pnpm install
+vp config --no-agent
 ```
 
-This also installs the repo's git hooks (`vp config` → `.vite-hooks`).
+The second command installs the repo's git hooks from `.vite-hooks`. It stays
+explicit so the published package has no consumer install lifecycle.
 
 ## Validation
 
 ```
-vp run verify    # vp check + vp test + vp pack + CLI smoke
+vp run verify    # checks + tests + pack + installed-tarball CLI smoke
 vp check --fix   # fix lint/format issues
 ```
 
-The pre-commit hook runs `vp staged` plus the same gate, and CI adds only
-`npm pack --dry-run` on top — a local green is a real CI mirror.
+The pre-commit hook runs `vp staged` plus the same gate. The gate asserts the
+exact release tarball contents, installs that version-stamped tarball offline
+without suppressing lifecycle behavior, and exercises the installed CLI.
 
 Checks are parity-locked to golden outputs; read the
 [parity oracle](parity/README.md) before touching any check's behavior, and

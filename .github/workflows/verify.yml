@@ -31,4 +31,3 @@ jobs:
           run-install: |
             - args: ["--frozen-lockfile"]
       - run: vp run verify # vp check + vp test + vp pack + cli smoke
-      - run: npm pack --dry-run --ignore-scripts
