@@ -1,7 +1,7 @@
 // Every init profile must produce a doctor-green workspace out of the box
 // (contract deliberately deferred until an origin remote exists).
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test } from "vite-plus/test";
 import { execSync, spawnSync } from "node:child_process";
 import { lstatSync, mkdtempSync, readFileSync, readlinkSync } from "node:fs";
 import { tmpdir } from "node:os";

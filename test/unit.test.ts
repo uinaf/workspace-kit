@@ -1,7 +1,7 @@
 // Port-time unit-test debt from parity/README.md: legacy behaviors that
 // goldens cannot capture, pinned here so the port cannot silently diverge.
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test } from "vite-plus/test";
 import { execSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

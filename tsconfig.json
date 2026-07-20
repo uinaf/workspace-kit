@@ -11,9 +11,7 @@
     "verbatimModuleSyntax": true,
     "erasableSyntaxOnly": true,
     "allowImportingTsExtensions": true,
-    "rewriteRelativeImportExtensions": true,
-    "outDir": "dist",
-    "declaration": true,
+    "noEmit": true,
     "skipLibCheck": true,
     "types": ["node"]
   },

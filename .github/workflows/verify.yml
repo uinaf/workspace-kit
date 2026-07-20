@@ -22,9 +22,13 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      - uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb # v1.15.0
         with:
           node-version-file: ".node-version"
-      - run: npm ci
-      - run: npm run verify # typecheck + tests + build + cli smoke
-      - run: npm pack --dry-run
+          cache: true
+          # vp install alone maps to `npm install`; frozen keeps CI on `npm ci`
+          # semantics so lockfile drift fails loudly instead of re-resolving.
+          run-install: |
+            - args: ["--frozen-lockfile"]
+      - run: vp run verify # vp check + vp test + vp pack + cli smoke
+      - run: npm pack --dry-run --ignore-scripts

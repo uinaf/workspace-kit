@@ -25,12 +25,16 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      - uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb # v1.15.0
         with:
           node-version-file: ".node-version"
-      - run: npm ci
-      - run: npm run verify # typecheck + tests + build + cli smoke
-      - run: npm pack --dry-run
+          cache: true
+          # vp install alone maps to `npm install`; frozen keeps CI on `npm ci`
+          # semantics so lockfile drift fails loudly instead of re-resolving.
+          run-install: |
+            - args: ["--frozen-lockfile"]
+      - run: vp run verify # vp check + vp test + vp pack + cli smoke
+      - run: npm pack --dry-run --ignore-scripts
 
   release:
     needs: [verify]
@@ -49,12 +53,15 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      # No registry-url: with trusted publishing, npm authenticates from the
-      # job's OIDC identity, not a registry token written by setup-node.
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      # Secret-bearing job: no dependency cache, fresh install via setup-vp.
+      # vp must be on PATH here because npm publish's prepack runs the verify
+      # gate (vp check/test/pack). Trusted publishing authenticates from the
+      # job's OIDC identity; no registry token is ever configured.
+      - uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb # v1.15.0
         with:
           node-version-file: ".node-version"
-      - run: npm ci
+          run-install: |
+            - args: ["--frozen-lockfile"]
       - uses: cycjimmy/semantic-release-action@b12c8f6015dc215fe37bc154d4ad456dd3833c90 # v6.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

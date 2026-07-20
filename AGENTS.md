@@ -25,10 +25,14 @@ the mechanism and its public documentation only.
 
 ## Verify
 
-`npm run verify` — oxlint + oxfmt check + typecheck + tests + build + CLI
-smoke. The pre-commit hook (configured automatically by `npm ci`) enforces
-it. `npm run fmt` fixes formatting; `parity/legacy/` and `parity/fixtures/`
-are exempt from lint/format — they are frozen.
+The repo runs on the [Vite+](https://github.com/voidzero-dev/vite-plus)
+toolchain; all tool config lives in `vite.config.ts`.
+
+`npm run verify` runs `vp check` (format, lint, type check), `vp test run`,
+`vp pack`, and a CLI smoke. The pre-commit hook (installed by `vp config`
+on `npm ci`) runs `vp staged` plus the full gate. Fix issues with
+`vp check --fix`; `parity/legacy/` and `parity/fixtures/` are exempt from
+lint/format — they are frozen.
 
 ## Releases
 

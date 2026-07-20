@@ -7,7 +7,7 @@ export function parseFrontmatter(text: string): Record<string, unknown> {
   const end = text.indexOf("\n---\n", 4);
   if (end < 0) return {};
   const raw = text.slice(4, end);
-  const out: Record<string, unknown> = {};
+  const out: Record<string, string | string[]> = {};
   let current: string | null = null;
   for (const line of raw.split("\n")) {
     const m = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
@@ -28,7 +28,7 @@ export function parseFrontmatter(text: string): Record<string, unknown> {
     }
     if (current && line.trim().startsWith("- ")) {
       const prev = out[current];
-      const arr = Array.isArray(prev) ? prev : prev ? [String(prev)] : [];
+      const arr = Array.isArray(prev) ? prev : prev ? [prev] : [];
       arr.push(clean(line.trim().slice(2)));
       out[current] = arr;
     }

@@ -3,7 +3,7 @@
 // are shared with the capture script via parity/scenarios.ts, so the two
 // runners cannot drift.
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test } from "vite-plus/test";
 import { readFileSync, mkdirSync, rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";

@@ -8,7 +8,7 @@
     "url": "git+https://github.com/uinaf/workspace-kit.git"
   },
   "bin": {
-    "workspace-kit": "dist/cli.js"
+    "workspace-kit": "dist/cli.mjs"
   },
   "files": [
     "dist",
@@ -19,22 +19,28 @@
     "access": "public"
   },
   "scripts": {
-    "lint": "oxlint --deny-warnings",
-    "fmt": "oxfmt",
-    "fmt:check": "oxfmt --check",
-    "typecheck": "tsc --noEmit",
-    "test": "node --test test/*.test.ts",
-    "build": "rm -rf dist && tsc -p tsconfig.build.json",
-    "smoke": "node dist/cli.js --version",
-    "verify": "npm run lint && npm run fmt:check && npm run typecheck && npm run test && npm run build && npm run smoke",
+    "test": "vp test run",
+    "build": "vp pack",
+    "smoke": "node dist/cli.mjs --version",
+    "verify": "vp check && vp test run && vp pack && node dist/cli.mjs --version",
     "prepack": "npm run verify",
-    "prepare": "git config core.hooksPath .githooks || true"
+    "prepare": "vp config --no-agent || true"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "oxfmt": "^0.59.0",
-    "oxlint": "^1.74.0",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vite": "npm:@voidzero-dev/vite-plus-core@0.2.5",
+    "vite-plus": "0.2.5"
+  },
+  "overrides": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@0.2.5"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "npm",
+      "version": "^12.0.0",
+      "onFail": "download"
+    }
   },
   "engines": {
     "node": ">=24.18.0"

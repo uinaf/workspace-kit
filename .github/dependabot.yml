@@ -1,0 +1,11 @@
+# Keeps SHA-pinned actions (setup-vp, checkout, semantic-release-action)
+# current with reviewable PRs.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # Let new action releases bake before PRing them (supply-chain buffer).
+    cooldown:
+      default-days: 7

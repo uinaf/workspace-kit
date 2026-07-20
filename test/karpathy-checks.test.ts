@@ -2,7 +2,7 @@
 // append-only log chronology, configurable required frontmatter, and soft
 // size-limit warnings. All default OFF — golden parity proves that.
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test } from "vite-plus/test";
 import { execSync, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

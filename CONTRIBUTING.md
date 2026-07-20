@@ -2,23 +2,24 @@
 
 ## Setup
 
-Node >= 24.18 (see `.node-version`) and git. Then:
+Node >= 24.18 (see `.node-version`) and git. The repo runs on the
+[Vite+](https://github.com/voidzero-dev/vite-plus) toolchain (`vp`). Then:
 
 ```
 npm ci
 ```
 
-This also configures the repo's git hooks (`core.hooksPath .githooks`).
+This also installs the repo's git hooks (`vp config` → `.vite-hooks`).
 
 ## Validation
 
 ```
-npm run verify   # lint + format check + typecheck + tests + build + CLI smoke
-npm run fmt      # fix formatting (oxfmt)
+npm run verify   # vp check + vp test + vp pack + CLI smoke
+vp check --fix   # fix lint/format issues
 ```
 
-The pre-commit hook runs the same gate, and CI adds only `npm pack --dry-run`
-on top — a local green is a real CI mirror.
+The pre-commit hook runs `vp staged` plus the same gate, and CI adds only
+`npm pack --dry-run` on top — a local green is a real CI mirror.
 
 Checks are parity-locked to golden outputs; read the
 [parity oracle](parity/README.md) before touching any check's behavior, and
