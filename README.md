@@ -1,62 +1,43 @@
 # workspace-kit
 
-Config-driven **agent workspace** validation and scaffolding. Not related to
-npm/yarn/pnpm workspaces or monorepo tooling.
+Config-driven validation and scaffolding for **agent workspaces** — the git
+repositories that give coding/assistant agents a stable operating context.
+Not related to npm/yarn/pnpm workspaces or monorepo tooling.
 
-An agent workspace is a git repository that gives coding/assistant agents a
-stable operating context: a canonical instruction file, optional memory and
-wiki layers, a project registry, and ownership contracts between peer
-workspaces. `workspace-kit` validates that structure deterministically and
-scaffolds new workspaces — it never authors instruction content and never
-touches machine-global state.
+## Install
 
 ```
-workspace-kit doctor [--json]        # run all configured checks
-workspace-kit wiki lint | stale | backfill [--dry-run]
-workspace-kit contract check | peer <path> | handoff <path...>
-workspace-kit links check | fix
-workspace-kit docs links
-workspace-kit init [--profile personal|runtime|work]
-workspace-kit config validate
+npm install -D @uinaf/workspace-kit
 ```
 
-Everything is driven by a `workspace.json` at the repo root; absent sections
-disable their checks, unknown files are always tolerated. See
-[docs/convention.md](docs/convention.md) for the workspace convention and
-every check's exact contract.
+Or run one-shot with `npx -y @uinaf/workspace-kit`. Requires Node >= 24.18,
+plus git on PATH for the history-dependent checks. Pin exact versions.
 
-## Status
+## Quick usage
 
-0.1.0, pre-npm-publish. All checks are implemented in `src/` and reproduce
-the migration oracle byte-for-byte: `parity/` holds frozen predecessor
-scripts, a synthetic fixture workspace, and golden outputs;
-`test/golden-parity.test.ts` drives the kit CLI through every scenario and
-diffs against the goldens. `init` profiles scaffold doctor-green workspaces
-out of the box.
+```
+npx -y @uinaf/workspace-kit init --profile personal   # scaffold a workspace
+npx -y @uinaf/workspace-kit doctor                    # validate it
+```
 
-## Principles
+`doctor` runs every check the workspace declares in its `workspace.json` —
+structure, wiki hygiene, ownership contracts, handoff screening, link lint,
+size limits. Absent config sections disable their checks, unknown files are
+always tolerated, and everything runs offline with zero runtime
+dependencies. `workspace-kit --help` lists all commands.
 
-- **Kit = mechanism, workspace = policy.** No defaults that encode any
-  consumer's specifics; all lists live in per-workspace config.
-- **Zero runtime dependencies, no postinstall, no network, no telemetry.**
-  This runs inside pre-commit hooks of private repositories.
-- **Tolerant by default.** Required-list plus forbidden-list; everything
-  unknown is allowed. Runtimes and harnesses add their own files.
-- **Extract, don't extend.** Checks are ports of proven validators; new
-  checks ship off by default.
+## Docs
 
-## Requirements
+- [Workspace convention and check contracts](docs/convention.md) — what an
+  agent workspace is and exactly what each check enforces
+- [Parity oracle](parity/README.md) — the executable spec the checks are
+  held to, byte-for-byte
+- [Release workflow](docs/releasing.md) — automatic, tokenless publishing
 
-Node >= 24.18, plus git on PATH for the history-dependent checks
-(`contract`, `docs links`, `wiki stale`). Works under `npx` and `bunx`.
-Consumers should pin exact versions.
+## Contributing
 
-## Releasing
-
-Automatic on push to main, tokenless: see [docs/releasing.md](docs/releasing.md) (npm
-Trusted Publishing via the `release.yml` workflow and the `release`
-environment).
+See [CONTRIBUTING.md](CONTRIBUTING.md). Vulnerabilities: [SECURITY.md](SECURITY.md).
 
 ## License
 
-MIT
+[MIT](LICENSE)

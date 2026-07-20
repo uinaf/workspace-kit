@@ -18,27 +18,21 @@ the mechanism and its public documentation only.
   telemetry.** devDependencies are allowed for build/test only.
 - The kit never authors instruction content and never touches machine-global
   state (`~/.claude/`, `~/.codex/`, `~/.agents/skills`).
-- Parity is law until 0.1.0: ported validators must reproduce
-  `parity/goldens/` byte-for-byte. Do not change a golden without changing
-  the legacy script that generates it — and legacy scripts are frozen except
-  for the two recorded fixes (missing `log.md` crash; hardcoded `bun`
-  spawn).
-
-## Layout
-
-- `parity/legacy/` — frozen validator scripts (bun) captured from the
-  originating workspaces; provenance in `parity/README.md`.
-- `parity/fixtures/` — synthetic fixture workspaces (green and seeded-error).
-- `parity/goldens/` — captured legacy outputs; regenerate only via
-  `parity/capture.ts` (requires bun locally; CI never runs legacy scripts).
-- `src/` — the ported TypeScript (erasableSyntaxOnly; compiled to `dist/`).
-- `docs/convention.md` — the public workspace convention and check
-  contracts.
+- **Parity is law.** The ported validators must reproduce `parity/goldens/`
+  byte-for-byte; new behavior ships config-gated and default-off. Never edit
+  a golden by hand — see [parity/README.md](parity/README.md) before
+  touching any check.
 
 ## Verify
 
 `npm run verify` — typecheck + node --test. Run it before any commit.
-Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `chore:`).
+
+## Releases
+
+Conventional Commits drive publishing: every push to `main` with `feat:` or
+`fix:` commits auto-releases to npm (see
+[docs/releasing.md](docs/releasing.md)). Choose prefixes accordingly —
+`docs:`/`chore:`/`test:` publish nothing.
 
 ## Compatibility
 
