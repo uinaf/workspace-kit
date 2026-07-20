@@ -23,7 +23,7 @@
     "build": "vp pack",
     "smoke": "node dist/cli.mjs --version",
     "verify": "vp check && vp test run && vp pack && node dist/cli.mjs --version",
-    "prepack": "npm run verify",
+    "prepack": "vp run verify",
     "prepare": "vp config --no-agent || true"
   },
   "devDependencies": {
@@ -32,17 +32,8 @@
     "vite": "npm:@voidzero-dev/vite-plus-core@0.2.5",
     "vite-plus": "0.2.5"
   },
-  "overrides": {
-    "vite": "npm:@voidzero-dev/vite-plus-core@0.2.5"
-  },
-  "devEngines": {
-    "packageManager": {
-      "name": "npm",
-      "version": "^12.0.0",
-      "onFail": "download"
-    }
-  },
   "engines": {
     "node": ">=24.18.0"
-  }
+  },
+  "packageManager": "pnpm@11.15.0"
 }

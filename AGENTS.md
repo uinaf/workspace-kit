@@ -28,9 +28,9 @@ the mechanism and its public documentation only.
 The repo runs on the [Vite+](https://github.com/voidzero-dev/vite-plus)
 toolchain; all tool config lives in `vite.config.ts`.
 
-`npm run verify` runs `vp check` (format, lint, type check), `vp test run`,
+`vp run verify` runs `vp check` (format, lint, type check), `vp test run`,
 `vp pack`, and a CLI smoke. The pre-commit hook (installed by `vp config`
-on `npm ci`) runs `vp staged` plus the full gate. Fix issues with
+on `pnpm install`) runs `vp staged` plus the full gate. Fix issues with
 `vp check --fix`; `parity/legacy/` and `parity/fixtures/` are exempt from
 lint/format — they are frozen.
 

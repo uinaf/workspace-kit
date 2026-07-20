@@ -6,7 +6,7 @@ Node >= 24.18 (see `.node-version`) and git. The repo runs on the
 [Vite+](https://github.com/voidzero-dev/vite-plus) toolchain (`vp`). Then:
 
 ```
-npm ci
+pnpm install
 ```
 
 This also installs the repo's git hooks (`vp config` → `.vite-hooks`).
@@ -14,7 +14,7 @@ This also installs the repo's git hooks (`vp config` → `.vite-hooks`).
 ## Validation
 
 ```
-npm run verify   # vp check + vp test + vp pack + CLI smoke
+vp run verify    # vp check + vp test + vp pack + CLI smoke
 vp check --fix   # fix lint/format issues
 ```
 

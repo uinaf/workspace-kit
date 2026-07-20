@@ -1,0 +1,7 @@
+packages:
+  - "."
+
+# Keep the vite alias resolved to Vite+ core for every peer context
+# (see docs: an importer entry alone is not enough under pnpm).
+overrides:
+  vite: npm:@voidzero-dev/vite-plus-core@0.2.5
