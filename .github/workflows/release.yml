@@ -1,46 +1,62 @@
 name: Release
 
-# Publishes to npm via Trusted Publishing (OIDC): no npm token is stored in
-# this repository. npmjs.com must list this exact workflow filename
-# (release.yml) and the "release" environment as the package's trusted
-# publisher — see docs/releasing.md.
+# Canonical verify -> release on push to main. Publishing uses npm Trusted
+# Publishing (OIDC): npmjs.com lists this workflow filename (release.yml)
+# and the "release" environment as the package's trusted publisher — see
+# docs/releasing.md. Versioning is tag-only (no bump-back commits: the main
+# ruleset requires signed commits, so semantic-release computes the version
+# from Conventional Commits and stamps it into the published tarball; the
+# checked-in package.json version is not authoritative).
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
 
 permissions: {}
 
 jobs:
-  publish:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: ".node-version"
+      - run: npm ci
+      - run: npm run verify
+      - run: npm run build
+      - run: node dist/cli.js --version
+      - run: npm pack --dry-run
+
+  release:
+    needs: [verify]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: release
     # Never cancel a publish mid-flight; queue instead.
     concurrency:
-      group: release-${{ github.repository }}
+      group: release-${{ github.repository }}-main
       cancel-in-progress: false
     permissions:
-      contents: read
-      id-token: write # OIDC token for npm trusted publishing
+      contents: write # GitHub release + v* tag
+      id-token: write # OIDC for npm trusted publishing
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           persist-credentials: false
+          fetch-depth: 0
       # No registry-url: with trusted publishing, npm authenticates from the
       # job's OIDC identity, not a registry token written by setup-node.
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version-file: ".node-version"
-      - name: Tag must match package.json version
-        run: |
-          pkg="$(node -p "require('./package.json').version")"
-          tag="${GITHUB_REF_NAME#v}"
-          if [ "$pkg" != "$tag" ]; then
-            echo "FAILED: tag v${tag} does not match package.json ${pkg}" >&2
-            exit 1
-          fi
       - run: npm ci
-      # prepack runs the full verify gate and a clean dist build; provenance
-      # is generated automatically under trusted publishing.
-      - run: npm publish
+      - uses: cycjimmy/semantic-release-action@b12c8f6015dc215fe37bc154d4ad456dd3833c90 # v6.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

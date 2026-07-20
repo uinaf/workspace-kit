@@ -53,7 +53,7 @@ Consumers should pin exact versions.
 
 ## Releasing
 
-Tag-driven, tokenless: see [docs/releasing.md](docs/releasing.md) (npm
+Automatic on push to main, tokenless: see [docs/releasing.md](docs/releasing.md) (npm
 Trusted Publishing via the `release.yml` workflow and the `release`
 environment).
 

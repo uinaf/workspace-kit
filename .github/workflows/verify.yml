@@ -1,9 +1,9 @@
 name: Verify
 
+# Pull-request verification only: pushes to main verify inside release.yml
+# so verification and release stay coupled.
 on:
   pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
