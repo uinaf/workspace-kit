@@ -10,8 +10,17 @@ repository, its secrets, or any maintainer machine's dotfiles.
 1. **Scope**: ensure the `uinaf` organization exists on npmjs.com (or the
    `@uinaf` scope is otherwise controlled by the owner account). Enable 2FA
    on the account.
-2. **First publish** (trusted publishing configuration lives on a package's
-   settings page, so the package must exist once):
+2. **Register the trusted publisher** with the npm CLI (`npm trust`
+   requires npm >= 11.10.0, so pin the operator command):
+
+   ```
+   npx -y npm@^11.10.0 login
+   npx -y npm@^11.10.0 trust github @uinaf/workspace-kit \
+     --repo uinaf/workspace-kit --file release.yml --env release --yes
+   ```
+
+3. **If `npm trust` refuses because the package has never been published**,
+   do one manual first publish, then rerun step 2:
 
    ```
    git clone git@github.com:uinaf/workspace-kit.git /tmp/wk && cd /tmp/wk
@@ -21,19 +30,12 @@ repository, its secrets, or any maintainer machine's dotfiles.
    `prepack` runs the full verify gate and a clean dist build;
    `publishConfig.access: public` is already set. Publish with 2FA/web
    login — do not create a long-lived automation token.
-3. **Configure the trusted publisher** on
-   npmjs.com → package `@uinaf/workspace-kit` → Settings → Trusted
-   publisher → GitHub Actions:
-   - Organization: `uinaf`
-   - Repository: `workspace-kit`
-   - Workflow filename: `release.yml`
-   - Environment: `release`
-4. **Tighten the package**: in the same settings, set publishing access to
-   "Require two-factor authentication or an automation or granular access
-   token" → prefer **"Trusted publisher only"** once available for the
-   package, so a leaked account session cannot publish manually.
+4. **Tighten the package** on npmjs.com package settings: prefer
+   **trusted-publisher-only** publishing once available for the package, so
+   a leaked account session cannot publish manually.
 5. Optionally add protection rules (required reviewers) to the GitHub
-   `release` environment — the workflow already gates on it.
+   `release` environment — the workflow already gates on it, and its
+   deployment policy only admits `v*` tag runs.
 
 ## Every release after that
 

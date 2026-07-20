@@ -16,6 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: release
+    # Never cancel a publish mid-flight; queue instead.
+    concurrency:
+      group: release-${{ github.repository }}
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write # OIDC token for npm trusted publishing
@@ -23,10 +27,11 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           persist-credentials: false
+      # No registry-url: with trusted publishing, npm authenticates from the
+      # job's OIDC identity, not a registry token written by setup-node.
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: 24
-          registry-url: https://registry.npmjs.org
+          node-version-file: ".node-version"
       - name: Tag must match package.json version
         run: |
           pkg="$(node -p "require('./package.json').version")"
