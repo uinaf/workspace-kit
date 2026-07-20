@@ -1,0 +1,30 @@
+{
+  "name": "@uinaf/workspace-kit",
+  "version": "0.0.0",
+  "description": "Config-driven agent workspace validation and scaffolding",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uinaf/workspace-kit.git"
+  },
+  "type": "module",
+  "bin": {
+    "workspace-kit": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "docs/convention.md"
+  ],
+  "engines": {
+    "node": ">=24.18.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.ts",
+    "verify": "npm run typecheck && npm run test"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^7.0.2"
+  }
+}

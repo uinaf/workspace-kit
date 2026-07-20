@@ -1,0 +1,30 @@
+memory/wiki/index.md: broken wikilink [[alpha]]
+memory/wiki/topics/bad-status.md: invalid status paused
+memory/wiki/topics/broken-frontmatter.md: missing frontmatter field status
+memory/wiki/topics/broken-frontmatter.md: updated must be YYYY-MM-DD
+memory/wiki/topics/broken-frontmatter.md: missing source does-not-exist.md
+memory/wiki/topics/dead-links.md: broken wikilink [[totally-missing-page]]
+memory/wiki/topics/dead-links.md: broken markdown link (gone-file.md)
+memory/wiki/topics/empty-tags.md: empty frontmatter field tags
+memory/wiki/topics/no-frontmatter.md: missing frontmatter
+memory/wiki/topics/no-frontmatter.md: unterminated frontmatter
+memory/wiki/topics/no-frontmatter.md: missing frontmatter field title
+memory/wiki/topics/no-frontmatter.md: missing frontmatter field type
+memory/wiki/topics/no-frontmatter.md: missing frontmatter field status
+memory/wiki/topics/no-frontmatter.md: missing frontmatter field updated
+memory/wiki/topics/no-frontmatter.md: missing frontmatter field tags
+memory/wiki/topics/no-frontmatter.md: missing frontmatter field sources
+memory/wiki/topics/no-frontmatter.md: empty frontmatter field tags
+memory/wiki/topics/no-frontmatter.md: empty frontmatter field sources
+memory/wiki/topics/related-broken.md: broken wikilink [[missing-related-target]]
+memory/wiki/topics/unterminated.md: unterminated frontmatter
+memory/wiki/topics/unterminated.md: missing frontmatter field title
+memory/wiki/topics/unterminated.md: missing frontmatter field type
+memory/wiki/topics/unterminated.md: missing frontmatter field status
+memory/wiki/topics/unterminated.md: missing frontmatter field updated
+memory/wiki/topics/unterminated.md: missing frontmatter field tags
+memory/wiki/topics/unterminated.md: missing frontmatter field sources
+memory/wiki/topics/unterminated.md: empty frontmatter field tags
+memory/wiki/topics/unterminated.md: empty frontmatter field sources
+memory/wiki/topics/orphan.md: no inbound wiki links
+memory/wiki/log.md: unparseable log heading bad heading without the grammar

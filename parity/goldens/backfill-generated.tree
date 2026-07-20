@@ -1,0 +1,290 @@
+=== memory/wiki/sources/daily-log.md ===
+---
+title: "Daily Log Backfill"
+type: wiki-index
+status: active
+updated: <TODAY>
+tags: [daily-log, backfill, timeline]
+sources:
+  - "memory/2026-01-02.md"
+related:
+  - "[[index]]"
+  - "[[../agents/write-backs]]"
+---
+
+# Daily Log Backfill
+
+Raw daily logs are the chronological evidence stream. Durable facts should be promoted into topic pages instead of copied wholesale.
+
+| Source | Kind | Tags |
+|---|---|---|
+| [2026-01-02](../../2026-01-02.md) | daily-log | #daily-log |
+
+=== memory/wiki/sources/index.md ===
+---
+title: "Source Catalog"
+type: wiki-index
+status: active
+updated: <TODAY>
+tags: [sources, backfill, wiki]
+sources:
+  - "AGENTS.md"
+  - "CONTRIBUTING.md"
+  - "MEMORY.md"
+  - "README.md"
+  - "SOUL.md"
+  - "TOOLS.md"
+  - "USER.md"
+  - "docs/README.md"
+  - "docs/reference/pipe-title.md"
+  - "docs/reference/sample-reference.md"
+  - "docs/reference/spaced name.md"
+  - "docs/runbooks/sample-runbook.md"
+  - "docs/specs/sample-spec.md"
+  - "memory/2026-01-02.md"
+  - "memory/contexts/demo/2026-01-03.md"
+  - "memory/intake/sample-intake.md"
+  - "memory/notes/sample-note.md"
+  - "user/FACET.md"
+related:
+  - "[[../index]]"
+  - "[[../tags/index]]"
+---
+
+# Source Catalog
+
+Generated catalog of raw/source-layer markdown files currently feeding the wiki.
+
+## Counts
+
+- Total sources: 18
+- context: 1
+- daily-log: 1
+- intake: 1
+- note: 1
+- reference: 3
+- runbook: 1
+- source: 8
+- spec: 1
+- user: 1
+
+## By Kind
+
+Daily logs live in their own catalog at [[daily-log]] to keep this index navigable; everything else is below.
+
+### context
+
+| Source | Kind | Tags |
+|---|---|---|
+| [2026-01-03](../../contexts/demo/2026-01-03.md) | context | #context #demo |
+
+### intake
+
+| Source | Kind | Tags |
+|---|---|---|
+| [Sample intake item](../../intake/sample-intake.md) | intake | #intake #sample |
+
+### note
+
+| Source | Kind | Tags |
+|---|---|---|
+| [Sample note](../../notes/sample-note.md) | note | #note #sample |
+
+### reference
+
+| Source | Kind | Tags |
+|---|---|---|
+| [Pipes \| in \| title](../../../docs/reference/pipe-title.md) | reference | #docs #eight #five #four #nine #one #reference #seven |
+| [Sample reference](../../../docs/reference/sample-reference.md) | reference | #docs #reference #sample |
+| [spaced name](../../../docs/reference/spaced%20name.md) | reference | #docs #reference |
+
+### runbook
+
+| Source | Kind | Tags |
+|---|---|---|
+| [Sample runbook](../../../docs/runbooks/sample-runbook.md) | runbook | #docs #runbook |
+
+### source
+
+| Source | Kind | Tags |
+|---|---|---|
+| [AGENTS.md](../../../AGENTS.md) | source | #source |
+| [Contributing](../../../CONTRIBUTING.md) | source | #source |
+| [MEMORY](../../../MEMORY.md) | source | #source |
+| [Fixture workspace](../../../README.md) | source | #source |
+| [SOUL](../../../SOUL.md) | source | #source |
+| [TOOLS](../../../TOOLS.md) | source | #source |
+| [USER](../../../USER.md) | source | #source |
+| [Docs](../../../docs/README.md) | source | #docs #source |
+
+### spec
+
+| Source | Kind | Tags |
+|---|---|---|
+| [Sample spec](../../../docs/specs/sample-spec.md) | spec | #docs #spec |
+
+### user
+
+| Source | Kind | Tags |
+|---|---|---|
+| [User facet](../../../user/FACET.md) | user | #private #user |
+
+=== memory/wiki/tags/docs.md ===
+---
+title: "Tag: docs"
+type: wiki
+status: active
+updated: <TODAY>
+tags: [tag, docs]
+sources:
+  - "docs/README.md"
+  - "docs/reference/pipe-title.md"
+  - "docs/reference/sample-reference.md"
+  - "docs/reference/spaced name.md"
+  - "docs/runbooks/sample-runbook.md"
+  - "docs/specs/sample-spec.md"
+related:
+  - "[[index]]"
+  - "[[../sources/index]]"
+---
+
+# Tag: docs
+
+6 sources currently carry this tag or derived classification.
+
+| Source | Kind | Tags |
+|---|---|---|
+| [Docs](../../../docs/README.md) | source | #docs #source |
+| [Pipes \| in \| title](../../../docs/reference/pipe-title.md) | reference | #docs #eight #five #four #nine #one #reference #seven |
+| [Sample reference](../../../docs/reference/sample-reference.md) | reference | #docs #reference #sample |
+| [spaced name](../../../docs/reference/spaced%20name.md) | reference | #docs #reference |
+| [Sample runbook](../../../docs/runbooks/sample-runbook.md) | runbook | #docs #runbook |
+| [Sample spec](../../../docs/specs/sample-spec.md) | spec | #docs #spec |
+
+=== memory/wiki/tags/index.md ===
+---
+title: "Tag Index"
+type: wiki-index
+status: active
+updated: <TODAY>
+tags: [tags, backfill, wiki]
+sources:
+  - memory/wiki/sources/index.md
+related:
+  - "[[../index]]"
+---
+
+# Tag Index
+
+Generated index of normalized tags across raw sources.
+
+- [[source]] — 8 sources
+- [[docs]] — 6 sources
+- [[reference]] — 3 sources
+- [[sample]] — 3 sources
+- context — 1 source
+- daily-log — 1 source
+- demo — 1 source
+- eight — 1 source
+- five — 1 source
+- four — 1 source
+- intake — 1 source
+- nine — 1 source
+- note — 1 source
+- one — 1 source
+- private — 1 source
+- runbook — 1 source
+- seven — 1 source
+- six — 1 source
+- spec — 1 source
+- three — 1 source
+- two — 1 source
+- user — 1 source
+
+=== memory/wiki/tags/reference.md ===
+---
+title: "Tag: reference"
+type: wiki
+status: active
+updated: <TODAY>
+tags: [tag, reference]
+sources:
+  - "docs/reference/pipe-title.md"
+  - "docs/reference/sample-reference.md"
+  - "docs/reference/spaced name.md"
+related:
+  - "[[index]]"
+  - "[[../sources/index]]"
+---
+
+# Tag: reference
+
+3 sources currently carry this tag or derived classification.
+
+| Source | Kind | Tags |
+|---|---|---|
+| [Pipes \| in \| title](../../../docs/reference/pipe-title.md) | reference | #docs #eight #five #four #nine #one #reference #seven |
+| [Sample reference](../../../docs/reference/sample-reference.md) | reference | #docs #reference #sample |
+| [spaced name](../../../docs/reference/spaced%20name.md) | reference | #docs #reference |
+
+=== memory/wiki/tags/sample.md ===
+---
+title: "Tag: sample"
+type: wiki
+status: active
+updated: <TODAY>
+tags: [tag, sample]
+sources:
+  - "docs/reference/sample-reference.md"
+  - "memory/intake/sample-intake.md"
+  - "memory/notes/sample-note.md"
+related:
+  - "[[index]]"
+  - "[[../sources/index]]"
+---
+
+# Tag: sample
+
+3 sources currently carry this tag or derived classification.
+
+| Source | Kind | Tags |
+|---|---|---|
+| [Sample reference](../../../docs/reference/sample-reference.md) | reference | #docs #reference #sample |
+| [Sample intake item](../../intake/sample-intake.md) | intake | #intake #sample |
+| [Sample note](../../notes/sample-note.md) | note | #note #sample |
+
+=== memory/wiki/tags/source.md ===
+---
+title: "Tag: source"
+type: wiki
+status: active
+updated: <TODAY>
+tags: [tag, source]
+sources:
+  - "AGENTS.md"
+  - "CONTRIBUTING.md"
+  - "MEMORY.md"
+  - "README.md"
+  - "SOUL.md"
+  - "TOOLS.md"
+  - "USER.md"
+  - "docs/README.md"
+related:
+  - "[[index]]"
+  - "[[../sources/index]]"
+---
+
+# Tag: source
+
+8 sources currently carry this tag or derived classification.
+
+| Source | Kind | Tags |
+|---|---|---|
+| [AGENTS.md](../../../AGENTS.md) | source | #source |
+| [Contributing](../../../CONTRIBUTING.md) | source | #source |
+| [MEMORY](../../../MEMORY.md) | source | #source |
+| [Fixture workspace](../../../README.md) | source | #source |
+| [SOUL](../../../SOUL.md) | source | #source |
+| [TOOLS](../../../TOOLS.md) | source | #source |
+| [USER](../../../USER.md) | source | #source |
+| [Docs](../../../docs/README.md) | source | #docs #source |

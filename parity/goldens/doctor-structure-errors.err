@@ -1,0 +1,6 @@
+missing CONTRIBUTING.md
+CLAUDE.md should be a symlink to AGENTS.md
+projects.json category examples entry missing string owns
+projects.json category examples entry has invalid branch
+missing H1:
+memory/2026-01-02.md

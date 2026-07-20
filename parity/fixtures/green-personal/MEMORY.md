@@ -1,0 +1,3 @@
+# MEMORY
+
+Fixture durable memory.

@@ -1,0 +1,15 @@
+{
+  "repository": "fixture-owner/fixture-workspace",
+  "peerRepository": "fixture-owner/peer-workspace",
+  "sharedAncestor": "PLACEHOLDER_ANCESTOR_SHA_REWRITTEN_BY_CAPTURE",
+  "requiredOwnerPaths": [
+    "AGENTS.md",
+    "SOUL.md",
+    "user/",
+    "workspace.contract.json"
+  ],
+  "forbiddenOwnerPaths": [
+    "IDENTITY.md",
+    "avatar.png"
+  ]
+}

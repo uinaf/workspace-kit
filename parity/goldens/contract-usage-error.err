@@ -1,0 +1,1 @@
+usage: scripts/workspace-contract.ts --check | --peer <checkout> | --handoff <path...>

@@ -1,0 +1,17 @@
+{
+  "examples": [
+    {
+      "name": "sample",
+      "repo": "fixture-owner/sample",
+      "path": "~/projects/fixture-owner/sample",
+      "owns": "sample project"
+    },
+    {
+      "name": "pinned",
+      "repo": "fixture-owner/pinned",
+      "path": "~/projects/fixture-owner/pinned",
+      "owns": "branch-pinned sample",
+      "branch": "release"
+    }
+  ]
+}

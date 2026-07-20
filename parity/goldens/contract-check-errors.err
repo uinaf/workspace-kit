@@ -1,0 +1,6 @@
+origin does not match fixture-owner/fixture-workspace
+required owner path is not tracked: SOUL.md
+required owner path is not tracked: user/
+foreign owner path is tracked: IDENTITY.md
+foreign owner path is tracked: secret/
+shared ancestor is not in HEAD: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
