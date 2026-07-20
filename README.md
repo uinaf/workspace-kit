@@ -51,6 +51,12 @@ Node >= 24.18, plus git on PATH for the history-dependent checks
 (`contract`, `docs links`, `wiki stale`). Works under `npx` and `bunx`.
 Consumers should pin exact versions.
 
+## Releasing
+
+Tag-driven, tokenless: see [docs/releasing.md](docs/releasing.md) (npm
+Trusted Publishing via the `release.yml` workflow and the `release`
+environment).
+
 ## License
 
 MIT
