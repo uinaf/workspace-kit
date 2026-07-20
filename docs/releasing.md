@@ -17,8 +17,13 @@ repository, its secrets, or any maintainer machine's dotfiles.
    ```
    npm login
    npm trust github @uinaf/workspace-kit \
-     --repo uinaf/workspace-kit --file release.yml --env release --yes
+     --repo uinaf/workspace-kit --file release.yml --env release \
+     --allow-publish --yes
    ```
+
+   `--allow-publish` scopes the workflow identity to regular publishes
+   (`--allow-stage-publish` exists for npm's staged-release flow, unused
+   here).
 
 3. **If `npm trust` refuses because the package has never been published**,
    do one manual first publish, then rerun step 2:
