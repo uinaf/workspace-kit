@@ -41,7 +41,12 @@ function firstHeading(text: string): string | undefined {
 }
 
 function slugify(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "untagged";
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "untagged"
+  );
 }
 
 function sourceKind(path: string): string {
@@ -81,7 +86,13 @@ function allSources(root: string): Source[] {
     ...walk("user"),
     ...walk("memory/contexts"),
     ...walk("memory").filter((p) => /^memory\/\d{4}-\d{2}-\d{2}\.md$/.test(p)),
-    "AGENTS.md", "MEMORY.md", "USER.md", "TOOLS.md", "SOUL.md", "README.md", "CONTRIBUTING.md",
+    "AGENTS.md",
+    "MEMORY.md",
+    "USER.md",
+    "TOOLS.md",
+    "SOUL.md",
+    "README.md",
+    "CONTRIBUTING.md",
   ].filter(
     // Root convention files are optional: a scaffold without SOUL.md et al.
     // must not crash the generator (recorded fix vs legacy).
@@ -142,7 +153,10 @@ export function wikiBackfill(options: { root: string; dryRun: boolean }): Backfi
       "|---|---|---|",
       ...sources.map(
         (s) =>
-          `| [${s.title.replaceAll("|", "\\|")}](${relative(dirname(`${root}/sources/index.md`), s.path).replaceAll(" ", "%20")}) | ${s.kind} | ${s.tags.slice(0, 8).map((t) => `#${t}`).join(" ")} |`,
+          `| [${s.title.replaceAll("|", "\\|")}](${relative(dirname(`${root}/sources/index.md`), s.path).replaceAll(" ", "%20")}) | ${s.kind} | ${s.tags
+            .slice(0, 8)
+            .map((t) => `#${t}`)
+            .join(" ")} |`,
       ),
     ].join("\n");
   }
@@ -165,7 +179,9 @@ export function wikiBackfill(options: { root: string; dryRun: boolean }): Backfi
   const materializedTagEntries = tagEntries.filter(([, list]) => list.length >= 2);
   const kindEntries = [...byKind.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 
-  write(`${root}/sources/index.md`, `---
+  write(
+    `${root}/sources/index.md`,
+    `---
 title: "Source Catalog"
 type: wiki-index
 status: active
@@ -191,10 +207,16 @@ ${kindEntries.map(([kind, list]) => `- ${kind}: ${list.length}`).join("\n")}
 
 Daily logs live in their own catalog at [[daily-log]] to keep this index navigable; everything else is below.
 
-${kindEntries.filter(([kind]) => kind !== "daily-log").map(([kind, list]) => `### ${kind}\n\n${table(list)}`).join("\n\n")}
-`);
+${kindEntries
+  .filter(([kind]) => kind !== "daily-log")
+  .map(([kind, list]) => `### ${kind}\n\n${table(list)}`)
+  .join("\n\n")}
+`,
+  );
 
-  write(`${root}/tags/index.md`, `---
+  write(
+    `${root}/tags/index.md`,
+    `---
 title: "Tag Index"
 type: wiki-index
 status: active
@@ -211,7 +233,8 @@ related:
 Generated index of normalized tags across raw sources.
 
 ${tagEntries.map(([tag, list]) => (list.length >= 2 ? `- [[${tag}]] — ${list.length} sources` : `- ${tag} — 1 source`)).join("\n")}
-`);
+`,
+  );
 
   // Purge stale tag pages (tags that no longer materialize)
   const keepTags = new Set(materializedTagEntries.map(([tag]) => tag));
@@ -231,7 +254,9 @@ ${tagEntries.map(([tag, list]) => (list.length >= 2 ? `- [[${tag}]] — ${list.l
   } catch {}
 
   for (const [tag, list] of materializedTagEntries) {
-    write(`${root}/tags/${tag}.md`, `---
+    write(
+      `${root}/tags/${tag}.md`,
+      `---
 title: "Tag: ${tag}"
 type: wiki
 status: active
@@ -249,11 +274,14 @@ related:
 ${list.length} source${list.length === 1 ? "" : "s"} currently carry this tag or derived classification.
 
 ${table(list)}
-`);
+`,
+    );
   }
 
   const daily = sources.filter((s) => s.kind === "daily-log");
-  write(`${root}/sources/daily-log.md`, `---
+  write(
+    `${root}/sources/daily-log.md`,
+    `---
 title: "Daily Log Backfill"
 type: wiki-index
 status: active
@@ -271,7 +299,8 @@ related:
 Raw daily logs are the chronological evidence stream. Durable facts should be promoted into topic pages instead of copied wholesale.
 
 ${table(daily)}
-`);
+`,
+  );
 
   const out = [
     `backfilled ${sources.length} sources, ${tagEntries.length} tags (${materializedTagEntries.length} materialized pages)`,

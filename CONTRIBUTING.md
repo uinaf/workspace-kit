@@ -13,7 +13,8 @@ This also configures the repo's git hooks (`core.hooksPath .githooks`).
 ## Validation
 
 ```
-npm run verify   # typecheck + tests + build + CLI smoke (plain node, no bun)
+npm run verify   # lint + format check + typecheck + tests + build + CLI smoke
+npm run fmt      # fix formatting (oxfmt)
 ```
 
 The pre-commit hook runs the same gate, and CI adds only `npm pack --dry-run`

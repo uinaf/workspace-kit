@@ -111,10 +111,7 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
       file: text(value.registry.file, "registry.file"),
       entry: {
         required: stringList(entry.required, "registry.entry.required"),
-        optional:
-          "optional" in entry
-            ? stringList(entry.optional, "registry.entry.optional")
-            : [],
+        optional: "optional" in entry ? stringList(entry.optional, "registry.entry.optional") : [],
       },
     };
   }
@@ -150,7 +147,11 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
     if (!Array.isArray(value.limits)) fail("limits must be an array");
     out.limits = value.limits.map((entry, index) => {
       if (!isRecord(entry)) fail(`limits[${index}] must be an object`);
-      if (typeof entry.maxLines !== "number" || !Number.isInteger(entry.maxLines) || entry.maxLines < 1) {
+      if (
+        typeof entry.maxLines !== "number" ||
+        !Number.isInteger(entry.maxLines) ||
+        entry.maxLines < 1
+      ) {
         fail(`limits[${index}].maxLines must be a positive integer`);
       }
       return {
@@ -170,9 +171,7 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
     out.handoff = {
       paths: "paths" in value.handoff ? stringList(value.handoff.paths, "handoff.paths") : [],
       prefixes:
-        "prefixes" in value.handoff
-          ? stringList(value.handoff.prefixes, "handoff.prefixes")
-          : [],
+        "prefixes" in value.handoff ? stringList(value.handoff.prefixes, "handoff.prefixes") : [],
     };
   }
 

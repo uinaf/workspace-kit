@@ -42,11 +42,7 @@ test("green goldens exist and exited 0", () => {
 
 test("failing goldens exist, exited 1, and carry errors", () => {
   for (const scenario of failingScenarios) {
-    assert.equal(
-      readFileSync(join(goldens, `${scenario}.exit`), "utf8").trim(),
-      "1",
-      scenario,
-    );
+    assert.equal(readFileSync(join(goldens, `${scenario}.exit`), "utf8").trim(), "1", scenario);
     assert.ok(
       readFileSync(join(goldens, `${scenario}.err`), "utf8").length > 0,
       `${scenario} should capture stderr`,
@@ -55,14 +51,8 @@ test("failing goldens exist, exited 1, and carry errors", () => {
 });
 
 test("usage error golden exits 2 with usage text", () => {
-  assert.equal(
-    readFileSync(join(goldens, "contract-usage-error.exit"), "utf8").trim(),
-    "2",
-  );
-  assert.match(
-    readFileSync(join(goldens, "contract-usage-error.err"), "utf8"),
-    /usage:/,
-  );
+  assert.equal(readFileSync(join(goldens, "contract-usage-error.exit"), "utf8").trim(), "2");
+  assert.match(readFileSync(join(goldens, "contract-usage-error.err"), "utf8"), /usage:/);
 });
 
 test("goldens contain no absolute or capture-day residue", () => {
@@ -91,9 +81,7 @@ test("backfill idempotency golden shows an unchanged worktree", () => {
 test("fixture keeps its structural invariants", () => {
   assert.ok(lstatSync(join(fixture, "CLAUDE.md")).isSymbolicLink());
   assert.equal(readlinkSync(join(fixture, "CLAUDE.md")), "AGENTS.md");
-  const contract = JSON.parse(
-    readFileSync(join(fixture, "workspace.contract.json"), "utf8"),
-  );
+  const contract = JSON.parse(readFileSync(join(fixture, "workspace.contract.json"), "utf8"));
   assert.equal(contract.repository, "fixture-owner/fixture-workspace");
   assert.ok(contract.sharedAncestor.startsWith("PLACEHOLDER"));
 });

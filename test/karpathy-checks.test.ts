@@ -22,10 +22,7 @@ function page(title: string, extra = "", body = ""): string {
 function makeWiki(): string {
   const dir = mkdtempSync(join(tmpdir(), "kwiki-"));
   mkdirSync(join(dir, "wiki", "topics"), { recursive: true });
-  writeFileSync(
-    join(dir, "wiki", "index.md"),
-    page("Index", "", "- [[alpha]]\n"),
-  );
+  writeFileSync(join(dir, "wiki", "index.md"), page("Index", "", "- [[alpha]]\n"));
   writeFileSync(
     join(dir, "wiki", "log.md"),
     page("Log", "", "## [2026-01-01] seed | first\n\n## [2026-01-02] seed | second\n"),
@@ -89,7 +86,9 @@ test("requiredFields: adding created flags pages missing it", () => {
 test("glob matcher handles segment wildcards and date shapes", () => {
   assert.ok(globToRegExp("memory/????-??-??.md").test("memory/2026-01-02.md"));
   assert.ok(!globToRegExp("memory/????-??-??.md").test("memory/contexts/x/2026-01-02.md"));
-  assert.ok(globToRegExp("memory/contexts/*/????-??-??.md").test("memory/contexts/demo/2026-01-02.md"));
+  assert.ok(
+    globToRegExp("memory/contexts/*/????-??-??.md").test("memory/contexts/demo/2026-01-02.md"),
+  );
   assert.ok(globToRegExp("**/*.md").test("a/b/c.md"));
   assert.ok(!globToRegExp("MEMORY.md").test("SUBMEMORY.md"));
 });
@@ -119,9 +118,12 @@ test("doctor counts limit warnings without failing, and limits command works", (
   const config = JSON.parse(readFileSync(join(dir, "workspace.json"), "utf8"));
   config.limits = [{ pattern: "docs/README.md", maxLines: 1 }];
   writeFileSync(join(dir, "workspace.json"), JSON.stringify(config, null, 2));
-  execSync("git init -q && git add -A && git -c user.email=f@example.com -c user.name=F commit -qm x", {
-    cwd: dir,
-  });
+  execSync(
+    "git init -q && git add -A && git -c user.email=f@example.com -c user.name=F commit -qm x",
+    {
+      cwd: dir,
+    },
+  );
   const doctor = spawnSync(process.execPath, [cli, "doctor", "--json"], {
     cwd: dir,
     encoding: "utf8",

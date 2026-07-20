@@ -54,18 +54,11 @@ export function makeEnv(): Record<string, string> {
 }
 
 export function sh(cwd: string, command: string, date?: string): string {
-  const env = date
-    ? { ...makeEnv(), GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date }
-    : makeEnv();
+  const env = date ? { ...makeEnv(), GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date } : makeEnv();
   return execSync(command, { cwd, env, encoding: "utf8" });
 }
 
-export function normalize(
-  text: string,
-  dir: string,
-  workRoot: string,
-  today: string,
-): string {
+export function normalize(text: string, dir: string, workRoot: string, today: string): string {
   return text
     .replaceAll(dir, "<WORK>")
     .replaceAll(workRoot, "<WORKROOT>")
@@ -277,10 +270,7 @@ export function runScenarios(opts: BuildOptions & { runner: Runner; sink: Sink }
   {
     const dir = buildBase(opts, "doctor-cascade");
     const alphaPath = join(dir, "memory", "wiki", "topics", "alpha.md");
-    writeFileSync(
-      alphaPath,
-      readFileSync(alphaPath, "utf8").replace("status: active\n", ""),
-    );
+    writeFileSync(alphaPath, readFileSync(alphaPath, "utf8").replace("status: active\n", ""));
     run("doctor-cascade-errors", dir, ["doctor"]);
   }
 
@@ -378,10 +368,7 @@ export function runScenarios(opts: BuildOptions & { runner: Runner; sink: Sink }
   {
     const dir = buildBase(opts, "errors-usage");
     run("contract-usage-error", dir, ["contract"]);
-    writeFileSync(
-      join(dir, "workspace.contract.json"),
-      '{ "version": 1, "handoff": [] }\n',
-    );
+    writeFileSync(join(dir, "workspace.contract.json"), '{ "version": 1, "handoff": [] }\n');
     run("contract-malformed", dir, ["contract", "check"]);
   }
 

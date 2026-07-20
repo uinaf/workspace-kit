@@ -3,16 +3,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { execSync } from "node:child_process";
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { clean, parseFrontmatter } from "../src/lib/frontmatter.ts";
-import { isPrivateHandoffPath, loadContract, workspaceErrors, peerErrors } from "../src/checks/contract.ts";
+import {
+  isPrivateHandoffPath,
+  loadContract,
+  workspaceErrors,
+  peerErrors,
+} from "../src/checks/contract.ts";
 import { wikiLintErrors } from "../src/checks/wikiLint.ts";
 import { wikiBackfill } from "../src/checks/wikiBackfill.ts";
 
@@ -138,7 +138,11 @@ test("non-reciprocal peers error; different ancestors skip the history check", (
     );
     execSync("git add -A && git -c user.email=f@example.com -c user.name=F commit -qm x", {
       cwd: dir,
-      env: { ...process.env, GIT_AUTHOR_DATE: "2026-01-01T00:00:00Z", GIT_COMMITTER_DATE: "2026-01-01T00:00:00Z" },
+      env: {
+        ...process.env,
+        GIT_AUTHOR_DATE: "2026-01-01T00:00:00Z",
+        GIT_COMMITTER_DATE: "2026-01-01T00:00:00Z",
+      },
     });
     return dir;
   };
@@ -158,7 +162,15 @@ test("non-reciprocal peers error; different ancestors skip the history check", (
 
 test("backfill cross-day idempotency: date-only diffs do not rewrite", () => {
   const dir = scratch("backfill-");
-  for (const file of ["AGENTS.md", "MEMORY.md", "USER.md", "TOOLS.md", "SOUL.md", "README.md", "CONTRIBUTING.md"]) {
+  for (const file of [
+    "AGENTS.md",
+    "MEMORY.md",
+    "USER.md",
+    "TOOLS.md",
+    "SOUL.md",
+    "README.md",
+    "CONTRIBUTING.md",
+  ]) {
     writeFileSync(join(dir, file), `# ${file}\n`);
   }
   inDir(dir, () => wikiBackfill({ root: "memory/wiki", dryRun: false }));
@@ -180,7 +192,15 @@ test("backfill cross-day idempotency: date-only diffs do not rewrite", () => {
 
 test("backfill --dry-run plans without writing", () => {
   const dir = scratch("dryrun-");
-  for (const file of ["AGENTS.md", "MEMORY.md", "USER.md", "TOOLS.md", "SOUL.md", "README.md", "CONTRIBUTING.md"]) {
+  for (const file of [
+    "AGENTS.md",
+    "MEMORY.md",
+    "USER.md",
+    "TOOLS.md",
+    "SOUL.md",
+    "README.md",
+    "CONTRIBUTING.md",
+  ]) {
     writeFileSync(join(dir, file), `# ${file}\n`);
   }
   const result = inDir(dir, () => wikiBackfill({ root: "memory/wiki", dryRun: true }));

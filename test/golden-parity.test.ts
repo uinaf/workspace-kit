@@ -50,9 +50,7 @@ test("kit CLI reproduces every legacy golden", () => {
 
   const compare = (label: string, actual: string, expected: string) => {
     if (actual !== expected) {
-      mismatches.push(
-        `${label}:\n--- expected ---\n${expected}\n--- actual ---\n${actual}`,
-      );
+      mismatches.push(`${label}:\n--- expected ---\n${expected}\n--- actual ---\n${actual}`);
     }
   };
 

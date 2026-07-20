@@ -1,13 +1,7 @@
 // Workspace scaffolder. Writes structural skeletons only — instruction
 // content is owner-authored; the kit never writes behavioral prose. Existing
 // files are never overwritten.
-import {
-  chmodSync,
-  lstatSync,
-  mkdirSync,
-  symlinkSync,
-  writeFileSync,
-} from "node:fs";
+import { chmodSync, lstatSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { kitVersion } from "./version.ts";
 
@@ -114,7 +108,12 @@ export function initWorkspace(dir: string, profile: Profile): InitResult {
     put("projects.json", "{}\n");
     put(
       "memory/wiki/index.md",
-      wikiPage("Wiki index", "wiki-index", "# Wiki index\n\nTODO: link topic pages as they appear.\n", today),
+      wikiPage(
+        "Wiki index",
+        "wiki-index",
+        "# Wiki index\n\nTODO: link topic pages as they appear.\n",
+        today,
+      ),
     );
     put(
       "memory/wiki/schema.md",
@@ -125,10 +124,7 @@ export function initWorkspace(dir: string, profile: Profile): InitResult {
         today,
       ),
     );
-    put(
-      "memory/wiki/log.md",
-      wikiPage("Wiki log", "wiki-log", "# Wiki log\n", today),
-    );
+    put("memory/wiki/log.md", wikiPage("Wiki log", "wiki-log", "# Wiki log\n", today));
     put(
       ".githooks/pre-commit",
       `#!/bin/sh
@@ -169,7 +165,10 @@ npx --yes @uinaf/workspace-kit@${kitVersion()} doctor
   }
 
   if (profile === "runtime") {
-    put("HEARTBEAT.md", "# HEARTBEAT.md\n\nTODO: the minimal liveness checks this runtime should run.\n");
+    put(
+      "HEARTBEAT.md",
+      "# HEARTBEAT.md\n\nTODO: the minimal liveness checks this runtime should run.\n",
+    );
     put("IDENTITY.md", "# IDENTITY.md\n\nTODO: this runtime's identity.\n");
     required.push("HEARTBEAT.md", "IDENTITY.md");
   }

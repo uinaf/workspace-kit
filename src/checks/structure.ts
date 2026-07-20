@@ -5,12 +5,7 @@
 // tracked semantics.
 import { existsSync, lstatSync, readdirSync, readFileSync, readlinkSync, statSync } from "node:fs";
 import { join } from "node:path";
-import type {
-  DailyLogsConfig,
-  LinkRule,
-  RegistryConfig,
-  WorkspaceConfig,
-} from "../config.ts";
+import type { DailyLogsConfig, LinkRule, RegistryConfig, WorkspaceConfig } from "../config.ts";
 
 export function requiredFileErrors(required: string[]): string[] {
   const bad: string[] = [];

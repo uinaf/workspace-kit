@@ -25,8 +25,10 @@ the mechanism and its public documentation only.
 
 ## Verify
 
-`npm run verify` — typecheck + tests + build + CLI smoke. The pre-commit
-hook (configured automatically by `npm ci`) enforces it.
+`npm run verify` — oxlint + oxfmt check + typecheck + tests + build + CLI
+smoke. The pre-commit hook (configured automatically by `npm ci`) enforces
+it. `npm run fmt` fixes formatting; `parity/legacy/` and `parity/fixtures/`
+are exempt from lint/format — they are frozen.
 
 ## Releases
 

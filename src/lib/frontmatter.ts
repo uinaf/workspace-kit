@@ -16,7 +16,11 @@ export function parseFrontmatter(text: string): Record<string, unknown> {
       current = key;
       const value = (m[2] ?? "").trim();
       if (value.startsWith("[") && value.endsWith("]")) {
-        out[key] = value.slice(1, -1).split(",").map((x) => clean(x)).filter(Boolean);
+        out[key] = value
+          .slice(1, -1)
+          .split(",")
+          .map((x) => clean(x))
+          .filter(Boolean);
       } else {
         out[key] = clean(value);
       }

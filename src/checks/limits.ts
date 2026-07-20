@@ -45,9 +45,7 @@ export function limitWarnings(rules: LimitRule[]): string[] {
       const content = readFileSync(file, "utf8");
       const lines = content.split("\n").length - (content.endsWith("\n") ? 1 : 0);
       if (lines > rule.maxLines) {
-        warnings.push(
-          `warning: ${file}: ${lines} lines exceeds soft limit ${rule.maxLines}`,
-        );
+        warnings.push(`warning: ${file}: ${lines} lines exceeds soft limit ${rule.maxLines}`);
       }
     }
   }

@@ -60,29 +60,29 @@ The kit checks presence and link integrity only — never prose.
 
 ```jsonc
 {
-  "minVersion": "0.1.0",                 // kit refuses to run if older
-  "required": ["AGENTS.md", "CLAUDE.md"],// files that must exist
-  "forbidden": [".env"],                 // files that must not exist
+  "minVersion": "0.1.0", // kit refuses to run if older
+  "required": ["AGENTS.md", "CLAUDE.md"], // files that must exist
+  "forbidden": [".env"], // files that must not exist
   "links": [{ "path": "CLAUDE.md", "target": "AGENTS.md" }],
   "registry": {
     "file": "projects.json",
-    "entry": { "required": ["name", "repo", "path", "owns"],
-               "optional": ["branch"] }
+    "entry": { "required": ["name", "repo", "path", "owns"], "optional": ["branch"] },
   },
   "dailyLogs": { "root": "memory", "contexts": "memory/contexts" },
   "wiki": {
     "root": "memory/wiki",
     "requiredFields": ["title", "type", "status", "updated", "tags", "sources"],
-    "indexCoverage": false,          // every page cataloged in index.md
-    "logChronology": false           // log.md dates never decrease (append-only proxy)
+    "indexCoverage": false, // every page cataloged in index.md
+    "logChronology": false, // log.md dates never decrease (append-only proxy)
   },
-  "limits": [                        // soft limits: warnings, never failures
+  "limits": [
+    // soft limits: warnings, never failures
     { "pattern": "MEMORY.md", "maxLines": 200 },
-    { "pattern": "memory/????-??-??.md", "maxLines": 80 }
+    { "pattern": "memory/????-??-??.md", "maxLines": 80 },
   ],
   "contract": { "file": "workspace.contract.json" },
   "handoff": { "paths": ["AGENTS.md"], "prefixes": ["memory/"] },
-  "docsLinks": { "enabled": false, "exclude": [] }
+  "docsLinks": { "enabled": false, "exclude": [] },
 }
 ```
 
@@ -93,7 +93,7 @@ defaults that encode any consumer's specifics** — every list above is policy
 and lives with the workspace. One deliberate exception: `wiki backfill`
 scans a fixed raw-source layout (`memory/intake`, `memory/notes`, `docs/`,
 `user/`, `memory/contexts`, dated `memory/*.md` logs, and the root
-convention files when present) — that layout *is* the convention, and the
+convention files when present) — that layout _is_ the convention, and the
 generated catalogs land under the configured `wiki.root`.
 
 ## Output contract

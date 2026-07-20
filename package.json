@@ -7,7 +7,6 @@
     "type": "git",
     "url": "git+https://github.com/uinaf/workspace-kit.git"
   },
-  "type": "module",
   "bin": {
     "workspace-kit": "dist/cli.js"
   },
@@ -15,23 +14,29 @@
     "dist",
     "docs/convention.md"
   ],
-  "engines": {
-    "node": ">=24.18.0"
-  },
+  "type": "module",
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
+    "lint": "oxlint --deny-warnings",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
     "typecheck": "tsc --noEmit",
     "test": "node --test test/*.test.ts",
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "smoke": "node dist/cli.js --version",
-    "verify": "npm run typecheck && npm run test && npm run build && npm run smoke",
+    "verify": "npm run lint && npm run fmt:check && npm run typecheck && npm run test && npm run build && npm run smoke",
     "prepack": "npm run verify",
     "prepare": "git config core.hooksPath .githooks || true"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "oxfmt": "^0.59.0",
+    "oxlint": "^1.74.0",
     "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=24.18.0"
   }
 }

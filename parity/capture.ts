@@ -34,8 +34,10 @@ function legacyArgv(command: string[]): string[] {
   if (tool === "wiki" && mode === "stale") return ["scripts/wiki-stale.ts"];
   if (tool === "wiki" && mode === "backfill") return ["scripts/wiki-backfill.ts"];
   if (tool === "contract" && mode === "check") return ["scripts/workspace-contract.ts", "--check"];
-  if (tool === "contract" && mode === "peer") return ["scripts/workspace-contract.ts", "--peer", ...rest];
-  if (tool === "contract" && mode === "handoff") return ["scripts/workspace-contract.ts", "--handoff", ...rest];
+  if (tool === "contract" && mode === "peer")
+    return ["scripts/workspace-contract.ts", "--peer", ...rest];
+  if (tool === "contract" && mode === "handoff")
+    return ["scripts/workspace-contract.ts", "--handoff", ...rest];
   if (tool === "contract" && mode === undefined) return ["scripts/workspace-contract.ts"];
   throw new Error(`no legacy mapping for command: ${command.join(" ")}`);
 }

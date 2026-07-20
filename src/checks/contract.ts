@@ -89,7 +89,8 @@ export function workspaceErrors(repoRoot = ".", file = "workspace.contract.json"
 
   const paths = trackedPaths(root);
   for (const path of contract.requiredOwnerPaths) {
-    if (!matchesTrackedPath(paths, path)) errors.push(`required owner path is not tracked: ${path}`);
+    if (!matchesTrackedPath(paths, path))
+      errors.push(`required owner path is not tracked: ${path}`);
   }
   for (const path of contract.forbiddenOwnerPaths) {
     if (matchesTrackedPath(paths, path)) errors.push(`foreign owner path is tracked: ${path}`);

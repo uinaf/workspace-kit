@@ -30,18 +30,18 @@ same normalization to the new implementation's output.
 
 ## Scenario map
 
-| Scenario | Covers |
-|---|---|
-| `doctor-green` | full doctor pass: required files, symlink, registry shape, daily H1, wiki lint + contract subchecks |
-| `doctor-cascade-errors` | failing wiki child: streamed child stderr ordering + `wiki-lint failed (exit 1)` aggregation |
-| `contract-check-green-https` | https remote form of the origin match |
-| `wiki-lint-green` | frontmatter, source existence, page-relative / root-relative / unique-leaf wikilinks, alias + anchor, code stripping, %20 markdown links, orphan exemptions, log grammar |
-| `contract-check-green` / `contract-check-errors` | origin match, tracked required / forbidden owner paths, ancestor validation (all errors accumulate) |
-| `handoff-allowed` / `handoff-blocked` | tolerant pass-through plus every denylist class: `.env*` basenames, exact paths, prefixes, absolute, `..` traversal |
-| `peer-check-green` / `peer-check-shared` | reciprocity, shared ancestor, post-split commit-id intersection |
-| `wiki-stale-green` / `wiki-stale-flagged` | commit-date map vs `updated:` comparison and report shape |
-| `backfill-*` + `wiki-lint-post-backfill` | generated catalogs, tag materialization threshold, stale tag-page purge, generator/linter lockstep, second-run idempotency |
-| `doctor-structure-errors` / `wiki-lint-errors` | every structure and wiki failure class, including ambiguous-leaf resolution reported as a broken wikilink |
+| Scenario                                         | Covers                                                                                                                                                                   |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `doctor-green`                                   | full doctor pass: required files, symlink, registry shape, daily H1, wiki lint + contract subchecks                                                                      |
+| `doctor-cascade-errors`                          | failing wiki child: streamed child stderr ordering + `wiki-lint failed (exit 1)` aggregation                                                                             |
+| `contract-check-green-https`                     | https remote form of the origin match                                                                                                                                    |
+| `wiki-lint-green`                                | frontmatter, source existence, page-relative / root-relative / unique-leaf wikilinks, alias + anchor, code stripping, %20 markdown links, orphan exemptions, log grammar |
+| `contract-check-green` / `contract-check-errors` | origin match, tracked required / forbidden owner paths, ancestor validation (all errors accumulate)                                                                      |
+| `handoff-allowed` / `handoff-blocked`            | tolerant pass-through plus every denylist class: `.env*` basenames, exact paths, prefixes, absolute, `..` traversal                                                      |
+| `peer-check-green` / `peer-check-shared`         | reciprocity, shared ancestor, post-split commit-id intersection                                                                                                          |
+| `wiki-stale-green` / `wiki-stale-flagged`        | commit-date map vs `updated:` comparison and report shape                                                                                                                |
+| `backfill-*` + `wiki-lint-post-backfill`         | generated catalogs, tag materialization threshold, stale tag-page purge, generator/linter lockstep, second-run idempotency                                               |
+| `doctor-structure-errors` / `wiki-lint-errors`   | every structure and wiki failure class, including ambiguous-leaf resolution reported as a broken wikilink                                                                |
 
 ## Regenerating
 
