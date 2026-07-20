@@ -31,6 +31,14 @@ function isPortableAbsolute(path: string): boolean {
   return path.startsWith("/") || /^[A-Za-z]:/.test(path);
 }
 
+function assertPortableComponents(path: string, label: string): void {
+  if (
+    path.split("/").some((segment) => segment !== "." && segment !== ".." && /[ .]$/.test(segment))
+  ) {
+    throw new Error(`${label} must not contain path components ending in a space or period`);
+  }
+}
+
 export function normalizeWorkspacePath(raw: string, label = "path"): string {
   if (!raw || raw.includes("\0")) {
     throw new Error(`${label} must be a non-empty repository-relative path`);
@@ -43,6 +51,7 @@ export function normalizeWorkspacePath(raw: string, label = "path"): string {
   if (normalized === "." || normalized === ".." || normalized.startsWith("../")) {
     throw new Error(`${label} must stay inside the workspace`);
   }
+  assertPortableComponents(normalized, label);
   return normalized.replace(/\/$/, "");
 }
 
@@ -56,6 +65,7 @@ export function normalizeLinkTarget(linkPath: string, raw: string, label = "targ
     throw new Error(`${label} must stay inside the workspace`);
   }
   const normalized = posix.normalize(portable);
+  assertPortableComponents(normalized, label);
   const resolvedTarget = posix.normalize(posix.join(posix.dirname(link), normalized));
   if (resolvedTarget === "." || resolvedTarget === ".." || resolvedTarget.startsWith("../")) {
     throw new Error(`${label} must stay inside the workspace`);

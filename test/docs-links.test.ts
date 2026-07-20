@@ -117,6 +117,16 @@ test("docs links resolves Git paths with POSIX semantics and exact traversal che
   assert.deepEqual(check(dir), ["README.md: broken link (../outside.md)"]);
 });
 
+test("docs links rejects non-portable tracked Markdown paths", () => {
+  if (process.platform === "win32") return;
+  const dir = repository();
+  put(dir, "docs/literal.md", "# Portable spelling\n");
+  put(dir, "docs\\literal.md", "[silently missed before](missing.md)\n");
+  track(dir);
+
+  assert.deepEqual(check(dir), ["docs\\literal.md: tracked Markdown path is not portable"]);
+});
+
 test("docs link exclusions match only the configured path boundary", () => {
   const dir = repository();
   put(dir, "docs/generated/broken.md", "[ignored](missing.md)\n");

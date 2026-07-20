@@ -61,8 +61,9 @@ The kit checks presence and link integrity only — never prose.
   destinations in tracked Markdown inline links, images, and reference
   definitions. It supports angle-bracket destinations, balanced parentheses,
   optional titles, and Markdown escapes; code spans/fences and external or
-  fragment-only destinations are ignored. Targets must be tracked, so a
-  gitignored-but-present file does not pass.
+  fragment-only destinations are ignored. Checked Markdown filenames must use
+  portable `/` separators; literal backslashes are reported as non-portable.
+  Targets must be tracked, so a gitignored-but-present file does not pass.
 
 ## Configuration reference (`workspace.json`)
 
@@ -99,8 +100,10 @@ keys at every supported nesting level are ignored at runtime (additive schema
 evolution across staggered kit versions) and reported with their full paths as
 warnings by `config validate`. Configured filesystem paths are normalized as
 portable repository-relative paths and must stay inside the workspace;
-symlinked scan/output directories are rejected rather than followed. Link
-targets may use `..` only when they still resolve inside the workspace. The kit
+components ending in an ASCII space or period are rejected because other
+platforms may reinterpret them. Symlinked scan/output directories are rejected
+rather than followed. Link targets may use `..` only when they still resolve
+inside the workspace, and link output paths must be unique ignoring case. The kit
 ships **no defaults that encode any consumer's specifics** — every list above
 is policy and lives with the workspace. One deliberate exception: `wiki
 backfill` scans a fixed raw-source layout (`memory/intake`, `memory/notes`,

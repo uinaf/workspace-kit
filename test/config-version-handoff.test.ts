@@ -83,6 +83,26 @@ test("config rejects identical and conflicting duplicate link paths", () => {
       }),
     /links\[1\]\.path duplicates links\[0\]\.path/,
   );
+  assert.throws(
+    () =>
+      parseWorkspaceConfig({
+        links: [
+          { path: "Alias.md", target: "AGENTS.md" },
+          { path: "alias.md", target: "docs/README.md" },
+        ],
+      }),
+    /links\[1\]\.path duplicates links\[0\]\.path/,
+  );
+  assert.throws(
+    () =>
+      parseWorkspaceConfig({
+        links: [
+          { path: "S.md", target: "AGENTS.md" },
+          { path: "ſ.md", target: "docs/README.md" },
+        ],
+      }),
+    /links\[1\]\.path duplicates links\[0\]\.path/,
+  );
 });
 
 test("contract files are read within their own workspace boundary", () => {

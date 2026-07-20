@@ -306,6 +306,10 @@ export function docsLinkErrors(config: DocsLinksConfig): string[] {
     .sort();
 
   for (const file of files) {
+    if (file.includes("\\")) {
+      bad.push(`${file}: tracked Markdown path is not portable`);
+      continue;
+    }
     let text: string;
     try {
       const stat = workspaceLstat(".", file, "tracked Markdown file");

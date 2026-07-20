@@ -58,6 +58,12 @@ function workspacePathList(value: unknown, field: string): string[] {
   );
 }
 
+function portablePathIdentity(path: string): string {
+  // Uppercase collapses Unicode aliases that lowercasing misses (for example,
+  // long s/S and final sigma/sigma) on common case-insensitive filesystems.
+  return path.normalize("NFC").toUpperCase().normalize("NFC");
+}
+
 function text(value: unknown, field: string): string {
   if (typeof value !== "string" || value.length === 0) {
     fail(`${field} must be a non-empty string`);
@@ -136,11 +142,12 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
         text(entry.path, `links[${index}].path`),
         `links[${index}].path`,
       );
-      const previous = linkPaths.get(path);
+      const pathIdentity = portablePathIdentity(path);
+      const previous = linkPaths.get(pathIdentity);
       if (previous !== undefined) {
         fail(`links[${index}].path duplicates links[${previous}].path`);
       }
-      linkPaths.set(path, index);
+      linkPaths.set(pathIdentity, index);
       return {
         path,
         target: normalizeLinkTarget(

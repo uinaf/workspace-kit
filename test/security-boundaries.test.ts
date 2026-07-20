@@ -52,6 +52,23 @@ test("links fix validates every rule before mutating", () => {
   assert.equal(existsSync(join(parent, "escaped-link")), false);
 });
 
+test("links fix rejects portable case-folded path collisions before mutating", () => {
+  const dir = scaffold();
+  symlinkSync("AGENTS.md", join(dir, "S.md"));
+  const config = JSON.parse(readFileSync(join(dir, "workspace.json"), "utf8"));
+  config.links = [
+    { path: "S.md", target: "docs/README.md" },
+    { path: "ſ.md", target: "AGENTS.md" },
+  ];
+  writeFileSync(join(dir, "workspace.json"), JSON.stringify(config, null, 2));
+
+  const result = kit(dir, "links", "fix");
+  assert.equal(result.status, 1);
+  assert.equal(result.stdout, "");
+  assert.match(result.stderr, /links\[1\]\.path duplicates links\[0\]\.path/);
+  assert.equal(readlinkSync(join(dir, "S.md")), "AGENTS.md");
+});
+
 test("links fix rejects targets reached through symlinked directories", () => {
   const dir = scaffold();
   const outside = mkdtempSync(join(tmpdir(), "link-target-outside-"));

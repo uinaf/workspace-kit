@@ -22,6 +22,9 @@ test("workspace paths use portable repository-relative semantics", () => {
   ]) {
     assert.throws(() => normalizeWorkspacePath(path), /inside the workspace|repository-relative/);
   }
+  for (const path of [".. /outside", "safe./file", "safe /file", "safe/.../file"]) {
+    assert.throws(() => normalizeWorkspacePath(path), /ending in a space or period/);
+  }
 });
 
 test("link targets may traverse only within the workspace", () => {
@@ -32,6 +35,12 @@ test("link targets may traverse only within the workspace", () => {
     /inside the workspace/,
   );
   assert.throws(() => normalizeLinkTarget("CLAUDE.md", "C:\\outside"), /inside the workspace/);
+  for (const target of [".. /outside", "safe./file", "safe /file", "safe/.../file"]) {
+    assert.throws(
+      () => normalizeLinkTarget("nested/CLAUDE.md", target),
+      /ending in a space or period/,
+    );
+  }
 });
 
 test("init refuses an escaping intermediate symlink", () => {
