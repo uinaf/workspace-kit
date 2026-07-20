@@ -101,12 +101,16 @@ test("handoff screening canonicalizes portable paths and matches prefix roots", 
   const handoff = { paths: ["./AGENTS.md"], prefixes: ["./memory//"] };
   for (const path of [
     "AGENTS.md",
+    "agents.md",
     "memory",
+    "MEMORY",
     "memory\\notes.md",
+    "MEMORY\\notes.md",
     "C:private\\file.md",
     "C:\\private\\file.md",
     "\\\\server\\share\\file.md",
     "x\\.env.local",
+    "x\\.ENV.LOCAL",
     ".",
   ]) {
     assert.equal(isPrivateHandoffPath(path, handoff), true, path);

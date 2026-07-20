@@ -179,5 +179,7 @@ function normalizePath(path: string): string {
     .replaceAll("\\", "/")
     .split("/")
     .filter((segment) => segment !== "" && segment !== ".");
-  return segments.join("/");
+  // Treat case aliases conservatively so a path approved on a case-sensitive
+  // host cannot name protected content when handed off on Windows or macOS.
+  return segments.join("/").toLowerCase();
 }
