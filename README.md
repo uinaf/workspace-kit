@@ -27,9 +27,12 @@ every check's exact contract.
 
 ## Status
 
-Pre-release. The `parity/` directory holds the migration oracle: frozen
-legacy validator scripts, synthetic fixture workspaces, and golden outputs
-that the ported implementation must reproduce byte-for-byte before 0.1.0.
+0.1.0, pre-npm-publish. All checks are implemented in `src/` and reproduce
+the migration oracle byte-for-byte: `parity/` holds frozen predecessor
+scripts, a synthetic fixture workspace, and golden outputs;
+`test/golden-parity.test.ts` drives the kit CLI through every scenario and
+diffs against the goldens. `init` profiles scaffold doctor-green workspaces
+out of the box.
 
 ## Principles
 

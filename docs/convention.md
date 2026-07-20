@@ -1,29 +1,105 @@
 # The agent workspace convention
 
-> Status: skeleton — the full convention and per-check contracts land with
-> the ported validators, before 0.1.0.
+An **agent workspace** is a git repository that gives coding/assistant
+agents a stable operating context. `workspace-kit` validates the structure;
+the content is always owner-authored. The convention has three layers, and a
+workspace declares which of them it uses in `workspace.json` — absent
+sections disable their checks, and unknown files are always tolerated
+(harnesses and runtimes add their own state; tooling must not fight them).
 
-An **agent workspace** is a git repository that gives agents a stable
-operating context. The convention has three layers:
+## 1. Instructions
 
-1. **Instructions** — one canonical `AGENTS.md` at the repo root;
-   `CLAUDE.md` is a relative symlink to it. Harness-specific runtime detail
-   stays out of the canonical file.
-2. **Memory (optional)** — raw daily logs (`memory/YYYY-MM-DD.md`,
-   `memory/contexts/<slug>/`), consolidated notes, and a compiled wiki
-   (`memory/wiki/`) whose pages carry frontmatter and form a link graph.
-3. **Operations** — a project registry (JSON), operational docs, and, for
-   peered workspaces, an ownership contract (`workspace.contract.json`) with
-   a handoff privacy gate.
+One canonical `AGENTS.md` at the repo root. `CLAUDE.md` is a relative
+symlink to it so both Codex-style and Claude-style harnesses read the same
+file. Harness- or runtime-specific mechanics stay out of the canonical file.
+The kit checks presence and link integrity only — never prose.
 
-`workspace-kit` validates whichever layers a workspace declares in its
-`workspace.json`. Absent sections disable their checks; unknown files are
-always tolerated — harnesses and runtimes add their own state and the
-tooling must not fight them.
+## 2. Memory (optional)
 
-## Check contracts
+- **Raw layer** — dated daily logs (`memory/YYYY-MM-DD.md`) and per-context
+  logs (`memory/contexts/<slug>/*.md`), each starting with an H1.
+- **Compiled layer** — a wiki (`memory/wiki/`) of pages carrying frontmatter
+  (`title`, `type`, `status: active|draft|archived`, `updated: YYYY-MM-DD`,
+  `tags`, `sources`) and forming a link graph. Wikilinks resolve
+  page-relative, then root-relative, then by unique leaf basename;
+  ambiguity is an error. Every non-index page needs an inbound link.
+  `sources:` entries must exist (external URLs and `[[links]]` exempt).
+  `log.md` records changes with `## [YYYY-MM-DD] slug | summary` headings.
+- **Generated catalogs** — `wiki backfill` maintains `sources/` and `tags/`
+  indexes from the raw layer (tag pages materialize at two or more sources;
+  stale tag pages are purged). `wiki stale` reports pages whose sources have
+  newer commits than their `updated:` stamp — informational, never a gate.
 
-To be documented per check as the ports land (doctor, wiki lint/stale/
-backfill, contract check/peer/handoff, links, docs links, init, config
-validate). Until then, `parity/` in the repository holds the executable
-truth: frozen legacy scripts, fixtures, and golden outputs.
+## 3. Operations (optional)
+
+- **Registry** — a JSON file mapping project categories to entries
+  (`{name, repo, path, owns, …}`); the entry shape is config-declared.
+- **Ownership contract** — for peered workspaces descended from one
+  historical ancestor: `workspace.contract.json` names the repository, its
+  peer, the shared ancestor commit, and required/forbidden owner paths.
+  `contract check` validates the local side; `contract peer` additionally
+  proves reciprocity and that no post-split commit id appears in both
+  histories (cherry-picks get new ids and are deliberately not detected —
+  cross-workspace movement stays a human-reviewed patch).
+- **Handoff gate** — `contract handoff <paths…>` screens proposed
+  cross-workspace paths against a configured denylist. Absolute paths,
+  `..` traversal, and `.env*` basenames are always blocked; passing means
+  "eligible for human review", never approval.
+
+## Configuration reference (`workspace.json`)
+
+```jsonc
+{
+  "minVersion": "0.1.0",                 // kit refuses to run if older
+  "required": ["AGENTS.md", "CLAUDE.md"],// files that must exist
+  "forbidden": [".env"],                 // files that must not exist
+  "links": [{ "path": "CLAUDE.md", "target": "AGENTS.md" }],
+  "registry": {
+    "file": "projects.json",
+    "entry": { "required": ["name", "repo", "path", "owns"],
+               "optional": ["branch"] }
+  },
+  "dailyLogs": { "root": "memory", "contexts": "memory/contexts" },
+  "wiki": { "root": "memory/wiki" },
+  "contract": { "file": "workspace.contract.json" },
+  "handoff": { "paths": ["AGENTS.md"], "prefixes": ["memory/"] },
+  "docsLinks": { "enabled": false, "exclude": [] }
+}
+```
+
+Strict JSON, no comments in the real file; every section optional; unknown
+keys ignored (additive schema evolution). The kit ships **no defaults that
+encode any consumer's specifics** — every list above is policy and lives
+with the workspace.
+
+## Output contract
+
+Errors print one per line to stderr and exit 1; success prints a terse
+`<check> ok`; usage errors exit 2. `doctor --json` emits a single-line
+`{"status","failed","checks"}` summary for machine collection and never
+includes file-content excerpts. Checks are deterministic, offline, and
+credential-free. History-dependent checks (`contract`, `wiki stale`) need a
+full clone (`fetch-depth: 0` in CI).
+
+## Profiles (`init`)
+
+`init` scaffolds structural skeletons with TODO markers — it never writes
+behavioral instruction content, and never overwrites existing files.
+
+- `work` — AGENTS.md + CLAUDE.md symlink + docs/README.md + workspace.json.
+- `personal` — work + README, `.env.example`, registry stub, memory/wiki
+  skeleton (lint-green), pre-commit hook wiring.
+- `runtime` — personal + HEARTBEAT.md and IDENTITY.md placeholders for
+  always-on runtime identities.
+
+A fresh scaffold is doctor-green immediately; the ownership contract stays
+unconfigured until an origin remote and a peer actually exist.
+
+## Exact check semantics
+
+The executable specification lives in the repository's `parity/` directory:
+frozen predecessor scripts, a synthetic fixture workspace, and golden
+outputs that the shipped implementation reproduces byte-for-byte
+(`test/golden-parity.test.ts`). Where behavior is quirky on purpose (the
+frontmatter dialect, non-string `updated:` skipping validation), unit tests
+in `test/unit.test.ts` pin the kept quirks.

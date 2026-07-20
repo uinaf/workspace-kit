@@ -1,0 +1,170 @@
+// Workspace scaffolder. Writes structural skeletons only — instruction
+// content is owner-authored; the kit never writes behavioral prose. Existing
+// files are never overwritten.
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname, join } from "node:path";
+import { kitVersion } from "./version.ts";
+
+export type Profile = "personal" | "runtime" | "work";
+export type InitResult = { created: string[]; skipped: string[] };
+
+const AGENTS_SKELETON = `# AGENTS.md
+
+<!-- Owner-authored: workspace-kit scaffolds structure only and never edits
+     this file again. Replace every TODO with your own operating rules. -->
+
+## Start Here
+
+TODO: what this workspace is, who owns it, and what belongs here.
+
+## Session Start
+
+TODO: what an agent should read first, and when.
+
+## Working Agreement
+
+TODO: planning, approval, and scope rules for agents working here.
+
+## Validation
+
+Run \`npx @uinaf/workspace-kit doctor\` before committing.
+
+## Boundaries
+
+TODO: what is private, what may leave this workspace, and how.
+`;
+
+function wikiPage(title: string, type: string, body: string, today: string): string {
+  return `---
+title: ${title}
+type: ${type}
+status: active
+updated: ${today}
+tags: [${type}]
+sources: [AGENTS.md]
+---
+
+${body}`;
+}
+
+export function initWorkspace(dir: string, profile: Profile): InitResult {
+  const created: string[] = [];
+  const skipped: string[] = [];
+  const today = new Date().toISOString().slice(0, 10);
+
+  mkdirSync(dir, { recursive: true });
+
+  const put = (rel: string, content: string, mode?: number): void => {
+    const path = join(dir, rel);
+    if (existsSync(path)) {
+      skipped.push(rel);
+      return;
+    }
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, content);
+    if (mode !== undefined) chmodSync(path, mode);
+    created.push(rel);
+  };
+
+  const link = (rel: string, target: string): void => {
+    const path = join(dir, rel);
+    try {
+      lstatSync(path);
+      skipped.push(rel);
+      return;
+    } catch {
+      // absent: create below
+    }
+    symlinkSync(target, path);
+    created.push(rel);
+  };
+
+  put("AGENTS.md", AGENTS_SKELETON);
+  link("CLAUDE.md", "AGENTS.md");
+  put("docs/README.md", "# Docs\n\nTODO: index the documents that live under docs/.\n");
+
+  const required = ["AGENTS.md", "CLAUDE.md", "docs/README.md", "workspace.json"];
+  const config: Record<string, unknown> = {
+    minVersion: kitVersion(),
+    required,
+    links: [{ path: "CLAUDE.md", target: "AGENTS.md" }],
+  };
+
+  if (profile === "personal" || profile === "runtime") {
+    put("README.md", "# Workspace\n\nTODO: one paragraph on what this repository is.\n");
+    put(".env.example", "# Names only — never values.\n");
+    put("projects.json", "{}\n");
+    put(
+      "memory/wiki/index.md",
+      wikiPage("Wiki index", "wiki-index", "# Wiki index\n\nTODO: link topic pages as they appear.\n", today),
+    );
+    put(
+      "memory/wiki/schema.md",
+      wikiPage(
+        "Wiki schema",
+        "wiki-schema",
+        "# Wiki schema\n\nTODO: describe the frontmatter and page conventions this wiki follows.\n",
+        today,
+      ),
+    );
+    put(
+      "memory/wiki/log.md",
+      wikiPage("Wiki log", "wiki-log", "# Wiki log\n", today),
+    );
+    put(
+      ".githooks/pre-commit",
+      `#!/bin/sh
+set -e
+cd "$(git rev-parse --show-toplevel)"
+if ! command -v node >/dev/null 2>&1; then
+  echo "pre-commit: node not found; skipping workspace-kit doctor" >&2
+  exit 0
+fi
+npx --yes @uinaf/workspace-kit@${kitVersion()} doctor
+`,
+      0o755,
+    );
+    required.push("README.md", ".env.example", "projects.json");
+    required.push("memory/wiki/index.md", "memory/wiki/schema.md", "memory/wiki/log.md");
+    config.registry = {
+      file: "projects.json",
+      entry: { required: ["name", "repo", "path", "owns"], optional: ["branch"] },
+    };
+    config.dailyLogs = { root: "memory", contexts: "memory/contexts" };
+    config.wiki = { root: "memory/wiki" };
+    config.handoff = {
+      paths: [
+        "AGENTS.md",
+        "MEMORY.md",
+        "SOUL.md",
+        "TOOLS.md",
+        "USER.md",
+        "HEARTBEAT.md",
+        "IDENTITY.md",
+        "avatar.png",
+        "projects.json",
+        "workspace.contract.json",
+        "workspace.json",
+      ],
+      prefixes: [".agents/skills/", "docs/reference/", "docs/runbooks/", "memory/", "user/"],
+    };
+    // contract: deliberately absent until an origin remote and a peer exist.
+  }
+
+  if (profile === "runtime") {
+    put("HEARTBEAT.md", "# HEARTBEAT.md\n\nTODO: the minimal liveness checks this runtime should run.\n");
+    put("IDENTITY.md", "# IDENTITY.md\n\nTODO: this runtime's identity.\n");
+    required.push("HEARTBEAT.md", "IDENTITY.md");
+  }
+
+  put("workspace.json", `${JSON.stringify(config, null, 2)}\n`);
+
+  return { created, skipped };
+}

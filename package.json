@@ -1,6 +1,6 @@
 {
   "name": "@uinaf/workspace-kit",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Config-driven agent workspace validation and scaffolding",
   "license": "MIT",
   "repository": {
@@ -21,7 +21,9 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "node --test test/*.test.ts",
-    "verify": "npm run typecheck && npm run test"
+    "build": "tsc -p tsconfig.build.json",
+    "verify": "npm run typecheck && npm run test",
+    "prepublishOnly": "npm run verify && npm run build"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
