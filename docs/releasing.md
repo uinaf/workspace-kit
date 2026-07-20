@@ -45,7 +45,9 @@ into the published tarball. Look up the current version with
 - The release job runs only after the in-workflow verify job passes; PRs are
   verified separately with read-only permissions and no environment access.
 - Publish concurrency is non-cancellable (queued, never killed mid-publish).
-- `prepack` rebuilds a clean `dist/` before any tarball is produced; verify
-  CI audits `npm pack --dry-run` contents.
+- `prepack` runs the full verify gate (which rebuilds a clean `dist/`)
+  before any tarball is produced; verify CI audits `npm pack --dry-run`
+  contents.
 - Workflow permissions are per-job and minimal; actions are SHA-pinned;
-  `persist-credentials: false` everywhere.
+  `persist-credentials: false` everywhere. The workflows themselves are
+  linted by actionlint + zizmor in CI (`actions-lint.yml`).

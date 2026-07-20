@@ -25,8 +25,10 @@
     "typecheck": "tsc --noEmit",
     "test": "node --test test/*.test.ts",
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
-    "verify": "npm run typecheck && npm run test",
-    "prepack": "npm run verify && npm run build"
+    "smoke": "node dist/cli.js --version",
+    "verify": "npm run typecheck && npm run test && npm run build && npm run smoke",
+    "prepack": "npm run verify",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

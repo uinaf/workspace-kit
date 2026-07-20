@@ -25,7 +25,8 @@ the mechanism and its public documentation only.
 
 ## Verify
 
-`npm run verify` — typecheck + node --test. Run it before any commit.
+`npm run verify` — typecheck + tests + build + CLI smoke. The pre-commit
+hook (configured automatically by `npm ci`) enforces it.
 
 ## Releases
 
