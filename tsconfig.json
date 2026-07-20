@@ -17,6 +17,6 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src", "test"],
+  "include": ["src", "test", "parity/scenarios.ts", "parity/capture.ts"],
   "exclude": ["parity/legacy", "parity/fixtures"]
 }

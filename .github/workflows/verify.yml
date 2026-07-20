@@ -23,3 +23,6 @@ jobs:
           node-version: 24
       - run: npm ci
       - run: npm run verify
+      - run: npm run build
+      - run: node dist/cli.js --version
+      - run: npm pack --dry-run

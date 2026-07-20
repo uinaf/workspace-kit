@@ -161,7 +161,7 @@ test("backfill cross-day idempotency: date-only diffs do not rewrite", () => {
   for (const file of ["AGENTS.md", "MEMORY.md", "USER.md", "TOOLS.md", "SOUL.md", "README.md", "CONTRIBUTING.md"]) {
     writeFileSync(join(dir, file), `# ${file}\n`);
   }
-  inDir(dir, () => wikiBackfill({ dryRun: false }));
+  inDir(dir, () => wikiBackfill({ root: "memory/wiki", dryRun: false }));
   // Simulate a previous-day generation: rewrite every generated updated:
   // stamp to an old date.
   const sourcesIndex = join(dir, "memory", "wiki", "sources", "index.md");
@@ -170,7 +170,7 @@ test("backfill cross-day idempotency: date-only diffs do not rewrite", () => {
     "updated: 2000-01-01",
   );
   writeFileSync(sourcesIndex, aged);
-  inDir(dir, () => wikiBackfill({ dryRun: false }));
+  inDir(dir, () => wikiBackfill({ root: "memory/wiki", dryRun: false }));
   assert.equal(
     readFileSync(sourcesIndex, "utf8"),
     aged,
@@ -183,7 +183,7 @@ test("backfill --dry-run plans without writing", () => {
   for (const file of ["AGENTS.md", "MEMORY.md", "USER.md", "TOOLS.md", "SOUL.md", "README.md", "CONTRIBUTING.md"]) {
     writeFileSync(join(dir, file), `# ${file}\n`);
   }
-  const result = inDir(dir, () => wikiBackfill({ dryRun: true }));
+  const result = inDir(dir, () => wikiBackfill({ root: "memory/wiki", dryRun: true }));
   assert.ok(result.planned.length > 0);
   assert.ok(result.planned.every((line) => line.startsWith("would ")));
   assert.throws(() => readFileSync(join(dir, "memory", "wiki", "sources", "index.md")));

@@ -49,11 +49,38 @@ function text(value: unknown, field: string): string {
   return value;
 }
 
+const KNOWN_KEYS = new Set([
+  "$schema",
+  "minVersion",
+  "required",
+  "forbidden",
+  "links",
+  "registry",
+  "dailyLogs",
+  "wiki",
+  "contract",
+  "handoff",
+  "docsLinks",
+]);
+
+// Unknown keys are tolerated at load (additive schema evolution across
+// staggered kit versions); `config validate` surfaces them as warnings.
+export function unknownConfigKeys(value: unknown): string[] {
+  if (!isRecord(value)) return [];
+  return Object.keys(value).filter((key) => !KNOWN_KEYS.has(key));
+}
+
 export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
   if (!isRecord(value)) fail(`${CONFIG_FILE} must be a JSON object`);
   const out: WorkspaceConfig = {};
 
-  if ("minVersion" in value) out.minVersion = text(value.minVersion, "minVersion");
+  if ("minVersion" in value) {
+    const minVersion = text(value.minVersion, "minVersion");
+    if (!/^\d+\.\d+\.\d+$/.test(minVersion)) {
+      fail("minVersion must be a semver version (X.Y.Z)");
+    }
+    out.minVersion = minVersion;
+  }
   if ("required" in value) out.required = stringList(value.required, "required");
   if ("forbidden" in value) out.forbidden = stringList(value.forbidden, "forbidden");
 
@@ -115,6 +142,9 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
 
   if ("docsLinks" in value) {
     if (!isRecord(value.docsLinks)) fail("docsLinks must be an object");
+    if ("enabled" in value.docsLinks && typeof value.docsLinks.enabled !== "boolean") {
+      fail("docsLinks.enabled must be a boolean");
+    }
     out.docsLinks = {
       enabled: value.docsLinks.enabled === true,
       exclude:
@@ -127,20 +157,22 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
   return out;
 }
 
-export function loadWorkspaceConfig(repoRoot = "."): WorkspaceConfig {
+export function readRawConfig(repoRoot = "."): unknown {
   let raw: string;
   try {
     raw = readFileSync(join(repoRoot, CONFIG_FILE), "utf8");
   } catch {
     fail(`missing ${CONFIG_FILE}`);
   }
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    return JSON.parse(raw);
   } catch {
     fail(`${CONFIG_FILE} is not valid JSON`);
   }
-  return parseWorkspaceConfig(parsed);
+}
+
+export function loadWorkspaceConfig(repoRoot = "."): WorkspaceConfig {
+  return parseWorkspaceConfig(readRawConfig(repoRoot));
 }
 
 export function compareVersions(a: string, b: string): number {

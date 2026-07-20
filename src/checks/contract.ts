@@ -145,12 +145,21 @@ export function peerErrors(
 }
 
 export function isPrivateHandoffPath(path: string, handoff: HandoffConfig): boolean {
-  // Kit-level invariants: never configurable.
+  // Kit-level invariants: never configurable. Raw-path checks run first so
+  // traversal is always blocked regardless of what it would normalize to.
   if (!path || path.startsWith("/") || path.split("/").includes("..")) return true;
-  const base = path.split("/").at(-1) ?? "";
-  if (base === ".env" || base.startsWith(".env.")) return true;
+  // Normalize before list matching so "./MEMORY.md" and "memory//x.md"
+  // cannot sidestep the denylist.
+  const normalized = normalizePath(path);
+  const base = normalized.split("/").at(-1) ?? "";
+  if (base.startsWith(".env")) return true;
   return (
-    handoff.paths.includes(path) ||
-    handoff.prefixes.some((prefix) => path.startsWith(prefix))
+    handoff.paths.includes(normalized) ||
+    handoff.prefixes.some((prefix) => normalized.startsWith(prefix))
   );
+}
+
+function normalizePath(path: string): string {
+  const segments = path.split("/").filter((segment) => segment !== "" && segment !== ".");
+  return segments.join("/");
 }

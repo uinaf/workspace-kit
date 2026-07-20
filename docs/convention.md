@@ -68,16 +68,23 @@ The kit checks presence and link integrity only — never prose.
 ```
 
 Strict JSON, no comments in the real file; every section optional; unknown
-keys ignored (additive schema evolution). The kit ships **no defaults that
-encode any consumer's specifics** — every list above is policy and lives
-with the workspace.
+keys are ignored at runtime (additive schema evolution across staggered kit
+versions) and reported as warnings by `config validate`. The kit ships **no
+defaults that encode any consumer's specifics** — every list above is policy
+and lives with the workspace. One deliberate exception: `wiki backfill`
+scans a fixed raw-source layout (`memory/intake`, `memory/notes`, `docs/`,
+`user/`, `memory/contexts`, dated `memory/*.md` logs, and the root
+convention files when present) — that layout *is* the convention, and the
+generated catalogs land under the configured `wiki.root`.
 
 ## Output contract
 
-Errors print one per line to stderr and exit 1; success prints a terse
+Errors print one per line to stderr and exit 1 (two parity-locked
+exceptions: the daily-log check prints one `missing H1:` block, and a green
+handoff prints the eligible paths as a list); success prints a terse
 `<check> ok`; usage errors exit 2. `doctor --json` emits a single-line
-`{"status","failed","checks"}` summary for machine collection and never
-includes file-content excerpts. Checks are deterministic, offline, and
+`{"status","failed","checks","errors"}` summary for machine collection and
+never includes file-content excerpts. Checks are deterministic, offline, and
 credential-free. History-dependent checks (`contract`, `wiki stale`) need a
 full clone (`fetch-depth: 0` in CI).
 

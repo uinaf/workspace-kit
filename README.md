@@ -47,8 +47,9 @@ out of the box.
 
 ## Requirements
 
-Node >= 24.18. Works under `npx` and `bunx`. Consumers should pin exact
-versions.
+Node >= 24.18, plus git on PATH for the history-dependent checks
+(`contract`, `docs links`, `wiki stale`). Works under `npx` and `bunx`.
+Consumers should pin exact versions.
 
 ## License
 

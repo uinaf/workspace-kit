@@ -45,11 +45,16 @@ function isStaleExempt(rel: string): boolean {
   return false;
 }
 
-export type WikiStaleResult = { out: string[]; err: string[] };
+export type WikiStaleResult = { out: string[]; err: string[]; fatal?: string };
 
 export function wikiStaleReport(root: string): WikiStaleResult {
   const err: string[] = [];
-  const pages = walk(root);
+  let pages: string[];
+  try {
+    pages = walk(root);
+  } catch {
+    return { out: [], err: [], fatal: `missing ${root}` };
+  }
   const commitDates = buildCommitDateMap((line) => err.push(line));
 
   type Stale = {

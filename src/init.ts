@@ -3,7 +3,6 @@
 // files are never overwritten.
 import {
   chmodSync,
-  existsSync,
   lstatSync,
   mkdirSync,
   symlinkSync,
@@ -59,16 +58,28 @@ export function initWorkspace(dir: string, profile: Profile): InitResult {
   const skipped: string[] = [];
   const today = new Date().toISOString().slice(0, 10);
 
-  mkdirSync(dir, { recursive: true });
+  try {
+    mkdirSync(dir, { recursive: true });
+  } catch (error) {
+    throw new Error(
+      `${dir} is not a usable directory: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 
   const put = (rel: string, content: string, mode?: number): void => {
     const path = join(dir, rel);
-    if (existsSync(path)) {
+    // lstat-based existence: a pre-existing dangling symlink must count as
+    // occupied, or writeFileSync would write THROUGH it to an
+    // attacker-chosen location in a hostile checkout.
+    try {
+      lstatSync(path);
       skipped.push(rel);
       return;
+    } catch {
+      // absent: create below
     }
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, content);
+    writeFileSync(path, content, { flag: "wx" });
     if (mode !== undefined) chmodSync(path, mode);
     created.push(rel);
   };
@@ -148,7 +159,6 @@ npx --yes @uinaf/workspace-kit@${kitVersion()} doctor
         "USER.md",
         "HEARTBEAT.md",
         "IDENTITY.md",
-        "avatar.png",
         "projects.json",
         "workspace.contract.json",
         "workspace.json",

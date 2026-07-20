@@ -3,12 +3,15 @@
 // workspace scripts (see parity/): errors one per line on stderr, exit 1;
 // terse "<check> ok" lines on stdout; exit 2 on usage errors.
 import { spawnSync } from "node:child_process";
-import { lstatSync, readlinkSync, rmSync, symlinkSync } from "node:fs";
+import { lstatSync, mkdirSync, readlinkSync, rmSync, symlinkSync } from "node:fs";
+import { dirname } from "node:path";
 import { chdir } from "node:process";
 import {
   CONFIG_FILE,
   compareVersions,
   loadWorkspaceConfig,
+  readRawConfig,
+  unknownConfigKeys,
   type WorkspaceConfig,
 } from "./config.ts";
 import { structureErrors } from "./checks/structure.ts";
@@ -57,15 +60,24 @@ function chdirToRepoRoot(): void {
   if (result.status === 0) chdir(result.stdout.trim());
 }
 
-function loadConfigOrFail(): WorkspaceConfig {
+function loadConfigOrFail(json = false): WorkspaceConfig {
+  // Explicit function-type annotation so control-flow analysis treats calls
+  // as never-returning.
+  const jsonFail: (message: string) => never = (message) => {
+    if (json) {
+      console.log(JSON.stringify({ status: "fail", failed: 1, checks: {}, errors: [message] }));
+      process.exit(1);
+    }
+    failWith(message);
+  };
   let config: WorkspaceConfig;
   try {
     config = loadWorkspaceConfig();
   } catch (error) {
-    failWith(error instanceof Error ? error.message : String(error));
+    jsonFail(error instanceof Error ? error.message : String(error));
   }
   if (config.minVersion && compareVersions(kitVersion(), config.minVersion) < 0) {
-    failWith(
+    jsonFail(
       `${CONFIG_FILE} requires workspace-kit >= ${config.minVersion} (running ${kitVersion()})`,
     );
   }
@@ -114,24 +126,26 @@ function runContractCheck(file: string): number {
 function doctor(config: WorkspaceConfig, json: boolean): never {
   const bad: string[] = [];
   const checks: Record<string, string> = {};
+  const detail: string[] = [];
 
   const structural = structureErrors(config);
   bad.push(...structural);
+  detail.push(...structural);
   checks.structure = structural.length === 0 ? "ok" : "fail";
 
-  const jsonQuiet = json;
   const stdout = (line: string) => {
-    if (!jsonQuiet) console.log(line);
+    if (!json) console.log(line);
   };
-  const stderr = (text: string) => {
-    if (!jsonQuiet) console.error(text);
+  const stderr = (lines: string[]) => {
+    detail.push(...lines);
+    if (!json) console.error(lines.join("\n"));
   };
 
   if (config.wiki) {
     const result = wikiLintErrors(config.wiki.root);
     const errors = result.fatal ? [result.fatal] : result.errors;
     if (errors.length > 0) {
-      stderr(errors.join("\n"));
+      stderr(errors);
       bad.push("wiki-lint failed (exit 1)");
       checks.wiki = "fail";
     } else {
@@ -145,7 +159,7 @@ function doctor(config: WorkspaceConfig, json: boolean): never {
       const contract = loadContract(".", config.contract.file);
       const errors = workspaceErrors(".", config.contract.file);
       if (errors.length > 0) {
-        stderr(errors.join("\n"));
+        stderr(errors);
         bad.push("workspace contract failed (exit 1)");
         checks.contract = "fail";
       } else {
@@ -153,7 +167,7 @@ function doctor(config: WorkspaceConfig, json: boolean): never {
         checks.contract = "ok";
       }
     } catch (error) {
-      stderr(error instanceof Error ? error.message : String(error));
+      stderr([error instanceof Error ? error.message : String(error)]);
       bad.push("workspace contract failed (exit 1)");
       checks.contract = "fail";
     }
@@ -162,7 +176,7 @@ function doctor(config: WorkspaceConfig, json: boolean): never {
   if (config.docsLinks?.enabled) {
     const errors = docsLinkErrors(config.docsLinks);
     if (errors.length > 0) {
-      stderr(errors.join("\n"));
+      stderr(errors);
       bad.push("docs links failed (exit 1)");
       checks.docsLinks = "fail";
     } else {
@@ -174,7 +188,12 @@ function doctor(config: WorkspaceConfig, json: boolean): never {
   if (json) {
     const failed = Object.values(checks).filter((v) => v === "fail").length;
     console.log(
-      JSON.stringify({ status: bad.length > 0 ? "fail" : "pass", failed, checks }),
+      JSON.stringify({
+        status: bad.length > 0 ? "fail" : "pass",
+        failed,
+        checks,
+        errors: detail,
+      }),
     );
     process.exit(bad.length > 0 ? 1 : 0);
   }
@@ -212,10 +231,18 @@ function main(): void {
       }
     }
     if (!["personal", "runtime", "work"].includes(profile)) usageExit();
-    const result = initWorkspace(dir, profile as "personal" | "runtime" | "work");
+    let result;
+    try {
+      result = initWorkspace(dir, profile as "personal" | "runtime" | "work");
+    } catch (error) {
+      failWith(error instanceof Error ? error.message : String(error));
+    }
     for (const line of result.created) console.log(`created ${line}`);
     for (const line of result.skipped) console.log(`kept existing ${line}`);
     console.log(`workspace scaffolded (${profile} profile)`);
+    if (result.created.includes(".githooks/pre-commit")) {
+      console.log("enable the hook with: git config core.hooksPath .githooks");
+    }
     process.exit(0);
   }
 
@@ -224,7 +251,7 @@ function main(): void {
   if (command === "doctor") {
     const json = rest.includes("--json");
     if (rest.some((arg) => arg !== "--json")) usageExit();
-    doctor(loadConfigOrFail(), json);
+    doctor(loadConfigOrFail(json), json);
   }
 
   if (command === "wiki") {
@@ -236,12 +263,13 @@ function main(): void {
     }
     if (mode === "stale" && args.length === 0) {
       const report = wikiStaleReport(wiki.root);
+      if (report.fatal) failWith(report.fatal);
       for (const line of report.err) console.error(line);
       for (const line of report.out) console.log(line);
       process.exit(0);
     }
     if (mode === "backfill" && args.every((a) => a === "--dry-run")) {
-      const result = wikiBackfill({ dryRun: args.includes("--dry-run") });
+      const result = wikiBackfill({ root: wiki.root, dryRun: args.includes("--dry-run") });
       for (const line of result.planned) console.log(line);
       for (const line of result.out) console.log(line);
       process.exit(0);
@@ -252,13 +280,14 @@ function main(): void {
   if (command === "contract") {
     const [mode, ...args] = rest;
     const config = loadConfigOrFail();
-    const contract = requireSection(config.contract, "contract");
 
     if (mode === "check" && args.length === 0) {
+      const contract = requireSection(config.contract, "contract");
       process.exit(runContractCheck(contract.file));
     }
 
     if (mode === "peer" && args.length === 1) {
+      const contract = requireSection(config.contract, "contract");
       try {
         const current = loadContract(".", contract.file);
         const peer = loadContract(args[0]!);
@@ -331,7 +360,14 @@ function main(): void {
           }
           rmSync(path);
         }
-        symlinkSync(target, path);
+        try {
+          mkdirSync(dirname(path), { recursive: true });
+          symlinkSync(target, path);
+        } catch (error) {
+          failWith(
+            `could not link ${path}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
         console.log(`linked ${path} -> ${target}`);
       }
       console.log("links ok");
@@ -357,10 +393,13 @@ function main(): void {
   if (command === "config") {
     const [mode, ...args] = rest;
     if (mode !== "validate" || args.length > 0) usageExit();
+    loadConfigOrFail(); // includes the minVersion gate
     try {
-      loadWorkspaceConfig();
-    } catch (error) {
-      failWith(error instanceof Error ? error.message : String(error));
+      for (const key of unknownConfigKeys(readRawConfig())) {
+        console.error(`warning: unrecognized key ${key} (ignored by this kit version)`);
+      }
+    } catch {
+      // unreachable: loadConfigOrFail already parsed the file
     }
     console.log("config ok");
     process.exit(0);

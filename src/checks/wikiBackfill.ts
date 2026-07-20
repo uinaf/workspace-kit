@@ -73,7 +73,7 @@ function tagsFor(path: string, fm: Record<string, unknown>): string[] {
   return [...derived].sort();
 }
 
-function allSources(): Source[] {
+function allSources(root: string): Source[] {
   const paths = [
     ...walk("memory/intake"),
     ...walk("memory/notes"),
@@ -82,7 +82,11 @@ function allSources(): Source[] {
     ...walk("memory/contexts"),
     ...walk("memory").filter((p) => /^memory\/\d{4}-\d{2}-\d{2}\.md$/.test(p)),
     "AGENTS.md", "MEMORY.md", "USER.md", "TOOLS.md", "SOUL.md", "README.md", "CONTRIBUTING.md",
-  ].filter((p, i, a) => a.indexOf(p) === i && !p.startsWith("memory/wiki/"));
+  ].filter(
+    // Root convention files are optional: a scaffold without SOUL.md et al.
+    // must not crash the generator (recorded fix vs legacy).
+    (p, i, a) => a.indexOf(p) === i && !p.startsWith(`${root}/`) && existsSync(p),
+  );
 
   return paths.sort().map((path) => {
     const text = readFileSync(path, "utf8");
@@ -103,7 +107,8 @@ function yamlList(items: string[]): string {
 
 export type BackfillResult = { out: string[]; planned: string[] };
 
-export function wikiBackfill(options: { dryRun: boolean }): BackfillResult {
+export function wikiBackfill(options: { root: string; dryRun: boolean }): BackfillResult {
+  const root = options.root;
   const today = new Date().toLocaleDateString("sv-SE");
   const planned: string[] = [];
 
@@ -137,12 +142,12 @@ export function wikiBackfill(options: { dryRun: boolean }): BackfillResult {
       "|---|---|---|",
       ...sources.map(
         (s) =>
-          `| [${s.title.replaceAll("|", "\\|")}](${relative(dirname("memory/wiki/sources/index.md"), s.path).replaceAll(" ", "%20")}) | ${s.kind} | ${s.tags.slice(0, 8).map((t) => `#${t}`).join(" ")} |`,
+          `| [${s.title.replaceAll("|", "\\|")}](${relative(dirname(`${root}/sources/index.md`), s.path).replaceAll(" ", "%20")}) | ${s.kind} | ${s.tags.slice(0, 8).map((t) => `#${t}`).join(" ")} |`,
       ),
     ].join("\n");
   }
 
-  const sources = allSources();
+  const sources = allSources(root);
   const byTag = new Map<string, Source[]>();
   const byKind = new Map<string, Source[]>();
   for (const s of sources) {
@@ -160,7 +165,7 @@ export function wikiBackfill(options: { dryRun: boolean }): BackfillResult {
   const materializedTagEntries = tagEntries.filter(([, list]) => list.length >= 2);
   const kindEntries = [...byKind.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 
-  write("memory/wiki/sources/index.md", `---
+  write(`${root}/sources/index.md`, `---
 title: "Source Catalog"
 type: wiki-index
 status: active
@@ -189,14 +194,14 @@ Daily logs live in their own catalog at [[daily-log]] to keep this index navigab
 ${kindEntries.filter(([kind]) => kind !== "daily-log").map(([kind, list]) => `### ${kind}\n\n${table(list)}`).join("\n\n")}
 `);
 
-  write("memory/wiki/tags/index.md", `---
+  write(`${root}/tags/index.md`, `---
 title: "Tag Index"
 type: wiki-index
 status: active
 updated: ${today}
 tags: [tags, backfill, wiki]
 sources:
-  - memory/wiki/sources/index.md
+  - ${root}/sources/index.md
 related:
   - "[[../index]]"
 ---
@@ -210,7 +215,7 @@ ${tagEntries.map(([tag, list]) => (list.length >= 2 ? `- [[${tag}]] — ${list.l
 
   // Purge stale tag pages (tags that no longer materialize)
   const keepTags = new Set(materializedTagEntries.map(([tag]) => tag));
-  const tagsDir = "memory/wiki/tags";
+  const tagsDir = `${root}/tags`;
   try {
     for (const name of readdirSync(tagsDir)) {
       if (!name.endsWith(".md") || name === "index.md") continue;
@@ -226,7 +231,7 @@ ${tagEntries.map(([tag, list]) => (list.length >= 2 ? `- [[${tag}]] — ${list.l
   } catch {}
 
   for (const [tag, list] of materializedTagEntries) {
-    write(`memory/wiki/tags/${tag}.md`, `---
+    write(`${root}/tags/${tag}.md`, `---
 title: "Tag: ${tag}"
 type: wiki
 status: active
@@ -248,7 +253,7 @@ ${table(list)}
   }
 
   const daily = sources.filter((s) => s.kind === "daily-log");
-  write("memory/wiki/sources/daily-log.md", `---
+  write(`${root}/sources/daily-log.md`, `---
 title: "Daily Log Backfill"
 type: wiki-index
 status: active
