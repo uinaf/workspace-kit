@@ -1,20 +1,13 @@
 // Port of the legacy wiki-stale. Informational: never fails a run; report
 // text and ordering are parity-locked to parity/goldens.
 import { execSync } from "node:child_process";
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { relative } from "node:path";
 import { asList, isExternal, parseFrontmatter } from "../lib/frontmatter.ts";
-
-function walk(dir: string): string[] {
-  return readdirSync(dir)
-    .flatMap((name) => {
-      const path = join(dir, name);
-      const stat = statSync(path);
-      if (stat.isDirectory()) return walk(path);
-      return path.endsWith(".md") ? [path] : [];
-    })
-    .sort();
-}
+import {
+  normalizeWorkspacePath,
+  readWorkspaceText,
+  walkWorkspaceMarkdown,
+} from "../lib/workspaceFs.ts";
 
 function buildCommitDateMap(warn: (line: string) => void): Map<string, string> {
   const map = new Map<string, string>();
@@ -47,13 +40,19 @@ function isStaleExempt(rel: string): boolean {
 
 export type WikiStaleResult = { out: string[]; err: string[]; fatal?: string };
 
-export function wikiStaleReport(root: string): WikiStaleResult {
+export function wikiStaleReport(rawRoot: string): WikiStaleResult {
   const err: string[] = [];
+  let root: string;
   let pages: string[];
   try {
-    pages = walk(root);
-  } catch {
-    return { out: [], err: [], fatal: `missing ${root}` };
+    root = normalizeWorkspacePath(rawRoot, "wiki.root");
+    pages = walkWorkspaceMarkdown(".", root);
+  } catch (error) {
+    return {
+      out: [],
+      err: [],
+      fatal: error instanceof Error ? error.message : String(error),
+    };
   }
   const commitDates = buildCommitDateMap((line) => err.push(line));
 
@@ -69,7 +68,7 @@ export function wikiStaleReport(root: string): WikiStaleResult {
   for (const path of pages) {
     const rel = relative(root, path).replace(/\.md$/, "").replaceAll("\\\\", "/");
     if (isStaleExempt(rel)) continue;
-    const text = readFileSync(path, "utf8");
+    const text = readWorkspaceText(".", path);
     const fm = parseFrontmatter(text);
     const updated = typeof fm.updated === "string" ? fm.updated : null;
     if (!updated || !/^\d{4}-\d{2}-\d{2}$/.test(updated)) continue;

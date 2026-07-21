@@ -21,7 +21,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
           fetch-depth: 0
@@ -34,7 +34,6 @@ jobs:
           run-install: |
             - args: ["--frozen-lockfile"]
       - run: vp run verify # vp check + vp test + vp pack + cli smoke
-      - run: npm pack --dry-run --ignore-scripts
 
   release:
     needs: [verify]
@@ -49,7 +48,7 @@ jobs:
       contents: write # GitHub release + v* tag
       id-token: write # OIDC for npm trusted publishing
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
           fetch-depth: 0

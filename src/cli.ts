@@ -3,8 +3,6 @@
 // workspace scripts (see parity/): errors one per line on stderr, exit 1;
 // terse "<check> ok" lines on stdout; exit 2 on usage errors.
 import { spawnSync } from "node:child_process";
-import { lstatSync, mkdirSync, readlinkSync, rmSync, symlinkSync } from "node:fs";
-import { dirname } from "node:path";
 import { chdir } from "node:process";
 import {
   CONFIG_FILE,
@@ -28,6 +26,13 @@ import { docsLinkErrors } from "./checks/docsLinks.ts";
 import { limitWarnings } from "./checks/limits.ts";
 import { initWorkspace } from "./init.ts";
 import { kitVersion } from "./version.ts";
+import {
+  assertWorkspaceLinkTarget,
+  createWorkspaceLink,
+  readWorkspaceLink,
+  unlinkWorkspaceLink,
+  workspaceLstat,
+} from "./lib/workspaceFs.ts";
 
 const USAGE = `usage: workspace-kit <command>
 
@@ -57,30 +62,38 @@ function failWith(message: string): never {
   process.exit(1);
 }
 
+function doctorFailure(message: string, json: boolean): never {
+  if (json) {
+    console.log(
+      JSON.stringify({
+        status: "fail",
+        failed: 1,
+        warnings: 0,
+        checks: {},
+        errors: [message],
+      }),
+    );
+    process.exit(1);
+  }
+  failWith(message);
+}
+
 function chdirToRepoRoot(): void {
   const result = spawnSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" });
   if (result.status === 0) chdir(result.stdout.trim());
 }
 
 function loadConfigOrFail(json = false): WorkspaceConfig {
-  // Explicit function-type annotation so control-flow analysis treats calls
-  // as never-returning.
-  const jsonFail: (message: string) => never = (message) => {
-    if (json) {
-      console.log(JSON.stringify({ status: "fail", failed: 1, checks: {}, errors: [message] }));
-      process.exit(1);
-    }
-    failWith(message);
-  };
   let config: WorkspaceConfig;
   try {
     config = loadWorkspaceConfig();
   } catch (error) {
-    jsonFail(error instanceof Error ? error.message : String(error));
+    doctorFailure(error instanceof Error ? error.message : String(error), json);
   }
   if (config.minVersion && compareVersions(kitVersion(), config.minVersion) < 0) {
-    jsonFail(
+    doctorFailure(
       `${CONFIG_FILE} requires workspace-kit >= ${config.minVersion} (running ${kitVersion()})`,
+      json,
     );
   }
   return config;
@@ -258,7 +271,11 @@ function main(): void {
   if (command === "doctor") {
     const json = rest.includes("--json");
     if (rest.some((arg) => arg !== "--json")) usageExit();
-    doctor(loadConfigOrFail(json), json);
+    try {
+      doctor(loadConfigOrFail(json), json);
+    } catch (error) {
+      doctorFailure(error instanceof Error ? error.message : String(error), json);
+    }
   }
 
   if (command === "wiki") {
@@ -331,23 +348,25 @@ function main(): void {
     if (args.length > 0) usageExit();
     const config = loadConfigOrFail();
     const links = requireSection(config.links, "links");
-    const lstatOrNull = (path: string) => {
-      try {
-        return lstatSync(path);
-      } catch {
-        return null;
-      }
-    };
     if (mode === "check") {
       const bad: string[] = [];
       for (const { path, target } of links) {
-        const stat = lstatOrNull(path);
+        try {
+          assertWorkspaceLinkTarget(".", path, target);
+        } catch (error) {
+          bad.push(
+            `${path} has unsafe target ${target}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+          continue;
+        }
+        const stat = workspaceLstat(".", path, "link path");
         if (!stat) {
           bad.push(`missing ${path}`);
         } else if (!stat.isSymbolicLink()) {
           bad.push(`${path} should be a symlink to ${target}`);
-        } else if (readlinkSync(path) !== target) {
-          bad.push(`${path} points to ${readlinkSync(path)}, expected ${target}`);
+        } else {
+          const actual = readWorkspaceLink(".", path);
+          if (actual !== target) bad.push(`${path} points to ${actual}, expected ${target}`);
         }
       }
       if (bad.length > 0) {
@@ -358,18 +377,22 @@ function main(): void {
       process.exit(0);
     }
     if (mode === "fix") {
-      for (const { path, target } of links) {
-        const stat = lstatOrNull(path);
-        if (stat) {
-          if (stat.isSymbolicLink() && readlinkSync(path) === target) continue;
-          if (!stat.isSymbolicLink()) {
-            failWith(`${path} exists and is not a symlink; refusing to replace it`);
-          }
-          rmSync(path);
+      const current = links.map((link) => {
+        assertWorkspaceLinkTarget(".", link.path, link.target);
+        const stat = workspaceLstat(".", link.path, "link path");
+        if (stat && !stat.isSymbolicLink()) {
+          failWith(`${link.path} exists and is not a symlink; refusing to replace it`);
         }
+        return {
+          ...link,
+          actual: stat?.isSymbolicLink() ? readWorkspaceLink(".", link.path) : undefined,
+        };
+      });
+      for (const { path, target, actual } of current) {
+        if (actual === target) continue;
         try {
-          mkdirSync(dirname(path), { recursive: true });
-          symlinkSync(target, path);
+          if (actual !== undefined) unlinkWorkspaceLink(".", path);
+          createWorkspaceLink(".", path, target);
         } catch (error) {
           failWith(
             `could not link ${path}: ${error instanceof Error ? error.message : String(error)}`,
@@ -425,4 +448,8 @@ function main(): void {
   usageExit();
 }
 
-main();
+try {
+  main();
+} catch (error) {
+  failWith(error instanceof Error ? error.message : String(error));
+}

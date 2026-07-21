@@ -3,14 +3,31 @@
 // parity-locked to parity/goldens. Required files deliberately use
 // filesystem existence, not git-tracked state — the contract check owns
 // tracked semantics.
-import { existsSync, lstatSync, readdirSync, readFileSync, readlinkSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { posix } from "node:path";
 import type { DailyLogsConfig, LinkRule, RegistryConfig, WorkspaceConfig } from "../config.ts";
+import {
+  assertWorkspaceLinkTarget,
+  readWorkspaceDirectory,
+  readWorkspaceLink,
+  readWorkspaceText,
+  workspaceLstat,
+} from "../lib/workspaceFs.ts";
 
 export function requiredFileErrors(required: string[]): string[] {
   const bad: string[] = [];
   for (const path of required) {
-    if (!existsSync(path)) bad.push(`missing ${path}`);
+    const stat = workspaceLstat(".", path);
+    if (!stat) {
+      bad.push(`missing ${path}`);
+      continue;
+    }
+    if (stat.isSymbolicLink()) {
+      try {
+        assertWorkspaceLinkTarget(".", path, readWorkspaceLink(".", path));
+      } catch {
+        bad.push(`missing ${path}`);
+      }
+    }
   }
   return bad;
 }
@@ -18,7 +35,7 @@ export function requiredFileErrors(required: string[]): string[] {
 export function forbiddenFileErrors(forbidden: string[]): string[] {
   const bad: string[] = [];
   for (const path of forbidden) {
-    if (existsSync(path)) bad.push(`forbidden file exists: ${path}`);
+    if (workspaceLstat(".", path)) bad.push(`forbidden file exists: ${path}`);
   }
   return bad;
 }
@@ -26,12 +43,20 @@ export function forbiddenFileErrors(forbidden: string[]): string[] {
 export function linkErrors(links: LinkRule[]): string[] {
   const bad: string[] = [];
   for (const { path, target } of links) {
-    if (!existsSync(path)) continue; // missing is the required-list's job
-    const stat = lstatSync(path);
+    try {
+      assertWorkspaceLinkTarget(".", path, target);
+    } catch (error) {
+      bad.push(
+        `${path} has unsafe target ${target}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      continue;
+    }
+    const stat = workspaceLstat(".", path);
+    if (!stat) continue; // missing is the required-list's job
     if (!stat.isSymbolicLink()) {
       bad.push(`${path} should be a symlink to ${target}`);
     } else {
-      const actual = readlinkSync(path);
+      const actual = readWorkspaceLink(".", path);
       if (actual !== target) {
         bad.push(`${path} points to ${actual}, expected ${target}`);
       }
@@ -43,9 +68,9 @@ export function linkErrors(links: LinkRule[]): string[] {
 export function registryErrors(registry: RegistryConfig): string[] {
   const bad: string[] = [];
   const file = registry.file;
-  if (!existsSync(file)) return bad; // missing is the required-list's job
+  if (!workspaceLstat(".", file)) return bad; // missing is the required-list's job
   try {
-    const parsed: unknown = JSON.parse(readFileSync(file, "utf8"));
+    const parsed: unknown = JSON.parse(readWorkspaceText(".", file));
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       bad.push(`${file} should be an object of category arrays`);
     } else {
@@ -88,25 +113,32 @@ export function registryErrors(registry: RegistryConfig): string[] {
 
 export function dailyLogErrors(config: DailyLogsConfig): string[] {
   const out: string[] = [];
-  if (existsSync(config.root)) {
-    for (const name of readdirSync(config.root)) {
-      if (/^\d{4}-\d{2}-\d{2}\.md$/.test(name)) out.push(join(config.root, name));
+  for (const entry of readWorkspaceDirectory(".", config.root, "empty")) {
+    const path = posix.join(config.root, entry.name);
+    if (entry.isSymbolicLink()) {
+      throw new Error(`${path}: symbolic links are not allowed in daily logs`);
     }
+    if (entry.isFile() && /^\d{4}-\d{2}-\d{2}\.md$/.test(entry.name)) out.push(path);
   }
-  if (existsSync(config.contexts)) {
-    for (const slug of readdirSync(config.contexts)) {
-      const dir = join(config.contexts, slug);
-      if (!statSync(dir).isDirectory()) continue;
-      for (const name of readdirSync(dir)) {
-        if (name.endsWith(".md")) out.push(join(dir, name));
+  for (const entry of readWorkspaceDirectory(".", config.contexts, "empty")) {
+    const dir = posix.join(config.contexts, entry.name);
+    if (entry.isSymbolicLink()) {
+      throw new Error(`${dir}: symbolic links are not allowed in daily-log contexts`);
+    }
+    if (!entry.isDirectory()) continue;
+    for (const child of readWorkspaceDirectory(".", dir)) {
+      const path = posix.join(dir, child.name);
+      if (child.isSymbolicLink()) {
+        throw new Error(`${path}: symbolic links are not allowed in daily logs`);
       }
+      if (child.isFile() && child.name.endsWith(".md")) out.push(path);
     }
   }
   out.sort();
 
   const missingH1: string[] = [];
   for (const path of out) {
-    const text = readFileSync(path, "utf8").replace(/^﻿/, "");
+    const text = readWorkspaceText(".", path).replace(/^﻿/, "");
     if (!text.startsWith("# ")) missingH1.push(path);
   }
   if (missingH1.length > 0) {

@@ -53,8 +53,17 @@ The kit checks presence and link integrity only — never prose.
   cross-workspace movement stays a human-reviewed patch).
 - **Handoff gate** — `contract handoff <paths…>` screens proposed
   cross-workspace paths against a configured denylist. Absolute paths,
-  `..` traversal, and `.env*` basenames are always blocked; passing means
-  "eligible for human review", never approval.
+  `..` traversal, Windows drive/UNC paths, and `.env*` basenames are always
+  blocked; configured directory roots and their descendants are protected
+  with platform-independent path semantics. Passing means "eligible for human
+  review", never approval.
+- **Documentation links** — when enabled, `docs links` validates relative
+  destinations in tracked Markdown inline links, images, and reference
+  definitions. It supports angle-bracket destinations, balanced parentheses,
+  optional titles, and Markdown escapes; code spans/fences and external or
+  fragment-only destinations are ignored. Checked Markdown filenames must use
+  portable `/` separators; literal backslashes are reported as non-portable.
+  Targets must be tracked, so a gitignored-but-present file does not pass.
 
 ## Configuration reference (`workspace.json`)
 
@@ -87,12 +96,18 @@ The kit checks presence and link integrity only — never prose.
 ```
 
 Strict JSON, no comments in the real file; every section optional; unknown
-keys are ignored at runtime (additive schema evolution across staggered kit
-versions) and reported as warnings by `config validate`. The kit ships **no
-defaults that encode any consumer's specifics** — every list above is policy
-and lives with the workspace. One deliberate exception: `wiki backfill`
-scans a fixed raw-source layout (`memory/intake`, `memory/notes`, `docs/`,
-`user/`, `memory/contexts`, dated `memory/*.md` logs, and the root
+keys at every supported nesting level are ignored at runtime (additive schema
+evolution across staggered kit versions) and reported with their full paths as
+warnings by `config validate`. Configured filesystem paths are normalized as
+portable repository-relative paths and must stay inside the workspace;
+components ending in an ASCII space or period are rejected because other
+platforms may reinterpret them. Symlinked scan/output directories are rejected
+rather than followed. Link targets may use `..` only when they still resolve
+inside the workspace, and link output paths must be unique ignoring case. The kit
+ships **no defaults that encode any consumer's specifics** — every list above
+is policy and lives with the workspace. One deliberate exception: `wiki
+backfill` scans a fixed raw-source layout (`memory/intake`, `memory/notes`,
+`docs/`, `user/`, `memory/contexts`, dated `memory/*.md` logs, and the root
 convention files when present) — that layout _is_ the convention, and the
 generated catalogs land under the configured `wiki.root`.
 
@@ -101,11 +116,12 @@ generated catalogs land under the configured `wiki.root`.
 Errors print one per line to stderr and exit 1 (two parity-locked
 exceptions: the daily-log check prints one `missing H1:` block, and a green
 handoff prints the eligible paths as a list); success prints a terse
-`<check> ok`; usage errors exit 2. `doctor --json` emits a single-line
-`{"status","failed","checks","errors"}` summary for machine collection and
-never includes file-content excerpts. Checks are deterministic, offline, and
-credential-free. History-dependent checks (`contract`, `wiki stale`) need a
-full clone (`fetch-depth: 0` in CI).
+`<check> ok`; usage errors exit 2. `doctor --json` emits exactly one
+newline-terminated `{"status","failed","warnings","checks","errors"}` object
+on stdout and keeps stderr empty, including configuration and operational
+failures. It never includes file-content excerpts. Checks are deterministic,
+offline, and credential-free. History-dependent checks (`contract`, `wiki
+stale`) need a full clone (`fetch-depth: 0` in CI).
 
 ## Profiles (`init`)
 

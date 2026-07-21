@@ -2,9 +2,9 @@
 // evaluation order are parity-locked to parity/goldens — do not "improve"
 // them without regenerating the oracle.
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { posix, resolve, win32 } from "node:path";
 import type { HandoffConfig } from "../config.ts";
+import { readWorkspaceText } from "../lib/workspaceFs.ts";
 
 export type Contract = {
   repository: string;
@@ -47,7 +47,7 @@ function textList(value: unknown, field: string): string[] {
 }
 
 export function loadContract(repoRoot = ".", file = "workspace.contract.json"): Contract {
-  const value = record(JSON.parse(readFileSync(resolve(repoRoot, file), "utf8")));
+  const value = record(JSON.parse(readWorkspaceText(repoRoot, file, "contract file")));
   return {
     repository: text(value.repository, "repository"),
     peerRepository: text(value.peerRepository, "peerRepository"),
@@ -148,19 +148,38 @@ export function peerErrors(
 export function isPrivateHandoffPath(path: string, handoff: HandoffConfig): boolean {
   // Kit-level invariants: never configurable. Raw-path checks run first so
   // traversal is always blocked regardless of what it would normalize to.
-  if (!path || path.startsWith("/") || path.split("/").includes("..")) return true;
-  // Normalize before list matching so "./MEMORY.md" and "memory//x.md"
+  const portable = path.replaceAll("\\", "/");
+  if (
+    !path ||
+    path.includes("\0") ||
+    posix.isAbsolute(portable) ||
+    win32.isAbsolute(path) ||
+    /^[A-Za-z]:/.test(portable) ||
+    portable.split("/").includes("..")
+  ) {
+    return true;
+  }
+  // Normalize candidates and configured rules alike so spelling differences
   // cannot sidestep the denylist.
   const normalized = normalizePath(path);
+  if (!normalized) return true;
   const base = normalized.split("/").at(-1) ?? "";
   if (base.startsWith(".env")) return true;
   return (
-    handoff.paths.includes(normalized) ||
-    handoff.prefixes.some((prefix) => normalized.startsWith(prefix))
+    handoff.paths.some((configured) => normalizePath(configured) === normalized) ||
+    handoff.prefixes.some((configured) => {
+      const prefix = normalizePath(configured);
+      return prefix !== "" && (normalized === prefix || normalized.startsWith(`${prefix}/`));
+    })
   );
 }
 
 function normalizePath(path: string): string {
-  const segments = path.split("/").filter((segment) => segment !== "" && segment !== ".");
-  return segments.join("/");
+  const segments = path
+    .replaceAll("\\", "/")
+    .split("/")
+    .filter((segment) => segment !== "" && segment !== ".");
+  // Treat case aliases conservatively so a path approved on a case-sensitive
+  // host cannot name protected content when handed off on Windows or macOS.
+  return segments.join("/").toLowerCase();
 }

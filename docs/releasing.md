@@ -15,9 +15,14 @@ maintainer machine.
 ## Versioning is tag-only
 
 The `main` ruleset requires signed commits, so there are no bot bump-back
-commits: the checked-in `package.json` version is **not authoritative** —
-semantic-release derives the version from the last `v*` tag and stamps it
-into the published tarball. Look up the current version with
+commits: the checked-in `package.json` version is **not authoritative**.
+Full source checkouts use the greater of that placeholder and the latest
+reachable strict `vX.Y.Z` tag; builds bake that effective version into the CLI.
+Shallow clones and source archives fail with a tag-history instruction instead
+of silently stamping the placeholder version.
+Semantic-release derives the next version, stamps `package.json` before the
+prepack gate, and therefore bakes the release version into the published
+tarball. Look up the released version with
 `npm view @uinaf/workspace-kit version` or the latest tag, not package.json.
 
 ## Configuration record (already done)
@@ -46,8 +51,10 @@ into the published tarball. Look up the current version with
   verified separately with read-only permissions and no environment access.
 - Publish concurrency is non-cancellable (queued, never killed mid-publish).
 - `prepack` runs the full verify gate (which rebuilds a clean `dist/`)
-  before any tarball is produced; verify CI audits `npm pack --dry-run`
-  contents.
+  before any tarball is produced. The gate stages the effective version the
+  same way semantic-release does, asserts the exact install-lifecycle-free tarball
+  contents, installs it offline, and exercises its bin, scaffold, manifest
+  version, and validation paths.
 - Workflow permissions are per-job and minimal; actions are SHA-pinned;
   `persist-credentials: false` everywhere. The workflows themselves are
   linted by actionlint + zizmor in CI (`actions-lint.yml`).

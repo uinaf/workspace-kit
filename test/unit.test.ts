@@ -86,12 +86,14 @@ test("missing wiki log is an error, not a crash (recorded fix)", () => {
 });
 
 test("handoff invariants are not configurable", () => {
-  for (const path of ["", "/etc/passwd", "a/../b", ".env", ".env.local", "x/.env.prod"]) {
+  for (const path of ["", "/etc/passwd", "a/../b", ".env", ".ENV", ".env.local", "x/.Env.prod"]) {
     assert.equal(isPrivateHandoffPath(path, HANDOFF), true, path);
   }
   assert.equal(isPrivateHandoffPath("scripts/ok.ts", HANDOFF), false);
   assert.equal(isPrivateHandoffPath("memory/x.md", HANDOFF), true);
+  assert.equal(isPrivateHandoffPath("MEMORY/x.md", HANDOFF), true);
   assert.equal(isPrivateHandoffPath("SOUL.md", HANDOFF), true);
+  assert.equal(isPrivateHandoffPath("soul.md", HANDOFF), true);
 });
 
 test("loadContract fails fast in field order", () => {

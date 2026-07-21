@@ -20,11 +20,13 @@ npx -y @uinaf/workspace-kit init --profile personal   # scaffold a workspace
 npx -y @uinaf/workspace-kit doctor                    # validate it
 ```
 
-`doctor` runs every check the workspace declares in its `workspace.json` —
-structure, wiki hygiene, ownership contracts, handoff screening, link lint,
-size limits. Absent config sections disable their checks, unknown files are
-always tolerated, and everything runs offline with zero runtime
-dependencies. `workspace-kit --help` lists all commands.
+`doctor` runs every repository-state check the workspace declares in its
+`workspace.json` — structure, wiki hygiene, ownership contracts,
+documentation links, and size limits. Candidate paths are screened separately
+with `contract handoff <paths...>` because passing that gate means only
+"eligible for human review." Absent config sections disable their checks,
+unknown files are always tolerated, and everything runs offline with zero
+runtime dependencies. `workspace-kit --help` lists all commands.
 
 ## Docs
 
