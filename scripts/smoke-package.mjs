@@ -125,6 +125,8 @@ try {
   assert.match(hook, /registry validate/);
   run(process.execPath, [installedCli, "config", "validate"], fixtureDir);
   run(process.execPath, [installedCli, "registry", "validate"], fixtureDir);
+  run(process.execPath, [installedCli, "wiki", "backfill"], fixtureDir);
+  run(process.execPath, [installedCli, "wiki", "backfill", "--check"], fixtureDir);
 
   console.log(`packed smoke ok (${sourceVersion})`);
 } finally {

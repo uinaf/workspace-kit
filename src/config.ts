@@ -21,6 +21,7 @@ export type WikiConfig = {
   requiredFields: string[];
   indexCoverage: boolean;
   logChronology: boolean;
+  revisionStaleness: boolean;
 };
 export type LimitRule = { pattern: string; maxLines: number };
 export type ContractConfig = { file: string };
@@ -123,7 +124,13 @@ const CONFIG_SHAPE: ConfigShape = {
     },
   },
   dailyLogs: { root: true, contexts: true },
-  wiki: { root: true, requiredFields: true, indexCoverage: true, logChronology: true },
+  wiki: {
+    root: true,
+    requiredFields: true,
+    indexCoverage: true,
+    logChronology: true,
+    revisionStaleness: true,
+  },
   limits: [{ pattern: true, maxLines: true }],
   contract: { file: true },
   handoff: { paths: true, prefixes: true },
@@ -250,7 +257,7 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
   if ("wiki" in value) {
     if (!isRecord(value.wiki)) fail("wiki must be an object");
     const wiki = value.wiki;
-    for (const flag of ["indexCoverage", "logChronology"]) {
+    for (const flag of ["indexCoverage", "logChronology", "revisionStaleness"]) {
       if (flag in wiki && typeof wiki[flag] !== "boolean") {
         fail(`wiki.${flag} must be a boolean`);
       }
@@ -263,6 +270,7 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
           : ["title", "type", "status", "updated", "tags", "sources"],
       indexCoverage: wiki.indexCoverage === true,
       logChronology: wiki.logChronology === true,
+      revisionStaleness: wiki.revisionStaleness === true,
     };
   }
 

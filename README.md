@@ -18,6 +18,7 @@ plus git on PATH for the history-dependent checks. Pin exact versions.
 ```
 npx -y @uinaf/workspace-kit init --profile personal   # scaffold a workspace
 npx -y @uinaf/workspace-kit doctor                    # validate it
+npx -y @uinaf/workspace-kit wiki backfill --check     # detect catalog drift
 npx -y @uinaf/workspace-kit registry validate         # validate projects.json
 ```
 

@@ -2,7 +2,7 @@
 // pre-release adversarial-review findings.
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
-import { execSync, spawnSync } from "node:child_process";
+import { execFileSync, execSync, spawnSync } from "node:child_process";
 import {
   existsSync,
   lstatSync,
@@ -14,7 +14,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { initWorkspace } from "../src/init.ts";
 
@@ -57,12 +57,60 @@ test("wiki backfill honors a configured wiki.root", () => {
   assert.ok(!existsSync(join(dir, "memory", "wiki", "sources")), "must not write memory/wiki");
 });
 
+test("wiki backfill --check reports drift without mutating and --dry-run stays green", () => {
+  const dir = scaffold("personal");
+  commitAll(dir);
+
+  const check = kit(dir, "wiki", "backfill", "--check");
+  assert.equal(check.status, 1);
+  assert.match(check.stdout, /would write memory\/wiki\/sources\/index\.md/);
+  assert.ok(!existsSync(join(dir, "memory", "wiki", "sources", "index.md")));
+
+  const dryRun = kit(dir, "wiki", "backfill", "--dry-run");
+  assert.equal(dryRun.status, 0, dryRun.stderr);
+  assert.equal(dryRun.stdout, check.stdout);
+
+  assert.equal(kit(dir, "wiki", "backfill").status, 0);
+  const clean = kit(dir, "wiki", "backfill", "--check");
+  assert.equal(clean.status, 0, clean.stderr);
+  assert.doesNotMatch(clean.stdout, /^would /m);
+
+  const staleTag = join(dir, "memory", "wiki", "tags", "orphan.md");
+  writeFileSync(staleTag, "# Orphan\n");
+  const deleteCheck = kit(dir, "wiki", "backfill", "--check");
+  assert.equal(deleteCheck.status, 1);
+  assert.match(deleteCheck.stdout, /would delete memory\/wiki\/tags\/orphan\.md/);
+  assert.ok(existsSync(staleTag), "check mode must not delete stale generated pages");
+});
+
+test("help documents the wiki backfill check mode", () => {
+  const dir = scaffold("work");
+  const result = kit(dir, "--help");
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /wiki backfill \[--dry-run\|--check\]/);
+});
+
 test("wiki stale reports a missing root cleanly", () => {
   const dir = scaffold("personal");
   rmSync(join(dir, "memory", "wiki"), { recursive: true });
   const result = kit(dir, "wiki", "stale");
   assert.equal(result.status, 1);
   assert.match(result.stderr, /missing memory\/wiki/);
+});
+
+test("wiki stale fails clearly instead of reporting clean in a shallow clone", () => {
+  const origin = scaffold("personal");
+  const config = JSON.parse(readFileSync(join(origin, "workspace.json"), "utf8"));
+  config.wiki.revisionStaleness = true;
+  writeFileSync(join(origin, "workspace.json"), JSON.stringify(config, null, 2));
+  commitAll(origin);
+  const clone = join(mkdtempSync(join(tmpdir(), "cli-shallow-")), "workspace");
+  execFileSync("git", ["clone", "-q", "--depth", "1", pathToFileURL(origin).href, clone]);
+
+  const result = kit(clone, "wiki", "stale");
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /wiki stale requires a full Git history; repository is shallow/);
+  assert.doesNotMatch(result.stdout, /wiki-stale ok/);
 });
 
 test("contract handoff works without a contract section and blocks ./ paths", () => {

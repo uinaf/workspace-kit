@@ -41,7 +41,7 @@ commands:
   doctor [--json]          run all checks configured in ${CONFIG_FILE}
   wiki lint                lint the wiki layer
   wiki stale               report wiki pages older than their sources
-  wiki backfill [--dry-run]  regenerate the wiki source/tag catalogs
+  wiki backfill [--dry-run|--check]  regenerate or verify wiki source/tag catalogs
   limits                   report soft size-limit warnings (never fails)
   contract check           validate this repository's workspace contract
   contract peer <path>     validate both contracts and history separation
@@ -288,17 +288,21 @@ function main(): void {
       process.exit(runWikiLint(wiki));
     }
     if (mode === "stale" && args.length === 0) {
-      const report = wikiStaleReport(wiki.root);
+      const report = wikiStaleReport(wiki.root, {
+        revisionStaleness: wiki.revisionStaleness,
+      });
       if (report.fatal) failWith(report.fatal);
       for (const line of report.err) console.error(line);
       for (const line of report.out) console.log(line);
       process.exit(0);
     }
-    if (mode === "backfill" && args.every((a) => a === "--dry-run")) {
-      const result = wikiBackfill({ root: wiki.root, dryRun: args.includes("--dry-run") });
+    const dryRun = args.length === 1 && args[0] === "--dry-run";
+    const check = args.length === 1 && args[0] === "--check";
+    if (mode === "backfill" && (args.length === 0 || dryRun || check)) {
+      const result = wikiBackfill({ root: wiki.root, dryRun: dryRun || check });
       for (const line of result.planned) console.log(line);
       for (const line of result.out) console.log(line);
-      process.exit(0);
+      process.exit(check && result.planned.length > 0 ? 1 : 0);
     }
     usageExit();
   }

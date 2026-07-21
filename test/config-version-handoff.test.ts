@@ -19,7 +19,12 @@ test("config reports nested unknown keys and canonicalizes repository paths", ()
       entry: { required: ["name"], optional: [] },
     },
     dailyLogs: { root: "./memory", contexts: "memory\\contexts" },
-    wiki: { root: "./memory//wiki", indexCoverage: false, indexCoverge: true },
+    wiki: {
+      root: "./memory//wiki",
+      indexCoverage: false,
+      revisionStaleness: true,
+      indexCoverge: true,
+    },
     contract: { file: ".\\workspace.contract.json" },
     handoff: { paths: [], prefixes: ["memory/"], prefxies: [] },
   };
@@ -37,7 +42,20 @@ test("config reports nested unknown keys and canonicalizes repository paths", ()
   assert.equal(parsed.registry?.file, "projects.json");
   assert.deepEqual(parsed.dailyLogs, { root: "memory", contexts: "memory/contexts" });
   assert.equal(parsed.wiki?.root, "memory/wiki");
+  assert.equal(parsed.wiki?.revisionStaleness, true);
   assert.equal(parsed.contract?.file, "workspace.contract.json");
+});
+
+test("revision staleness is opt-in and must be boolean", () => {
+  const parsed = parseWorkspaceConfig({ wiki: { root: "memory/wiki" } });
+  assert.equal(parsed.wiki?.revisionStaleness, false);
+  assert.throws(
+    () =>
+      parseWorkspaceConfig({
+        wiki: { root: "memory/wiki", revisionStaleness: "true" },
+      }),
+    /wiki\.revisionStaleness must be a boolean/,
+  );
 });
 
 test("config rejects repository paths and link targets that escape the workspace", () => {

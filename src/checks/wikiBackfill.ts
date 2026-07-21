@@ -1,6 +1,7 @@
 // Port of the legacy wiki-backfill generator. Generated content, the
 // date-only-diff idempotency suppression, and the stale tag-page purge are
-// parity-locked to parity/goldens. Adds --dry-run (no legacy counterpart).
+// parity-locked to parity/goldens. Dry-run planning also powers the kit-only
+// --check CLI mode; neither mode mutates the workspace.
 import { basename, dirname, posix, relative } from "node:path";
 import { parseFrontmatter } from "../lib/frontmatter.ts";
 import {

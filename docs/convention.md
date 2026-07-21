@@ -27,8 +27,19 @@ The kit checks presence and link integrity only — never prose.
   `log.md` records changes with `## [YYYY-MM-DD] slug | summary` headings.
 - **Generated catalogs** — `wiki backfill` maintains `sources/` and `tags/`
   indexes from the raw layer (tag pages materialize at two or more sources;
-  stale tag pages are purged). `wiki stale` reports pages whose sources have
-  newer commits than their `updated:` stamp — informational, never a gate.
+  stale tag pages are purged). `wiki backfill --dry-run` prints the same write
+  and deletion plan without applying it and always exits zero;
+  `wiki backfill --check` is also non-mutating but exits one when that plan is
+  non-empty, making catalog drift enforceable in CI.
+- **Staleness** — `wiki stale` reports committed sources whose latest commit
+  date is after the page's `updated:` stamp. This legacy-compatible default is
+  date-only. Opt-in `wiki.revisionStaleness` also compares the source blob at
+  `HEAD` with the blob visible in the page's latest commit; a different blob
+  proves that the page revision did not see the current source state,
+  including same-day and divergent-branch changes, and is reported with a
+  `newer commit` marker. Findings remain informational and exit zero. In this
+  stricter mode, missing or shallow Git history is an operational error
+  because a clean result could not be proven.
 - **llm-wiki enforcement (opt-in)** — for workspaces adopting the full
   LLM-maintained-wiki discipline: `wiki.indexCoverage` requires every
   non-exempt page to be cataloged directly in `index.md` (the index is a
@@ -101,6 +112,7 @@ The kit checks presence and link integrity only — never prose.
     "requiredFields": ["title", "type", "status", "updated", "tags", "sources"],
     "indexCoverage": false, // every page cataloged in index.md
     "logChronology": false, // log.md dates never decrease (append-only proxy)
+    "revisionStaleness": false, // compare source blobs at HEAD and page revision
   },
   "limits": [
     // soft limits: warnings, never failures
@@ -139,7 +151,14 @@ newline-terminated `{"status","failed","warnings","checks","errors"}` object
 on stdout and keeps stderr empty, including configuration and operational
 failures. It never includes file-content excerpts. Checks are deterministic,
 offline, and credential-free. History-dependent checks (`contract`, `wiki
-stale`) need a full clone (`fetch-depth: 0` in CI).
+stale`) need a full clone (`fetch-depth: 0` in CI). With
+`wiki.revisionStaleness` enabled, `wiki stale` exits 1 with an explicit error
+in a shallow clone instead of printing `wiki-stale ok`; the default mode keeps
+the parity-locked legacy fallback and output.
+
+`wiki backfill --check` prints every pending `would write` or `would delete`
+operation and exits 1 when any are present; a clean generated catalog exits 0.
+`--dry-run` prints the same plan but exits 0 whether or not work is pending.
 
 `registry validate` also exits 1 for malformed entries or unsafe local checkout
 state and prints `registry ok` on success. It reads Git metadata only; it never
