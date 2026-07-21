@@ -119,9 +119,12 @@ try {
   );
   const config = JSON.parse(readFileSync(join(fixtureDir, "workspace.json"), "utf8"));
   assert.equal(config.minVersion, sourceVersion);
+  assert.ok(config.registry.entry.required.includes("mode"));
   const hook = readFileSync(join(fixtureDir, ".githooks", "pre-commit"), "utf8");
   assert.match(hook, new RegExp(`@uinaf/workspace-kit@${sourceVersion.replaceAll(".", "\\.")}`));
+  assert.match(hook, /registry validate/);
   run(process.execPath, [installedCli, "config", "validate"], fixtureDir);
+  run(process.execPath, [installedCli, "registry", "validate"], fixtureDir);
 
   console.log(`packed smoke ok (${sourceVersion})`);
 } finally {

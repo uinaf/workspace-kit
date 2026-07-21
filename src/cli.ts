@@ -24,6 +24,7 @@ import {
 } from "./checks/contract.ts";
 import { docsLinkErrors } from "./checks/docsLinks.ts";
 import { limitWarnings } from "./checks/limits.ts";
+import { projectRegistryErrors } from "./checks/registry.ts";
 import { initWorkspace } from "./init.ts";
 import { kitVersion } from "./version.ts";
 import {
@@ -47,6 +48,7 @@ commands:
   contract handoff <path...>  screen proposed handoff paths
   links check | fix        verify or recreate configured alias symlinks
   docs links               check relative links in tracked markdown
+  registry validate        validate project-registry policy and local checkouts
   config validate          validate ${CONFIG_FILE} itself
   init [--profile personal|runtime|work] [--dir <path>]  scaffold a workspace
   --version                print the kit version
@@ -417,6 +419,20 @@ function main(): void {
       process.exit(1);
     }
     console.log("docs-links ok");
+    process.exit(0);
+  }
+
+  if (command === "registry") {
+    const [mode, ...args] = rest;
+    if (mode !== "validate" || args.length > 0) usageExit();
+    const config = loadConfigOrFail();
+    const registry = requireSection(config.registry, "registry");
+    const errors = projectRegistryErrors(".", registry);
+    if (errors.length > 0) {
+      console.error(errors.join("\n"));
+      process.exit(1);
+    }
+    console.log("registry ok");
     process.exit(0);
   }
 

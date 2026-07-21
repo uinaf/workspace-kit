@@ -5,9 +5,15 @@ import {
 } from "./lib/workspaceFs.ts";
 
 export type LinkRule = { path: string; target: string };
+export type ProjectRegistryConfig = {
+  pathPrefix: string;
+  modes: string[];
+  catalog?: { field: string; modes: string[] };
+};
 export type RegistryConfig = {
   file: string;
   entry: { required: string[]; optional: string[] };
+  project?: ProjectRegistryConfig;
 };
 export type DailyLogsConfig = { root: string; contexts: string };
 export type WikiConfig = {
@@ -58,7 +64,7 @@ function workspacePathList(value: unknown, field: string): string[] {
   );
 }
 
-function portablePathIdentity(path: string): string {
+export function portablePathIdentity(path: string): string {
   // Uppercase collapses Unicode aliases that lowercasing misses (for example,
   // long s/S and final sigma/sigma) on common case-insensitive filesystems.
   return path.normalize("NFC").toUpperCase().normalize("NFC");
@@ -69,6 +75,34 @@ function text(value: unknown, field: string): string {
     fail(`${field} must be a non-empty string`);
   }
   return value;
+}
+
+function nonEmptyUniqueStringList(value: unknown, field: string): string[] {
+  const values = stringList(value, field);
+  if (values.length === 0 || values.some((item) => item.length === 0)) {
+    fail(`${field} must be a non-empty array of non-empty strings`);
+  }
+  if (new Set(values).size !== values.length) fail(`${field} must not contain duplicates`);
+  return values;
+}
+
+function homePathPrefix(value: unknown, field: string): string {
+  const prefix = text(value, field);
+  if (
+    !prefix.startsWith("~/") ||
+    prefix.length <= 2 ||
+    !prefix.endsWith("/") ||
+    prefix.includes("\\") ||
+    prefix.includes("\0") ||
+    prefix.includes("//") ||
+    prefix
+      .slice(2, -1)
+      .split("/")
+      .some((part) => part === "." || part === ".." || /[ .]$/.test(part))
+  ) {
+    fail(`${field} must be a portable, traversal-free home-relative directory ending in /`);
+  }
+  return prefix;
 }
 
 type ConfigShape = true | { readonly [key: string]: ConfigShape } | readonly [ConfigShape];
@@ -82,6 +116,11 @@ const CONFIG_SHAPE: ConfigShape = {
   registry: {
     file: true,
     entry: { required: true, optional: true },
+    project: {
+      pathPrefix: true,
+      modes: true,
+      catalog: { field: true, modes: true },
+    },
   },
   dailyLogs: { root: true, contexts: true },
   wiki: { root: true, requiredFields: true, indexCoverage: true, logChronology: true },
@@ -163,13 +202,38 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
     if (!isRecord(value.registry)) fail("registry must be an object");
     const entry = value.registry.entry;
     if (!isRecord(entry)) fail("registry.entry must be an object");
-    out.registry = {
+    const registry: RegistryConfig = {
       file: normalizeWorkspacePath(text(value.registry.file, "registry.file"), "registry.file"),
       entry: {
         required: stringList(entry.required, "registry.entry.required"),
         optional: "optional" in entry ? stringList(entry.optional, "registry.entry.optional") : [],
       },
     };
+    if ("project" in value.registry) {
+      if (!isRecord(value.registry.project)) fail("registry.project must be an object");
+      const project = value.registry.project;
+      const modes = nonEmptyUniqueStringList(project.modes, "registry.project.modes");
+      registry.project = {
+        pathPrefix: homePathPrefix(project.pathPrefix, "registry.project.pathPrefix"),
+        modes,
+      };
+      if ("catalog" in project) {
+        if (!isRecord(project.catalog)) fail("registry.project.catalog must be an object");
+        const field = text(project.catalog.field, "registry.project.catalog.field");
+        if (!registry.entry.required.includes(field) && !registry.entry.optional.includes(field)) {
+          fail(`registry.project.catalog.field must be declared in registry.entry`);
+        }
+        const catalogModes = nonEmptyUniqueStringList(
+          project.catalog.modes,
+          "registry.project.catalog.modes",
+        );
+        if (catalogModes.some((mode) => !modes.includes(mode))) {
+          fail("registry.project.catalog.modes must be included in registry.project.modes");
+        }
+        registry.project.catalog = { field, modes: catalogModes };
+      }
+    }
+    out.registry = registry;
   }
 
   if ("dailyLogs" in value) {

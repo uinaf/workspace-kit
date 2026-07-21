@@ -65,12 +65,12 @@ export function linkErrors(links: LinkRule[]): string[] {
   return bad;
 }
 
-export function registryErrors(registry: RegistryConfig): string[] {
+export function registryErrors(registry: RegistryConfig, repoRoot = "."): string[] {
   const bad: string[] = [];
   const file = registry.file;
-  if (!workspaceLstat(".", file)) return bad; // missing is the required-list's job
+  if (!workspaceLstat(repoRoot, file)) return bad; // missing is the required-list's job
   try {
-    const parsed: unknown = JSON.parse(readWorkspaceText(".", file));
+    const parsed: unknown = JSON.parse(readWorkspaceText(repoRoot, file));
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       bad.push(`${file} should be an object of category arrays`);
     } else {

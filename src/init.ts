@@ -8,7 +8,12 @@ import { createWorkspaceLink, workspaceLstat, writeWorkspaceText } from "./lib/w
 export type Profile = "personal" | "runtime" | "work";
 export type InitResult = { created: string[]; skipped: string[] };
 
-const AGENTS_SKELETON = `# AGENTS.md
+function agentsSkeleton(profile: Profile): string {
+  const registryValidation =
+    profile === "personal" || profile === "runtime"
+      ? "\nRun `npx @uinaf/workspace-kit registry validate` before committing registry changes."
+      : "";
+  return `# AGENTS.md
 
 <!-- Owner-authored: workspace-kit scaffolds structure only and never edits
      this file again. Replace every TODO with your own operating rules. -->
@@ -28,11 +33,13 @@ TODO: planning, approval, and scope rules for agents working here.
 ## Validation
 
 Run \`npx @uinaf/workspace-kit doctor\` before committing.
+${registryValidation}
 
 ## Boundaries
 
 TODO: what is private, what may leave this workspace, and how.
 `;
+}
 
 function wikiPage(title: string, type: string, body: string, today: string): string {
   return `---
@@ -87,7 +94,7 @@ export function initWorkspace(dir: string, profile: Profile): InitResult {
     created.push(rel);
   };
 
-  put("AGENTS.md", AGENTS_SKELETON);
+  put("AGENTS.md", agentsSkeleton(profile));
   link("CLAUDE.md", "AGENTS.md");
   put("docs/README.md", "# Docs\n\nTODO: index the documents that live under docs/.\n");
 
@@ -127,10 +134,11 @@ export function initWorkspace(dir: string, profile: Profile): InitResult {
 set -e
 cd "$(git rev-parse --show-toplevel)"
 if ! command -v node >/dev/null 2>&1; then
-  echo "pre-commit: node not found; skipping workspace-kit doctor" >&2
+  echo "pre-commit: node not found; skipping workspace-kit checks" >&2
   exit 0
 fi
 npx --yes @uinaf/workspace-kit@${kitVersion()} doctor
+npx --yes @uinaf/workspace-kit@${kitVersion()} registry validate
 `,
       0o755,
     );
@@ -138,7 +146,15 @@ npx --yes @uinaf/workspace-kit@${kitVersion()} doctor
     required.push("memory/wiki/index.md", "memory/wiki/schema.md", "memory/wiki/log.md");
     config.registry = {
       file: "projects.json",
-      entry: { required: ["name", "repo", "path", "owns"], optional: ["branch"] },
+      entry: {
+        required: ["name", "repo", "path", "owns", "mode"],
+        optional: ["branch", "catalog"],
+      },
+      project: {
+        pathPrefix: "~/projects/",
+        modes: ["managed", "route-only"],
+        catalog: { field: "catalog", modes: ["managed"] },
+      },
     };
     config.dailyLogs = { root: "memory", contexts: "memory/contexts" };
     config.wiki = { root: "memory/wiki" };

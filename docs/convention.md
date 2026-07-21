@@ -43,7 +43,17 @@ The kit checks presence and link integrity only — never prose.
 ## 3. Operations (optional)
 
 - **Registry** — a JSON file mapping project categories to entries
-  (`{name, repo, path, owns, …}`); the entry shape is config-declared.
+  (`{name, repo, path, owns, mode, …}`); the entry shape is config-declared.
+  An explicit `registry.project` policy enables `registry validate`: the
+  consumer declares the allowed modes and home-relative checkout prefix, while
+  `repo` follows the portable GitHub `owner/repo` contract. Every entry is
+  parsed before local checkout inspection, so malformed optional fields fail
+  without running partial validation. Existing checkouts must be repository
+  roots with the declared GitHub origin; portable case/Unicode path aliases and
+  different paths resolving to the same canonical checkout are rejected. The optional catalog policy declares its
+  field and allowed modes; catalog values must name regular, repository-relative
+  files without symlink traversal. Missing checkouts are valid. This command is
+  opt-in and is not part of parity-locked `doctor` output.
 - **Ownership contract** — for peered workspaces descended from one
   historical ancestor: `workspace.contract.json` names the repository, its
   peer, the shared ancestor commit, and required/forbidden owner paths.
@@ -75,7 +85,15 @@ The kit checks presence and link integrity only — never prose.
   "links": [{ "path": "CLAUDE.md", "target": "AGENTS.md" }],
   "registry": {
     "file": "projects.json",
-    "entry": { "required": ["name", "repo", "path", "owns"], "optional": ["branch"] },
+    "entry": {
+      "required": ["name", "repo", "path", "owns", "mode"],
+      "optional": ["branch", "catalog"],
+    },
+    "project": {
+      "pathPrefix": "~/projects/",
+      "modes": ["managed", "route-only"],
+      "catalog": { "field": "catalog", "modes": ["managed"] },
+    },
   },
   "dailyLogs": { "root": "memory", "contexts": "memory/contexts" },
   "wiki": {
@@ -123,19 +141,25 @@ failures. It never includes file-content excerpts. Checks are deterministic,
 offline, and credential-free. History-dependent checks (`contract`, `wiki
 stale`) need a full clone (`fetch-depth: 0` in CI).
 
+`registry validate` also exits 1 for malformed entries or unsafe local checkout
+state and prints `registry ok` on success. It reads Git metadata only; it never
+clones, fetches, pulls, or changes a checkout.
+
 ## Profiles (`init`)
 
 `init` scaffolds structural skeletons with TODO markers — it never writes
 behavioral instruction content, and never overwrites existing files.
 
 - `work` — AGENTS.md + CLAUDE.md symlink + docs/README.md + workspace.json.
-- `personal` — work + README, `.env.example`, registry stub, memory/wiki
-  skeleton (lint-green), pre-commit hook wiring.
+- `personal` — work + README, `.env.example`, project-registry stub,
+  memory/wiki skeleton (lint-green), pre-commit hook wiring for both `doctor`
+  and `registry validate`.
 - `runtime` — personal + HEARTBEAT.md and IDENTITY.md placeholders for
   always-on runtime identities.
 
-A fresh scaffold is doctor-green immediately; the ownership contract stays
-unconfigured until an origin remote and a peer actually exist.
+A fresh scaffold is doctor-green immediately, and personal/runtime scaffolds
+are also registry-green. The ownership contract stays unconfigured until an
+origin remote and a peer actually exist.
 
 ## Exact check semantics
 

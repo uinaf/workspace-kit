@@ -23,6 +23,13 @@ for (const profile of ["personal", "runtime", "work"] as const) {
     // Scaffolded AGENTS.md is a structural skeleton, never behavioral prose.
     const agents = readFileSync(join(dir, "AGENTS.md"), "utf8");
     assert.match(agents, /TODO/);
+    if (profile === "personal" || profile === "runtime") {
+      assert.match(agents, /workspace-kit registry validate/);
+      const hook = readFileSync(join(dir, ".githooks", "pre-commit"), "utf8");
+      assert.match(hook, /workspace-kit@[^ ]+ registry validate/);
+    } else {
+      assert.doesNotMatch(agents, /workspace-kit registry validate/);
+    }
 
     execSync("git init -q", { cwd: dir });
     const doctor = spawnSync(process.execPath, [cli, "doctor"], {
@@ -35,6 +42,15 @@ for (const profile of ["personal", "runtime", "work"] as const) {
       `doctor must pass on a fresh ${profile} scaffold:\n${doctor.stderr}`,
     );
     assert.match(doctor.stdout, /doctor ok/);
+
+    if (profile === "personal" || profile === "runtime") {
+      const registry = spawnSync(process.execPath, [cli, "registry", "validate"], {
+        cwd: dir,
+        encoding: "utf8",
+      });
+      assert.equal(registry.status, 0, registry.stderr);
+      assert.equal(registry.stdout, "registry ok\n");
+    }
   });
 
   test(`init --profile ${profile} never overwrites existing files`, () => {

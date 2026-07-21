@@ -18,6 +18,7 @@ plus git on PATH for the history-dependent checks. Pin exact versions.
 ```
 npx -y @uinaf/workspace-kit init --profile personal   # scaffold a workspace
 npx -y @uinaf/workspace-kit doctor                    # validate it
+npx -y @uinaf/workspace-kit registry validate         # validate projects.json
 ```
 
 `doctor` runs every repository-state check the workspace declares in its
@@ -27,6 +28,14 @@ with `contract handoff <paths...>` because passing that gate means only
 "eligible for human review." Absent config sections disable their checks,
 unknown files are always tolerated, and everything runs offline with zero
 runtime dependencies. `workspace-kit --help` lists all commands.
+
+`registry validate` is an explicit project-registry gate. It validates the
+entire declared entry shape before inspecting any locally present checkout,
+then checks project paths against the configured home-relative prefix, GitHub
+origins, portable case/Unicode aliases, canonical roots, and optional catalog pointers. The explicit
+`registry.project` policy enables this command; missing checkouts are allowed.
+Personal and runtime scaffolds include this gate in their generated pre-commit
+hook and validation instructions.
 
 ## Docs
 
