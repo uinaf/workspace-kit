@@ -17,6 +17,11 @@ test("config reports nested unknown keys and canonicalizes repository paths", ()
     registry: {
       file: "./projects.json",
       entry: { required: ["name"], optional: [] },
+      project: {
+        pathPrefix: "~/projects/",
+        modes: ["managed"],
+        originHosts: ["GitLab.com"],
+      },
     },
     dailyLogs: { root: "./memory", contexts: "memory\\contexts" },
     wiki: {
@@ -40,6 +45,7 @@ test("config reports nested unknown keys and canonicalizes repository paths", ()
   assert.deepEqual(parsed.forbidden, ["private/secrets.md"]);
   assert.deepEqual(parsed.links, [{ path: "nested/CLAUDE.md", target: "../AGENTS.md" }]);
   assert.equal(parsed.registry?.file, "projects.json");
+  assert.deepEqual(parsed.registry?.project?.originHosts, ["gitlab.com"]);
   assert.deepEqual(parsed.dailyLogs, { root: "memory", contexts: "memory/contexts" });
   assert.equal(parsed.wiki?.root, "memory/wiki");
   assert.equal(parsed.wiki?.revisionStaleness, true);

@@ -125,7 +125,7 @@ test("registry validate rejects invalid project policy and duplicate declaration
   const invalidResult = kit(invalid, home, "registry", "validate");
   assert.equal(invalidResult.status, 1);
   assert.match(invalidResult.stderr, /invalid mode automatic/);
-  assert.match(invalidResult.stderr, /invalid GitHub repository not-a-repository/);
+  assert.match(invalidResult.stderr, /invalid Git repository path not-a-repository/);
   assert.match(invalidResult.stderr, /unsafe project path/);
   assert.match(invalidResult.stderr, /catalog is not allowed for mode route-only/);
   assert.match(invalidResult.stderr, /unsafe catalog path/);
@@ -188,6 +188,21 @@ test("registry validate accepts supported GitHub origins and an existing catalog
   assert.equal(result.status, 0, result.stderr);
 });
 
+test("registry validate accepts a configured host and nested repository path", () => {
+  const home = scratch("registry-home-");
+  checkout(home, "alpha", "ssh://git@git.example.com/platform/ai/alpha.git");
+  const dir = workspace({ tools: [project("alpha", { repo: "platform/ai/alpha" })] });
+  const configPath = join(dir, "workspace.json");
+  const config = JSON.parse(readFileSync(configPath, "utf8"));
+  config.registry.project.originHosts = ["Git.Example.com"];
+  writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
+
+  const result = kit(dir, home, "registry", "validate");
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "registry ok\n");
+});
+
 test("registry validate rejects nested paths and duplicate canonical roots", () => {
   const home = scratch("registry-home-");
   const alpha = checkout(home, "alpha", "git@github.com:fixture-owner/alpha.git");
@@ -233,17 +248,22 @@ test("registry validate rejects an existing non-Git project root", () => {
 test("registry validate rejects missing, unsupported, and mismatched origins", () => {
   const home = scratch("registry-home-");
   checkout(home, "missing");
-  checkout(home, "unsupported", "https://example.invalid/fixture-owner/unsupported.git");
+  checkout(home, "unsupported", "ftp://example.invalid/fixture-owner/unsupported.git");
+  checkout(home, "unapproved", "https://gitlab.com/fixture-owner/unapproved.git");
   checkout(home, "mismatch", "git@github.com:fixture-owner/elsewhere.git");
   const dir = workspace({
-    tools: [project("missing"), project("unsupported"), project("mismatch")],
+    tools: [project("missing"), project("unsupported"), project("unapproved"), project("mismatch")],
   });
 
   const result = kit(dir, home, "registry", "validate");
 
   assert.equal(result.status, 1);
   assert.match(result.stderr, /tools\/missing: origin remote is missing/);
-  assert.match(result.stderr, /tools\/unsupported: origin is not a supported GitHub URL/);
+  assert.match(result.stderr, /tools\/unsupported: origin is not a supported Git URL/);
+  assert.match(
+    result.stderr,
+    /tools\/unapproved: origin host is not allowed \(found gitlab\.com; allowed github\.com\)/,
+  );
   assert.match(
     result.stderr,
     /tools\/mismatch: origin mismatch \(expected fixture-owner\/mismatch, found fixture-owner\/elsewhere\)/,

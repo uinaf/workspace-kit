@@ -55,16 +55,13 @@ The kit checks presence and link integrity only — never prose.
 
 - **Registry** — a JSON file mapping project categories to entries
   (`{name, repo, path, owns, mode, …}`); the entry shape is config-declared.
-  An explicit `registry.project` policy enables `registry validate`: the
-  consumer declares the allowed modes and home-relative checkout prefix, while
-  `repo` follows the portable GitHub `owner/repo` contract. Every entry is
-  parsed before local checkout inspection, so malformed optional fields fail
-  without running partial validation. Existing checkouts must be repository
-  roots with the declared GitHub origin; portable case/Unicode path aliases and
-  different paths resolving to the same canonical checkout are rejected. The optional catalog policy declares its
-  field and allowed modes; catalog values must name regular, repository-relative
-  files without symlink traversal. Missing checkouts are valid. This command is
-  opt-in and is not part of parity-locked `doctor` output.
+  `registry.project` enables `registry validate` and declares allowed modes,
+  checkout prefix, and Git origin hosts (`["github.com"]` by default). Repository
+  paths may include nested groups. Existing checkouts must match both the path
+  and an allowed host using HTTPS, SCP-style SSH, or `ssh://`; credentials and
+  unsafe URL/path syntax are rejected. Portable path aliases, duplicate checkout
+  roots, and unsafe catalogs also fail. Missing checkouts are valid. This command
+  is opt-in and is not part of parity-locked `doctor` output.
 - **Ownership contract** — for peered workspaces descended from one
   historical ancestor: `workspace.contract.json` names the repository, its
   peer, the shared ancestor commit, and required/forbidden owner paths.
@@ -103,6 +100,7 @@ The kit checks presence and link integrity only — never prose.
     "project": {
       "pathPrefix": "~/projects/",
       "modes": ["managed", "route-only"],
+      "originHosts": ["github.com"],
       "catalog": { "field": "catalog", "modes": ["managed"] },
     },
   },

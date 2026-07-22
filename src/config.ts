@@ -3,11 +3,13 @@ import {
   normalizeWorkspacePath,
   readWorkspaceText,
 } from "./lib/workspaceFs.ts";
+import { normalizeGitHost } from "./lib/gitRemote.ts";
 
 export type LinkRule = { path: string; target: string };
 export type ProjectRegistryConfig = {
   pathPrefix: string;
   modes: string[];
+  originHosts: string[];
   catalog?: { field: string; modes: string[] };
 };
 export type RegistryConfig = {
@@ -120,6 +122,7 @@ const CONFIG_SHAPE: ConfigShape = {
     project: {
       pathPrefix: true,
       modes: true,
+      originHosts: true,
       catalog: { field: true, modes: true },
     },
   },
@@ -220,9 +223,18 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
       if (!isRecord(value.registry.project)) fail("registry.project must be an object");
       const project = value.registry.project;
       const modes = nonEmptyUniqueStringList(project.modes, "registry.project.modes");
+      const originHosts = (
+        "originHosts" in project
+          ? nonEmptyUniqueStringList(project.originHosts, "registry.project.originHosts")
+          : ["github.com"]
+      ).map(
+        (host) =>
+          normalizeGitHost(host) ?? fail("registry.project.originHosts must contain valid hosts"),
+      );
       registry.project = {
         pathPrefix: homePathPrefix(project.pathPrefix, "registry.project.pathPrefix"),
         modes,
+        originHosts,
       };
       if ("catalog" in project) {
         if (!isRecord(project.catalog)) fail("registry.project.catalog must be an object");
