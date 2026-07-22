@@ -32,9 +32,11 @@ runtime dependencies. `workspace-kit --help` lists all commands.
 
 `registry validate` is an explicit project-registry gate. It validates the
 entire declared entry shape before inspecting any locally present checkout,
-then checks project paths against the configured home-relative prefix, GitHub
-origins, portable case/Unicode aliases, canonical roots, and optional catalog pointers. The explicit
-`registry.project` policy enables this command; missing checkouts are allowed.
+then checks project paths against the configured home-relative prefix, allowed
+Git origin hosts, repository paths, portable case/Unicode aliases, canonical
+roots, and optional catalog pointers. The explicit `registry.project` policy
+enables this command; `originHosts` defaults to `["github.com"]`, and missing
+checkouts are allowed.
 Personal and runtime scaffolds include this gate in their generated pre-commit
 hook and validation instructions.
 

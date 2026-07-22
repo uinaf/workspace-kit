@@ -4,6 +4,7 @@
 import { spawnSync } from "node:child_process";
 import { posix, resolve, win32 } from "node:path";
 import type { HandoffConfig } from "../config.ts";
+import { parseGitRemote } from "../lib/gitRemote.ts";
 import { readWorkspaceText } from "../lib/workspaceFs.ts";
 
 export type Contract = {
@@ -57,13 +58,6 @@ export function loadContract(repoRoot = ".", file = "workspace.contract.json"): 
   };
 }
 
-function repositoryName(remote: string): string | null {
-  const match = remote
-    .trim()
-    .match(/^(?:git@github\.com:|https:\/\/github\.com\/)([^/]+\/[^/]+?)(?:\.git)?$/);
-  return match?.[1] ?? null;
-}
-
 function trackedPaths(repoRoot: string): string[] {
   const result = git(repoRoot, ["ls-files", "-z"]);
   if (result.status !== 0) throw new Error("could not list tracked files");
@@ -83,8 +77,11 @@ export function workspaceErrors(repoRoot = ".", file = "workspace.contract.json"
   const origin = git(root, ["remote", "get-url", "origin"]);
   if (origin.status !== 0) {
     errors.push("origin remote is missing");
-  } else if (repositoryName(origin.stdout) !== contract.repository) {
-    errors.push(`origin does not match ${contract.repository}`);
+  } else {
+    const remote = parseGitRemote(origin.stdout);
+    if (remote?.host !== "github.com" || remote.repository !== contract.repository) {
+      errors.push(`origin does not match ${contract.repository}`);
+    }
   }
 
   const paths = trackedPaths(root);

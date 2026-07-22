@@ -7,11 +7,11 @@ import {
   type ProjectRegistryConfig,
   type RegistryConfig,
 } from "../config.ts";
+import { isGitRepositoryPath, parseGitRemote } from "../lib/gitRemote.ts";
 import { readWorkspaceText, workspaceLstat } from "../lib/workspaceFs.ts";
 import { registryErrors } from "./structure.ts";
 
 const PROJECT_FIELDS = ["name", "repo", "path", "mode"] as const;
-const GITHUB_REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 
 type GitResult = { status: number; stdout: string };
 type ProjectEntry = {
@@ -79,17 +79,6 @@ function unsafeCatalogPath(path: string): boolean {
   return path.split("/").some((part) => part === "." || part === ".." || /[ .]$/.test(part));
 }
 
-function githubRepository(remote: string): string | undefined {
-  let normalized = remote.trim();
-  if (normalized.endsWith(".git")) normalized = normalized.slice(0, -4);
-  for (const prefix of ["git@github.com:", "https://github.com/", "ssh://git@github.com/"]) {
-    if (!normalized.startsWith(prefix)) continue;
-    const repository = normalized.slice(prefix.length);
-    return GITHUB_REPOSITORY.test(repository) ? repository : undefined;
-  }
-  return undefined;
-}
-
 function configuredHome(options: ProjectRegistryOptions): string {
   return options.homeDirectory ?? process.env.HOME ?? process.env.USERPROFILE ?? homedir();
 }
@@ -154,8 +143,8 @@ function staticEntryErrors(
         `${file} ${entry.label}: invalid mode ${entry.mode} (expected ${project.modes.join(" or ")})`,
       );
     }
-    if (!GITHUB_REPOSITORY.test(entry.repo)) {
-      errors.push(`${file} ${entry.label}: invalid GitHub repository ${entry.repo}`);
+    if (!isGitRepositoryPath(entry.repo)) {
+      errors.push(`${file} ${entry.label}: invalid Git repository path ${entry.repo}`);
     }
     if (unsafeProjectPath(entry.path, project.pathPrefix)) {
       errors.push(`${file} ${entry.label}: unsafe project path ${entry.path}`);
@@ -214,6 +203,7 @@ function catalogPathError(
 function checkoutErrors(
   file: string,
   entries: ProjectEntry[],
+  project: ProjectRegistryConfig,
   options: ProjectRegistryOptions,
 ): string[] {
   const errors: string[] = [];
@@ -267,12 +257,16 @@ function checkoutErrors(
     if (origin.status !== 0 || origin.stdout.trim().length === 0) {
       errors.push(`${file} ${entry.label}: origin remote is missing`);
     } else {
-      const actualRepository = githubRepository(origin.stdout);
-      if (actualRepository === undefined) {
-        errors.push(`${file} ${entry.label}: origin is not a supported GitHub URL`);
-      } else if (actualRepository !== entry.repo) {
+      const actual = parseGitRemote(origin.stdout);
+      if (actual === undefined) {
+        errors.push(`${file} ${entry.label}: origin is not a supported Git URL`);
+      } else if (!project.originHosts.includes(actual.host)) {
         errors.push(
-          `${file} ${entry.label}: origin mismatch (expected ${entry.repo}, found ${actualRepository})`,
+          `${file} ${entry.label}: origin host is not allowed (found ${actual.host}; allowed ${project.originHosts.join(", ")})`,
+        );
+      } else if (actual.repository !== entry.repo) {
+        errors.push(
+          `${file} ${entry.label}: origin mismatch (expected ${entry.repo}, found ${actual.repository})`,
         );
       }
     }
@@ -324,5 +318,5 @@ export function projectRegistryErrors(
   const entries = parseEntries(parsed, registry.project);
   const staticErrors = staticEntryErrors(registry.file, entries, registry.project);
   if (staticErrors.length > 0) return staticErrors;
-  return checkoutErrors(registry.file, entries, options);
+  return checkoutErrors(registry.file, entries, registry.project, options);
 }
