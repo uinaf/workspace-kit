@@ -11,7 +11,7 @@ test("Git remotes normalize supported forms and nested repository paths", () => 
     host: "gitlab.com",
     repository: "group/subgroup/repository",
   });
-  assert.deepEqual(parseGitRemote("ssh://git@git.example.com/platform/ai/service"), {
+  assert.deepEqual(parseGitRemote("ssh://git@git.example.com:2222/platform/ai/service"), {
     host: "git.example.com",
     repository: "platform/ai/service",
   });

@@ -42,7 +42,7 @@ export function parseGitRemote(input: string): GitRemote | undefined {
     const validProtocol =
       (url.protocol === "https:" && !url.username) ||
       (url.protocol === "ssh:" && url.username === "git");
-    if (!validProtocol || url.password || url.port || url.search || url.hash) {
+    if (!validProtocol || url.password || url.search || url.hash) {
       return undefined;
     }
     host = url.hostname;
