@@ -74,7 +74,7 @@ test("config rejects duplicate origin hosts after normalization", () => {
           project: {
             pathPrefix: "~/projects/",
             modes: ["managed"],
-            originHosts: ["GitHub.com", "github.com"],
+            originHosts: ["Git.Example.com", "git.example.com"],
           },
         },
       }),
