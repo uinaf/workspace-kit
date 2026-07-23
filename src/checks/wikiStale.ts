@@ -212,16 +212,21 @@ function isWikiPage(root: string, path: string): boolean {
   return path.endsWith(".md") && path.startsWith(`${root}/`);
 }
 
+function normalizeLineEndings(text: string): string {
+  return text.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
+}
+
 function withoutUpdatedMetadata(text: string): string {
-  if (!text.startsWith("---\n")) return text;
-  const end = text.indexOf("\n---\n", 4);
-  if (end < 0) return text;
-  const frontmatter = text
+  const normalized = normalizeLineEndings(text);
+  if (!normalized.startsWith("---\n")) return normalized;
+  const end = normalized.indexOf("\n---\n", 4);
+  if (end < 0) return normalized;
+  const frontmatter = normalized
     .slice(4, end)
     .split("\n")
     .filter((line) => !line.startsWith("updated:"))
     .join("\n");
-  return `---\n${frontmatter}${text.slice(end)}`;
+  return `---\n${frontmatter}${normalized.slice(end)}`;
 }
 
 function sourceState(root: string, path: string, text: string): string {
@@ -237,10 +242,13 @@ function latestSubstantiveCommit(
 
   for (const commit of history.commits(path)) {
     const object = history.blobAt(commit.hash, path);
-    if (!object) continue;
-    const text = withoutUpdatedMetadata(history.blobText(object));
     const parent = commit.parents[0];
     const parentObject = parent ? history.blobAt(parent, path) : undefined;
+    if (!object) {
+      if (parentObject) return commit;
+      continue;
+    }
+    const text = withoutUpdatedMetadata(history.blobText(object));
     if (
       parentObject === undefined ||
       withoutUpdatedMetadata(history.blobText(parentObject)) !== text
@@ -347,7 +355,8 @@ function revisionWikiStaleReport(rawRoot: string): WikiStaleResult {
       const rel = relative(root, path).replace(/\.md$/, "").replaceAll("\\\\", "/");
       if (isStaleExempt(rel)) continue;
       const text = readWorkspaceText(".", path);
-      const fm = parseFrontmatter(text);
+      const normalizedText = normalizeLineEndings(text);
+      const fm = parseFrontmatter(normalizedText);
       const updated = typeof fm.updated === "string" ? fm.updated : null;
       if (!updated || !/^\d{4}-\d{2}-\d{2}$/.test(updated)) continue;
 
@@ -355,7 +364,9 @@ function revisionWikiStaleReport(rawRoot: string): WikiStaleResult {
       let newest = "";
       const pageCommit = history.latestCommit(path);
       const pageHeadBlob = history.blobAt(history.head, path);
-      const proposedPage = pageHeadBlob === undefined || history.blobText(pageHeadBlob) !== text;
+      const proposedPage =
+        pageHeadBlob === undefined ||
+        normalizeLineEndings(history.blobText(pageHeadBlob)) !== normalizedText;
       for (const source of asList(fm.sources)) {
         if (isExternal(source) || source.startsWith("[[")) continue;
         const sourcePath = normalizeWorkspacePath(source, "wiki source");
@@ -372,7 +383,11 @@ function revisionWikiStaleReport(rawRoot: string): WikiStaleResult {
           : undefined;
         let revisionStale = false;
         let workingTree = false;
-        const sourceMissing = workspaceLstat(".", sourcePath, "wiki source") === undefined;
+        const sourceStat = workspaceLstat(".", sourcePath, "wiki source");
+        if (sourceStat?.isSymbolicLink()) {
+          throw new Error(`${sourcePath}: symbolic-link file is not allowed`);
+        }
+        const sourceMissing = sourceStat === undefined;
         if (!proposedPage) {
           const headSourceBlob = history.blobAt(history.head, sourcePath);
           if (sourceMissing) {

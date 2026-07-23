@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -314,6 +321,28 @@ test("wiki stale reports a deleted tracked source instead of failing", () => {
   assert.match(result.out.join("\n"), /docs\/source\.md \(2026-07-21; working tree; deleted\)/);
 });
 
+test("wiki stale dates a committed wiki-source deletion at the deletion commit", () => {
+  const dir = mkdtempSync(join(tmpdir(), "wiki-stale-committed-deletion-"));
+  mkdirSync(join(dir, "memory", "wiki"), { recursive: true });
+  writeFileSync(
+    join(dir, "memory", "wiki", "source.md"),
+    "---\ntitle: Source\ntype: wiki\nstatus: active\nupdated: 2026-07-21\ntags: [topic]\nsources: []\n---\n\n# Source\n",
+  );
+  writeFileSync(
+    join(dir, "memory", "wiki", "dependent.md"),
+    "---\ntitle: Dependent\ntype: wiki\nstatus: active\nupdated: 2026-07-21\ntags: [topic]\nsources:\n  - memory/wiki/source.md\n---\n\n# Dependent\n",
+  );
+  execFileSync("git", ["init", "-q", "-b", "main"], { cwd: dir });
+  commitAll(dir, "baseline", "2026-07-21T08:00:00Z");
+
+  unlinkSync(join(dir, "memory", "wiki", "source.md"));
+  commitAll(dir, "delete wiki source", "2026-07-23T08:00:00Z");
+  const result = inDir(dir, () => strictReport("memory/wiki"));
+
+  assert.match(result.out[0] ?? "", /updated=2026-07-21, newest source=2026-07-23/);
+  assert.match(result.out.join("\n"), /memory\/wiki\/source\.md \(2026-07-23; deleted\)/);
+});
+
 test("wiki stale keeps the latest commit date with mixed uncommitted sources", () => {
   const dir = mkdtempSync(join(tmpdir(), "wiki-stale-mixed-sources-"));
   mkdirSync(join(dir, "docs"), { recursive: true });
@@ -333,6 +362,64 @@ test("wiki stale keeps the latest commit date with mixed uncommitted sources", (
   const result = inDir(dir, () => strictReport("memory/wiki"));
   assert.match(result.out[0] ?? "", /updated=2026-07-21, newest source=2026-07-23/);
   assert.match(result.out.join("\n"), /docs\/new\.md \(working tree; uncommitted\)/);
+});
+
+test("wiki stale compares clean CRLF worktrees by semantic content", () => {
+  const dir = mkdtempSync(join(tmpdir(), "wiki-stale-crlf-"));
+  const leaf = join(dir, "docs", "leaf.md");
+  const nested = join(dir, "memory", "wiki", "nested.md");
+  const page = join(dir, "memory", "wiki", "topic.md");
+  mkdirSync(join(dir, "docs"), { recursive: true });
+  mkdirSync(join(dir, "memory", "wiki"), { recursive: true });
+  writeFileSync(join(dir, ".gitattributes"), "*.md text eol=crlf\n");
+  writeFileSync(leaf, "# Leaf\n\nInitial.\n");
+  writeFileSync(
+    nested,
+    "---\ntitle: Nested\ntype: wiki\nstatus: active\nupdated: 2026-07-21\ntags: [topic]\nsources: []\n---\n\n# Nested\n",
+  );
+  writeFileSync(
+    page,
+    "---\ntitle: Topic\ntype: wiki\nstatus: active\nupdated: 2026-07-21\ntags: [topic]\nsources:\n  - docs/leaf.md\n  - memory/wiki/nested.md\n---\n\n# Topic\n",
+  );
+  execFileSync("git", ["init", "-q", "-b", "main"], { cwd: dir });
+  commitAll(dir, "baseline", "2026-07-21T08:00:00Z");
+  writeFileSync(leaf, "# Leaf\n\nChanged.\n");
+  commitAll(dir, "change leaf", "2026-07-21T09:00:00Z");
+
+  for (const path of [leaf, nested, page]) unlinkSync(path);
+  execFileSync(
+    "git",
+    ["checkout", "--", "docs/leaf.md", "memory/wiki/nested.md", "memory/wiki/topic.md"],
+    { cwd: dir },
+  );
+  assert.match(readFileSync(page, "utf8"), /\r\n/);
+  assert.equal(execFileSync("git", ["status", "--short"], { cwd: dir, encoding: "utf8" }), "");
+
+  const result = inDir(dir, () => strictReport("memory/wiki"));
+  assert.match(result.out.join("\n"), /docs\/leaf\.md \(2026-07-21; newer commit\)/);
+  assert.doesNotMatch(result.out.join("\n"), /memory\/wiki\/nested\.md/);
+});
+
+test("wiki stale rejects a source replaced by a symbolic link", () => {
+  const dir = mkdtempSync(join(tmpdir(), "wiki-stale-source-link-"));
+  const source = join(dir, "docs", "source.md");
+  const outside = join(mkdtempSync(join(tmpdir(), "wiki-stale-outside-")), "outside.md");
+  mkdirSync(join(dir, "docs"), { recursive: true });
+  mkdirSync(join(dir, "memory", "wiki"), { recursive: true });
+  writeFileSync(source, "# Source\n");
+  writeFileSync(outside, "# Outside\n");
+  writeFileSync(
+    join(dir, "memory", "wiki", "topic.md"),
+    "---\ntitle: Topic\ntype: wiki\nstatus: active\nupdated: 2026-07-21\ntags: [topic]\nsources:\n  - docs/source.md\n---\n\n# Topic\n",
+  );
+  execFileSync("git", ["init", "-q", "-b", "main"], { cwd: dir });
+  commitAll(dir, "baseline", "2026-07-21T08:00:00Z");
+
+  unlinkSync(source);
+  symlinkSync(outside, source);
+  const result = inDir(dir, () => strictReport("memory/wiki"));
+
+  assert.equal(result.fatal, "docs/source.md: symbolic-link file is not allowed");
 });
 
 test("wiki stale rejects source paths outside the workspace", () => {
