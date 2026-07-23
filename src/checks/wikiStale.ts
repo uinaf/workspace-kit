@@ -8,6 +8,7 @@ import {
   normalizeWorkspacePath,
   readWorkspaceText,
   walkWorkspaceMarkdown,
+  workspaceLstat,
 } from "../lib/workspaceFs.ts";
 
 type Commit = { hash: string; date: string };
@@ -185,6 +186,7 @@ type StaleSource = {
   newerRevision?: boolean;
   workingTree?: boolean;
   uncommitted?: boolean;
+  deleted?: boolean;
 };
 type StalePage = {
   page: string;
@@ -267,7 +269,8 @@ function renderStale(stale: StalePage[], err: string[]): WikiStaleResult {
           : source.newerRevision
             ? "; newer commit"
             : "";
-      out.push(`  - ${source.path} (${source.date}${revision})`);
+      const deletion = source.deleted ? "; deleted" : "";
+      out.push(`  - ${source.path} (${source.date}${revision}${deletion})`);
     }
     if (entry.newer.length > 5) out.push(`  - ... +${entry.newer.length - 5} more`);
   }
@@ -369,9 +372,13 @@ function revisionWikiStaleReport(rawRoot: string): WikiStaleResult {
           : undefined;
         let revisionStale = false;
         let workingTree = false;
+        const sourceMissing = workspaceLstat(".", sourcePath, "wiki source") === undefined;
         if (!proposedPage) {
           const headSourceBlob = history.blobAt(history.head, sourcePath);
-          if (isWikiPage(root, sourcePath)) {
+          if (sourceMissing) {
+            workingTree = headSourceBlob !== undefined;
+            revisionStale = visibleSourceBlob !== undefined;
+          } else if (isWikiPage(root, sourcePath)) {
             const currentState = sourceState(root, sourcePath, readWorkspaceText(".", sourcePath));
             workingTree =
               headSourceBlob === undefined ||
@@ -395,11 +402,16 @@ function revisionWikiStaleReport(rawRoot: string): WikiStaleResult {
             newerRevision: revisionStale && !dateStale,
             workingTree: workingTree && !dateStale,
             uncommitted: sourceCommit === undefined,
+            deleted: sourceMissing,
           });
-          if (!newest || sourceDate > newest) newest = sourceDate;
+          if (substantiveCommit && (!newest || substantiveCommit.date > newest)) {
+            newest = substantiveCommit.date;
+          }
         }
       }
-      if (newer.length > 0) stale.push({ page: path, updated, newest, newer });
+      if (newer.length > 0) {
+        stale.push({ page: path, updated, newest: newest || "working tree", newer });
+      }
     }
   } catch (error) {
     return fatal(error);

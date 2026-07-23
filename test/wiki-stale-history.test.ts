@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -293,6 +293,46 @@ test("wiki stale detects untracked and staged-new source files", () => {
   execFileSync("git", ["add", "docs/new.md"], { cwd: dir });
   const staged = inDir(dir, () => strictReport("memory/wiki"));
   assert.match(staged.out.join("\n"), /docs\/new\.md \(working tree; uncommitted\)/);
+});
+
+test("wiki stale reports a deleted tracked source instead of failing", () => {
+  const dir = mkdtempSync(join(tmpdir(), "wiki-stale-deleted-source-"));
+  mkdirSync(join(dir, "docs"), { recursive: true });
+  mkdirSync(join(dir, "memory", "wiki"), { recursive: true });
+  writeFileSync(join(dir, "docs", "source.md"), "# Source\n");
+  writeFileSync(
+    join(dir, "memory", "wiki", "topic.md"),
+    "---\ntitle: Topic\ntype: wiki\nstatus: active\nupdated: 2026-07-21\ntags: [topic]\nsources:\n  - docs/source.md\n---\n\n# Topic\n",
+  );
+  execFileSync("git", ["init", "-q", "-b", "main"], { cwd: dir });
+  commitAll(dir, "baseline", "2026-07-21T08:00:00Z");
+
+  unlinkSync(join(dir, "docs", "source.md"));
+  const result = inDir(dir, () => strictReport("memory/wiki"));
+
+  assert.equal(result.fatal, undefined);
+  assert.match(result.out.join("\n"), /docs\/source\.md \(2026-07-21; working tree; deleted\)/);
+});
+
+test("wiki stale keeps the latest commit date with mixed uncommitted sources", () => {
+  const dir = mkdtempSync(join(tmpdir(), "wiki-stale-mixed-sources-"));
+  mkdirSync(join(dir, "docs"), { recursive: true });
+  mkdirSync(join(dir, "memory", "wiki"), { recursive: true });
+  writeFileSync(join(dir, "docs", "committed.md"), "# Committed\n\nInitial.\n");
+  writeFileSync(
+    join(dir, "memory", "wiki", "topic.md"),
+    "---\ntitle: Topic\ntype: wiki\nstatus: active\nupdated: 2026-07-21\ntags: [topic]\nsources:\n  - docs/committed.md\n  - docs/new.md\n---\n\n# Topic\n",
+  );
+  execFileSync("git", ["init", "-q", "-b", "main"], { cwd: dir });
+  commitAll(dir, "baseline", "2026-07-21T08:00:00Z");
+
+  writeFileSync(join(dir, "docs", "committed.md"), "# Committed\n\nChanged.\n");
+  commitAll(dir, "update committed source", "2026-07-23T08:00:00Z");
+  writeFileSync(join(dir, "docs", "new.md"), "# New\n");
+
+  const result = inDir(dir, () => strictReport("memory/wiki"));
+  assert.match(result.out[0] ?? "", /updated=2026-07-21, newest source=2026-07-23/);
+  assert.match(result.out.join("\n"), /docs\/new\.md \(working tree; uncommitted\)/);
 });
 
 test("wiki stale rejects source paths outside the workspace", () => {
