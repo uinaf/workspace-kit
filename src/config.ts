@@ -231,6 +231,9 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
         (host) =>
           normalizeGitHost(host) ?? fail("registry.project.originHosts must contain valid hosts"),
       );
+      if (new Set(originHosts).size !== originHosts.length) {
+        fail("registry.project.originHosts must not contain duplicates after normalization");
+      }
       registry.project = {
         pathPrefix: homePathPrefix(project.pathPrefix, "registry.project.pathPrefix"),
         modes,
