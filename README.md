@@ -40,6 +40,12 @@ checkouts are allowed.
 Personal and runtime scaffolds include this gate in their generated pre-commit
 hook and validation instructions.
 
+For Git-aware wiki freshness, opt in with `wiki.revisionStaleness`. The check
+then evaluates the current working tree, including staged and unstaged edits,
+so source changes are visible before commit and a page edited in the same
+proposed revision can attest them. For wiki-to-wiki sources, an `updated:`-only
+frontmatter change is metadata: it does not make dependent pages stale.
+
 ## Docs
 
 - [Workspace convention and check contracts](docs/convention.md) — what an

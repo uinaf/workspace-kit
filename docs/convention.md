@@ -33,13 +33,24 @@ The kit checks presence and link integrity only — never prose.
   non-empty, making catalog drift enforceable in CI.
 - **Staleness** — `wiki stale` reports committed sources whose latest commit
   date is after the page's `updated:` stamp. This legacy-compatible default is
-  date-only. Opt-in `wiki.revisionStaleness` also compares the source blob at
-  `HEAD` with the blob visible in the page's latest commit; a different blob
-  proves that the page revision did not see the current source state,
-  including same-day and divergent-branch changes, and is reported with a
-  `newer commit` marker. Findings remain informational and exit zero. In this
-  stricter mode, missing or shallow Git history is an operational error
-  because a clean result could not be proven.
+  date-only. Opt-in `wiki.revisionStaleness` compares each source's current
+  working-tree state with the state visible in the page's latest commit; a
+  different state proves that the page revision did not see the proposed
+  source state, including dirty, same-day, backdated, and divergent-branch
+  changes. A page edited in the working tree is itself the proposed attestation
+  revision, but its `updated:` date must still cover the source's latest
+  substantive commit. For sources inside the wiki, changes only to the
+  top-level frontmatter `updated:` field are attestation metadata: they neither
+  advance that substantive date nor stale dependent pages. Substantive nested
+  edits still propagate across their direct source edge; the check does not
+  speculate over untouched transitive dependents.
+
+  Revision mode evaluates staged and unstaged files together as the proposed
+  working tree, not the Git index in isolation. A partial commit can therefore
+  differ from the state that was checked; rerun the check after committing a
+  subset. Findings remain informational and exit zero. Missing or shallow Git
+  history is an operational error because a clean result could not be proven.
+
 - **llm-wiki enforcement (opt-in)** — for workspaces adopting the full
   LLM-maintained-wiki discipline: `wiki.indexCoverage` requires every
   non-exempt page to be cataloged directly in `index.md` (the index is a
@@ -110,7 +121,7 @@ The kit checks presence and link integrity only — never prose.
     "requiredFields": ["title", "type", "status", "updated", "tags", "sources"],
     "indexCoverage": false, // every page cataloged in index.md
     "logChronology": false, // log.md dates never decrease (append-only proxy)
-    "revisionStaleness": false, // compare source blobs at HEAD and page revision
+    "revisionStaleness": false, // compare proposed source and page revisions
   },
   "limits": [
     // soft limits: warnings, never failures
