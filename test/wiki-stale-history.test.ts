@@ -226,10 +226,23 @@ test("wiki stale ignores substantive edits discarded by a metadata-only merge", 
   writeFileSync(source, readFileSync(source, "utf8").replace("2026-07-21", "2026-07-22"));
   commitAll(dir, "attest source on main", "2026-07-22T08:00:00Z");
 
-  execFileSync("git", ["merge", "--no-ff", "--no-commit", "discarded-change"], {
-    cwd: dir,
-    stdio: "pipe",
-  });
+  execFileSync(
+    "git",
+    [
+      "-c",
+      "user.email=fixture@example.com",
+      "-c",
+      "user.name=Fixture",
+      "merge",
+      "--no-ff",
+      "--no-commit",
+      "discarded-change",
+    ],
+    {
+      cwd: dir,
+      stdio: "pipe",
+    },
+  );
   writeFileSync(
     source,
     readFileSync(source, "utf8")
