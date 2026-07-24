@@ -2,7 +2,9 @@
 // Stale findings remain informational; opt-in revision mode fails only when
 // complete Git history cannot be inspected safely.
 import { execFileSync, execSync } from "node:child_process";
-import { relative } from "node:path";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { delimiter, join, relative, resolve } from "node:path";
 import { asList, isExternal, parseFrontmatter } from "../lib/frontmatter.ts";
 import {
   normalizeWorkspacePath,
@@ -20,7 +22,9 @@ type GitHistory = {
   commits(path: string): HistoryCommit[];
   blobAt(revision: string, path: string): string | undefined;
   blobText(object: string): string;
+  filteredText(path: string, text: string): string;
   worktreeBlob(path: string): string;
+  dispose(): void;
 };
 
 function buildCommitDateMap(warn: (line: string) => void): Map<string, string> {
@@ -47,10 +51,14 @@ function buildCommitDateMap(warn: (line: string) => void): Map<string, string> {
   return map;
 }
 
-function gitOutput(args: string[]): string {
+function gitOutput(
+  args: string[],
+  options: { env?: NodeJS.ProcessEnv; input?: string } = {},
+): string {
   try {
     return execFileSync("git", args, {
       encoding: "utf8",
+      ...options,
       maxBuffer: 128 * 1024 * 1024,
     });
   } catch (error) {
@@ -71,6 +79,16 @@ function buildGitHistory(): GitHistory {
   const blobs = new Map<string, string | undefined>();
   const blobTexts = new Map<string, string>();
   const worktreeBlobs = new Map<string, string>();
+  const objectDirectory = mkdtempSync(join(tmpdir(), "workspace-kit-wiki-stale-"));
+  const repositoryObjects = resolve(gitOutput(["rev-parse", "--git-path", "objects"]).trim());
+  const inheritedAlternates = process.env.GIT_ALTERNATE_OBJECT_DIRECTORIES;
+  const objectEnvironment = {
+    ...process.env,
+    GIT_ALTERNATE_OBJECT_DIRECTORIES: inheritedAlternates
+      ? `${repositoryObjects}${delimiter}${inheritedAlternates}`
+      : repositoryObjects,
+    GIT_OBJECT_DIRECTORY: objectDirectory,
+  };
 
   return {
     head,
@@ -167,6 +185,15 @@ function buildGitHistory(): GitHistory {
       blobTexts.set(object, output);
       return output;
     },
+    filteredText(path, text) {
+      // Isolate the temporary blob so a read-only check never mutates the repository object store.
+      const object = gitOutput(["hash-object", "-w", `--path=${path}`, "--stdin"], {
+        env: objectEnvironment,
+        input: text,
+      }).trim();
+      if (!object) throw new Error("could not inspect text state");
+      return gitOutput(["cat-file", "blob", object], { env: objectEnvironment });
+    },
     worktreeBlob(path) {
       const cached = worktreeBlobs.get(path);
       if (cached !== undefined) return cached;
@@ -174,6 +201,9 @@ function buildGitHistory(): GitHistory {
       if (!object) throw new Error(`could not inspect working-tree state for ${path}`);
       worktreeBlobs.set(path, object);
       return object;
+    },
+    dispose() {
+      rmSync(objectDirectory, { force: true, recursive: true });
     },
   };
 }
@@ -366,7 +396,7 @@ function revisionWikiStaleReport(rawRoot: string): WikiStaleResult {
       const pageHeadBlob = history.blobAt(history.head, path);
       const proposedPage =
         pageHeadBlob === undefined ||
-        normalizeLineEndings(history.blobText(pageHeadBlob)) !== normalizedText;
+        history.filteredText(path, text) !== history.blobText(pageHeadBlob);
       for (const source of asList(fm.sources)) {
         if (isExternal(source) || source.startsWith("[[")) continue;
         const sourcePath = normalizeWorkspacePath(source, "wiki source");
@@ -394,7 +424,11 @@ function revisionWikiStaleReport(rawRoot: string): WikiStaleResult {
             workingTree = headSourceBlob !== undefined;
             revisionStale = visibleSourceBlob !== undefined;
           } else if (isWikiPage(root, sourcePath)) {
-            const currentState = sourceState(root, sourcePath, readWorkspaceText(".", sourcePath));
+            const currentState = sourceState(
+              root,
+              sourcePath,
+              history.filteredText(sourcePath, readWorkspaceText(".", sourcePath)),
+            );
             workingTree =
               headSourceBlob === undefined ||
               currentState !== sourceState(root, sourcePath, history.blobText(headSourceBlob));
@@ -430,6 +464,8 @@ function revisionWikiStaleReport(rawRoot: string): WikiStaleResult {
     }
   } catch (error) {
     return fatal(error);
+  } finally {
+    history.dispose();
   }
 
   return renderStale(stale, []);

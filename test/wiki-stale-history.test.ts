@@ -371,15 +371,15 @@ test("wiki stale compares clean CRLF worktrees by semantic content", () => {
   const page = join(dir, "memory", "wiki", "topic.md");
   mkdirSync(join(dir, "docs"), { recursive: true });
   mkdirSync(join(dir, "memory", "wiki"), { recursive: true });
-  writeFileSync(join(dir, ".gitattributes"), "*.md text eol=crlf\n");
+  writeFileSync(join(dir, ".gitattributes"), "*.md text eol=crlf ident\n");
   writeFileSync(leaf, "# Leaf\n\nInitial.\n");
   writeFileSync(
     nested,
-    "---\ntitle: Nested\ntype: wiki\nstatus: active\nupdated: 2026-07-21\ntags: [topic]\nsources: []\n---\n\n# Nested\n",
+    "---\ntitle: Nested\ntype: wiki\nstatus: active\nupdated: 2026-07-21\ntags: [topic]\nsources: []\n---\n\n# Nested\n\n$Id$\n",
   );
   writeFileSync(
     page,
-    "---\ntitle: Topic\ntype: wiki\nstatus: active\nupdated: 2026-07-21\ntags: [topic]\nsources:\n  - docs/leaf.md\n  - memory/wiki/nested.md\n---\n\n# Topic\n",
+    "---\ntitle: Topic\ntype: wiki\nstatus: active\nupdated: 2026-07-21\ntags: [topic]\nsources:\n  - docs/leaf.md\n  - memory/wiki/nested.md\n---\n\n# Topic\n\n$Id$\n",
   );
   execFileSync("git", ["init", "-q", "-b", "main"], { cwd: dir });
   commitAll(dir, "baseline", "2026-07-21T08:00:00Z");
@@ -393,6 +393,7 @@ test("wiki stale compares clean CRLF worktrees by semantic content", () => {
     { cwd: dir },
   );
   assert.match(readFileSync(page, "utf8"), /\r\n/);
+  assert.match(readFileSync(page, "utf8"), /\$Id: [0-9a-f]+ \$/);
   assert.equal(execFileSync("git", ["status", "--short"], { cwd: dir, encoding: "utf8" }), "");
 
   const result = inDir(dir, () => strictReport("memory/wiki"));
