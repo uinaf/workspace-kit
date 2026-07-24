@@ -64,6 +64,24 @@ test("revision staleness is opt-in and must be boolean", () => {
   );
 });
 
+test("config rejects duplicate origin hosts after normalization", () => {
+  assert.throws(
+    () =>
+      parseWorkspaceConfig({
+        registry: {
+          file: "projects.json",
+          entry: { required: [], optional: [] },
+          project: {
+            pathPrefix: "~/projects/",
+            modes: ["managed"],
+            originHosts: ["Git.Example.com", "git.example.com"],
+          },
+        },
+      }),
+    /registry\.project\.originHosts must not contain duplicates after normalization/,
+  );
+});
+
 test("config rejects repository paths and link targets that escape the workspace", () => {
   assert.throws(
     () => parseWorkspaceConfig({ required: ["../outside"] }),
