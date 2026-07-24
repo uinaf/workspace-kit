@@ -417,6 +417,9 @@ function revisionWikiStaleReport(rawRoot: string): WikiStaleResult {
         if (sourceStat?.isSymbolicLink()) {
           throw new Error(`${sourcePath}: symbolic-link file is not allowed`);
         }
+        if (sourceStat && !sourceStat.isFile()) {
+          throw new Error(`${sourcePath}: expected a regular file`);
+        }
         const sourceMissing = sourceStat === undefined;
         if (!proposedPage) {
           const headSourceBlob = history.blobAt(history.head, sourcePath);

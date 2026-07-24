@@ -401,7 +401,7 @@ test("wiki stale compares clean CRLF worktrees by semantic content", () => {
   assert.doesNotMatch(result.out.join("\n"), /memory\/wiki\/nested\.md/);
 });
 
-test("wiki stale rejects a source replaced by a symbolic link", () => {
+test("wiki stale rejects a source replaced by a link or non-regular file", () => {
   const dir = mkdtempSync(join(tmpdir(), "wiki-stale-source-link-"));
   const source = join(dir, "docs", "source.md");
   const outside = join(mkdtempSync(join(tmpdir(), "wiki-stale-outside-")), "outside.md");
@@ -421,6 +421,12 @@ test("wiki stale rejects a source replaced by a symbolic link", () => {
   const result = inDir(dir, () => strictReport("memory/wiki"));
 
   assert.equal(result.fatal, "docs/source.md: symbolic-link file is not allowed");
+
+  unlinkSync(source);
+  mkdirSync(source);
+  const nonRegular = inDir(dir, () => strictReport("memory/wiki"));
+
+  assert.equal(nonRegular.fatal, "docs/source.md: expected a regular file");
 });
 
 test("wiki stale rejects source paths outside the workspace", () => {
