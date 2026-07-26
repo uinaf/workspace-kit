@@ -256,6 +256,16 @@ test("init refuses to write through pre-existing dangling symlinks", () => {
   assert.ok(!existsSync(plantedTarget), "must not create files at the symlink target");
 });
 
+test("init points workspace owners to the packaged bootstrap convention", () => {
+  const parent = mkdtempSync(join(tmpdir(), "init-guide-"));
+  const result = kit(parent, "init", "--profile", "runtime");
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(
+    result.stdout,
+    /next: replace the AGENTS\.md TODOs using @uinaf\/workspace-kit\/docs\/convention\.md/,
+  );
+});
+
 test("init --dir pointing at an existing file fails cleanly", () => {
   const parent = mkdtempSync(join(tmpdir(), "notadir-"));
   const file = join(parent, "occupied");

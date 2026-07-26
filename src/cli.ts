@@ -262,6 +262,7 @@ function main(): void {
     for (const line of result.created) console.log(`created ${line}`);
     for (const line of result.skipped) console.log(`kept existing ${line}`);
     console.log(`workspace scaffolded (${profile} profile)`);
+    console.log("next: replace the AGENTS.md TODOs using @uinaf/workspace-kit/docs/convention.md");
     if (result.created.includes(".githooks/pre-commit")) {
       console.log("enable the hook with: git config core.hooksPath .githooks");
     }

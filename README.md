@@ -46,10 +46,18 @@ so source changes are visible before commit and a page edited in the same
 proposed revision can attest them. For wiki-to-wiki sources, an `updated:`-only
 frontmatter change is metadata: it does not make dependent pages stale.
 
+## Independent by design
+
+`workspace-kit` only owns workspace structure and validation. It does not
+install or invoke `uinaf/agents` or `uinaf/dotfiles`; those are optional
+companion tools with independent installation, releases, and verification.
+Consumers choose whether and how to combine them.
+
 ## Docs
 
-- [Workspace convention and check contracts](docs/convention.md) — what an
-  agent workspace is and exactly what each check enforces
+- [Workspace convention, bootstrap, and check contracts](docs/convention.md) —
+  workspace structure, skill ownership, scaffold follow-through, and exactly
+  what each check enforces
 - [Parity oracle](parity/README.md) — the executable spec the checks are
   held to, byte-for-byte
 - [Release workflow](docs/releasing.md) — automatic, tokenless publishing

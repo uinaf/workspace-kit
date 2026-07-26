@@ -30,6 +30,11 @@ TODO: what an agent should read first, and when.
 
 TODO: planning, approval, and scope rules for agents working here.
 
+## Skill Ownership
+
+TODO: name any repo-local skill roots, what belongs in them, and where shared
+skills are owned. Installed machine-global copies are not workspace source.
+
 ## Validation
 
 Run \`npx @uinaf/workspace-kit doctor\` before committing.
@@ -99,10 +104,11 @@ export function initWorkspace(dir: string, profile: Profile): InitResult {
   put("docs/README.md", "# Docs\n\nTODO: index the documents that live under docs/.\n");
 
   const required = ["AGENTS.md", "CLAUDE.md", "docs/README.md", "workspace.json"];
+  const links = [{ path: "CLAUDE.md", target: "AGENTS.md" }];
   const config: Record<string, unknown> = {
     minVersion: kitVersion(),
     required,
-    links: [{ path: "CLAUDE.md", target: "AGENTS.md" }],
+    links,
   };
 
   if (profile === "personal" || profile === "runtime") {
@@ -177,12 +183,15 @@ npx --yes @uinaf/workspace-kit@${kitVersion()} registry validate
   }
 
   if (profile === "runtime") {
+    put(".agents/skills/.gitkeep", "");
+    link(".claude/skills", "../.agents/skills");
     put(
       "HEARTBEAT.md",
       "# HEARTBEAT.md\n\nTODO: the minimal liveness checks this runtime should run.\n",
     );
     put("IDENTITY.md", "# IDENTITY.md\n\nTODO: this runtime's identity.\n");
-    required.push("HEARTBEAT.md", "IDENTITY.md");
+    required.push(".agents/skills", ".claude/skills", "HEARTBEAT.md", "IDENTITY.md");
+    links.push({ path: ".claude/skills", target: "../.agents/skills" });
   }
 
   put("workspace.json", `${JSON.stringify(config, null, 2)}\n`);

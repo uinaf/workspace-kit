@@ -62,7 +62,30 @@ The kit checks presence and link integrity only — never prose.
   decides. Contradiction and duplicate detection remain agentic maintenance
   work by design: a deterministic linter cannot judge semantics.
 
-## 3. Operations (optional)
+## 3. Skills (optional)
+
+Workspace-specific skill source belongs in
+`.agents/skills/<name>/SKILL.md`. Keep it in the workspace repository.
+When Claude-compatible discovery is needed, use one relative link:
+`.claude/skills -> ../.agents/skills`.
+
+[OpenClaw discovers `<workspace>/.agents/skills`](https://docs.openclaw.ai/tools/skills)
+directly, so no second workspace skill tree or compatibility copy is needed.
+
+Shared skills are a different concern. They belong in their own upstream
+repository and may be installed into machine-global directories by
+consumer-owned tooling. Those installed copies are capabilities, not the
+source of workspace-specific behavior.
+
+`workspace-kit` only scaffolds and validates repository structure. It never
+installs skills or edits machine-global directories. A consumer that adopts
+local skills should:
+
+- list `.agents/skills` and `.claude/skills` in `required`;
+- declare the Claude symlink in `links`;
+- never put either local skill path in `forbidden`.
+
+## 4. Operations (optional)
 
 - **Registry** — a JSON file mapping project categories to entries
   (`{name, repo, path, owns, mode, …}`); the entry shape is config-declared.
@@ -188,6 +211,11 @@ behavioral instruction content, and never overwrites existing files.
 A fresh scaffold is doctor-green immediately, and personal/runtime scaffolds
 are also registry-green. The ownership contract stays unconfigured until an
 origin remote and a peer actually exist.
+
+After scaffolding, the workspace owner must replace the `AGENTS.md` TODOs
+before treating the repository as operational. The runtime profile creates an
+empty `.agents/skills/` source root and links `.claude/skills` to it. It does
+not install or enable any skill.
 
 ## Exact check semantics
 

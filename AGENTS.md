@@ -16,8 +16,14 @@ the mechanism and its public documentation only.
   (`fixture-owner/fixture-workspace` style).
 - **Zero runtime dependencies. No postinstall scripts. No network calls, no
   telemetry.** devDependencies are allowed for build/test only.
+- Keep this repository standalone. Do not add package, script, CI, checkout, or
+  validation dependencies on `uinaf/agents` or `uinaf/dotfiles`. Optional
+  documentation links are fine; composition belongs to the consumer.
 - The kit never authors instruction content and never touches machine-global
   state (`~/.claude/`, `~/.codex/`, `~/.agents/skills`).
+- Scaffolds may prompt owners to declare skill ownership, but must never
+  install, copy, or choose consumer-specific skills or make an installed
+  machine-global copy authoritative.
 - **Parity is law.** The ported validators must reproduce `parity/goldens/`
   byte-for-byte; new behavior ships config-gated and default-off. Never edit
   a golden by hand — see [parity/README.md](parity/README.md) before

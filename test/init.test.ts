@@ -23,10 +23,23 @@ for (const profile of ["personal", "runtime", "work"] as const) {
     // Scaffolded AGENTS.md is a structural skeleton, never behavioral prose.
     const agents = readFileSync(join(dir, "AGENTS.md"), "utf8");
     assert.match(agents, /TODO/);
+    assert.match(agents, /## Skill Ownership/);
     if (profile === "personal" || profile === "runtime") {
       assert.match(agents, /workspace-kit registry validate/);
       const hook = readFileSync(join(dir, ".githooks", "pre-commit"), "utf8");
       assert.match(hook, /workspace-kit@[^ ]+ registry validate/);
+
+      const config = JSON.parse(readFileSync(join(dir, "workspace.json"), "utf8")) as {
+        handoff?: { prefixes?: unknown };
+      };
+      const prefixes = config.handoff?.prefixes;
+      assert.ok(Array.isArray(prefixes));
+      assert.ok(prefixes.includes(".agents/skills/"));
+      if (profile === "runtime") {
+        assert.ok(lstatSync(join(dir, ".agents", "skills")).isDirectory());
+        assert.ok(lstatSync(join(dir, ".claude", "skills")).isSymbolicLink());
+        assert.equal(readlinkSync(join(dir, ".claude", "skills")), "../.agents/skills");
+      }
     } else {
       assert.doesNotMatch(agents, /workspace-kit registry validate/);
     }
