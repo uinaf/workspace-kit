@@ -1,9 +1,10 @@
 # The agent workspace convention
 
 An **agent workspace** is a git repository that gives coding/assistant
-agents a stable operating context. `workspace-kit` validates the structure;
-the content is always owner-authored. The convention has three layers, and a
-workspace declares which of them it uses in `workspace.json` — absent
+agents a stable operating context. `workspace-kit` validates the structure and
+scaffolds an owner-editable skeleton; workspace owners supply operating content
+and policy. The convention has four layers, and a workspace declares which of
+them it uses in `workspace.json` — absent
 sections disable their checks, and unknown files are always tolerated
 (harnesses and runtimes add their own state; tooling must not fight them).
 
@@ -12,7 +13,8 @@ sections disable their checks, and unknown files are always tolerated
 One canonical `AGENTS.md` at the repo root. `CLAUDE.md` is a relative
 symlink to it so both Codex-style and Claude-style harnesses read the same
 file. Harness- or runtime-specific mechanics stay out of the canonical file.
-The kit checks presence and link integrity only — never prose.
+The structural check covers presence and link integrity; prose remains
+owner-reviewed.
 
 ## 2. Memory (optional)
 
@@ -99,16 +101,16 @@ Sync links every locally authored skill into `.agents/skills`, ensures the
 Claude discovery link, then delegates each remote entry to a pinned `skills`
 CLI with telemetry disabled, project scope, and copy mode. The dependency owns
 source retrieval, security assessment, copying, and content hashes.
-Workspace-kit never writes to machine-global skill directories or removes
-undeclared content.
+Workspace-kit scopes its writes to declared workspace skills and their
+discovery links. Machine-global skill directories and undeclared workspace
+content remain consumer-owned.
 
 Commit the generated `skills-lock.json` with the copied remote skills. Use
 `skills check` for an offline check of workspace declarations, runtime
 links/copies, and declared-versus-locked provenance. `doctor` includes the same
 check whenever the `skills` section exists.
 
-Shared machine-global skills are a separate consumer choice and remain outside
-workspace-kit.
+Consumers own shared machine-global skill selection and installation.
 
 ## 4. Operations (optional)
 
@@ -224,8 +226,9 @@ clones, fetches, pulls, or changes a checkout.
 
 ## Profiles (`init`)
 
-`init` scaffolds structural skeletons with TODO markers — it never writes
-behavioral instruction content, and never overwrites existing files.
+`init` scaffolds an owner-editable instruction skeleton with TODO markers,
+kit-owned validation commands, and the selected profile's structural files.
+Existing files remain unchanged.
 
 - `work` — AGENTS.md + CLAUDE.md symlink + docs/README.md + workspace.json.
 - `personal` — work + README, `.env.example`, project-registry stub,
@@ -238,11 +241,11 @@ A fresh scaffold is doctor-green immediately, and personal/runtime scaffolds
 are also registry-green. The ownership contract stays unconfigured until an
 origin remote and a peer actually exist.
 
-After scaffolding, the workspace owner must replace the `AGENTS.md` TODOs
-before treating the repository as operational. The runtime profile creates an
-empty `skills/skills.json` remote manifest, a `.agents/skills/` discovery
-directory, and the `.claude/skills` compatibility link. It does not install or
-enable any skill.
+After scaffolding, the workspace owner replaces the `AGENTS.md` TODOs before
+treating the repository as operational. The runtime profile creates an empty
+`skills/skills.json` remote manifest, a `.agents/skills/` discovery directory,
+and the `.claude/skills` compatibility link; the owner then declares and syncs
+the skills that runtime uses.
 
 ## Exact check semantics
 

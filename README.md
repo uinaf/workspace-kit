@@ -2,7 +2,8 @@
 
 Config-driven validation and scaffolding for **agent workspaces** — the git
 repositories that give coding/assistant agents a stable operating context.
-Not related to npm/yarn/pnpm workspaces or monorepo tooling.
+This workspace model is distinct from package-manager workspaces and monorepo
+tooling.
 
 ## Install
 
@@ -23,14 +24,14 @@ npx -y @uinaf/workspace-kit registry validate         # validate projects.json
 npx -y @uinaf/workspace-kit skills sync               # materialize workspace skills
 ```
 
-`doctor` runs every repository-state check the workspace declares in its
-`workspace.json` — structure, wiki hygiene, ownership contracts,
-documentation links, workspace-local skills, and size limits. Candidate paths
-are screened separately with `contract handoff <paths...>` because passing that
-gate means only "eligible for human review." Absent config sections disable
-their checks, unknown files are always tolerated, and all validation runs
-offline with zero runtime dependencies. `workspace-kit --help` lists all
-commands.
+`doctor` runs the configured structure, wiki-lint, ownership-contract,
+documentation-link, workspace-skill, and soft-limit checks. Project-registry
+validation and wiki freshness remain explicit commands because they have
+separate operational contracts. Candidate paths are screened with
+`contract handoff <paths...>` for human review eligibility. Absent config
+sections disable their checks, unknown files are always tolerated, and all
+validation runs offline with zero runtime dependencies.
+`workspace-kit --help` lists all commands.
 
 `registry validate` is an explicit project-registry gate. It validates the
 entire declared entry shape before inspecting any locally present checkout,
@@ -48,14 +49,13 @@ so source changes are visible before commit and a page edited in the same
 proposed revision can attest them. For wiki-to-wiki sources, an `updated:`-only
 frontmatter change is metadata: it does not make dependent pages stale.
 
-## Independent by design
+## Composition model
 
-`workspace-kit` only owns workspace structure and validation. It does not
-install or invoke `uinaf/agents` or `uinaf/dotfiles`; those are optional
-companion tools with independent installation, releases, and verification.
-Consumers choose whether and how to combine them. Its optional `skills sync`
-command links authored workspace skills and installs only the remote skills
-declared by that workspace.
+`workspace-kit` owns portable workspace structure, scaffolding, and validation.
+Consumers compose it with independently installed and released companion tools
+such as `uinaf/agents` and `uinaf/dotfiles`. The optional `skills sync` command
+links authored workspace skills and installs the workspace's declared remote
+skills while leaving machine-global capabilities to the consumer.
 
 ## Docs
 

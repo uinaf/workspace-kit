@@ -1,6 +1,5 @@
-// Workspace scaffolder. Writes structural skeletons only — instruction
-// content is owner-authored; the kit never writes behavioral prose. Existing
-// files are never overwritten.
+// Workspace scaffolder. Writes owner-editable structural skeletons and
+// kit-owned validation commands. Existing files remain unchanged.
 import { mkdirSync, realpathSync } from "node:fs";
 import { kitVersion } from "./version.ts";
 import { createWorkspaceLink, workspaceLstat, writeWorkspaceText } from "./lib/workspaceFs.ts";

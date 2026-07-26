@@ -20,10 +20,10 @@
   },
   "scripts": {
     "test": "vp test run",
-    "coverage:skills": "vp test run test/skills.test.ts --coverage",
+    "coverage": "vp test run --coverage",
     "build": "vp pack",
     "smoke": "node scripts/smoke-package.mjs",
-    "verify": "vp check && vp test run && vp test run test/skills.test.ts --coverage && vp pack && node scripts/smoke-package.mjs",
+    "verify": "vp check && vp test run --coverage && vp pack && node scripts/smoke-package.mjs",
     "prepack": "vp run verify"
   },
   "devDependencies": {

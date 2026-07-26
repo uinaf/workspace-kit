@@ -5,8 +5,8 @@ Contributor guide for agents working in `uinaf/workspace-kit`.
 ## What this repo is
 
 The public, config-driven CLI that validates and scaffolds agent workspaces.
-The design spec and consumer decisions live outside this repo; this repo owns
-the mechanism and its public documentation only.
+This repository owns the portable mechanism and its public documentation;
+consumers own their workspace policy and composition.
 
 ## Hard rules
 
@@ -21,8 +21,9 @@ the mechanism and its public documentation only.
 - Keep this repository standalone. Do not add package, script, CI, checkout, or
   validation dependencies on `uinaf/agents` or `uinaf/dotfiles`. Optional
   documentation links are fine; composition belongs to the consumer.
-- The kit never authors instruction content and never touches machine-global
-  state (`~/.claude/`, `~/.codex/`, `~/.agents/skills`).
+- The scaffolder writes an owner-editable instruction skeleton and kit-owned
+  validation commands. Machine-global state (`~/.claude/`, `~/.codex/`,
+  `~/.agents/skills`) remains consumer-owned.
 - Skill sync may link only local skills under `skills/` and copy only remote
   skills explicitly declared in `skills/skills.json`. It must never choose
   skills, install them globally, or remove undeclared workspace content.
@@ -36,10 +37,10 @@ the mechanism and its public documentation only.
 The repo runs on the [Vite+](https://github.com/voidzero-dev/vite-plus)
 toolchain; all tool config lives in `vite.config.ts`.
 
-`vp run verify` runs `vp check` (format, lint, type check), `vp test run`, the
-focused workspace-skill coverage gate, `vp pack`, and an installed-tarball CLI
-smoke. The skill gate requires at least 90% statements, functions, and lines;
-branch coverage stays pragmatic at 75%. After `pnpm install`, run
+`vp run verify` runs `vp check` (format, lint, type check), the full test suite
+with focused workspace-skill coverage, `vp pack`, and an installed-tarball CLI
+smoke. Skill statements, functions, and lines stay at or above 90%; branch
+coverage stays pragmatic at 75%. After `pnpm install`, run
 `vp config --no-agent` to install the pre-commit hook; it runs `vp staged` plus
 the full gate. Fix issues with `vp check --fix`; `parity/legacy/` and
 `parity/fixtures/` are exempt from lint/format — they are frozen.
