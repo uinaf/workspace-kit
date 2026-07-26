@@ -224,6 +224,18 @@ operation and exits 1 when any are present; a clean generated catalog exits 0.
 state and prints `registry ok` on success. It reads Git metadata only; it never
 clones, fetches, pulls, or changes a checkout.
 
+## Repository security composition
+
+Workspace repositories run full-history secret detection in a dedicated CI
+workflow on pull requests and default-branch pushes, with scheduled and manual
+runs for recurring coverage. The consumer may add the workflow path to
+`workspace.json.required` so `doctor` verifies that the repository keeps the
+workflow as part of its structure.
+
+Local workspace validation stays focused on deterministic structure, wiki,
+registry, documentation, and skill contracts. Host configuration audits and
+repository-history security scans remain independently operated surfaces.
+
 ## Profiles (`init`)
 
 `init` scaffolds an owner-editable instruction skeleton with TODO markers,

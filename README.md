@@ -57,6 +57,11 @@ such as `uinaf/agents` and `uinaf/dotfiles`. The optional `skills sync` command
 links authored workspace skills and installs the workspace's declared remote
 skills while leaving machine-global capabilities to the consumer.
 
+Workspace repositories run history-based secret detection in a dedicated CI
+workflow. Consumers can list that workflow in `workspace.json.required` when
+its presence is part of their structural contract. Local `workspace-kit`
+commands remain deterministic, credential-free workspace checks.
+
 ## Docs
 
 - [Workspace convention, bootstrap, and check contracts](docs/convention.md) —
