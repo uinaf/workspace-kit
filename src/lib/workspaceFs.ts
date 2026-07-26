@@ -9,6 +9,7 @@ import {
   readdirSync,
   readlinkSync,
   renameSync,
+  rmSync,
   symlinkSync,
   unlinkSync,
   writeFileSync,
@@ -331,6 +332,19 @@ export function unlinkWorkspaceFile(root: string, path: string): void {
     unlinkSync(resolve(root, relative));
   } catch (error) {
     throw new Error(`${relative}: could not delete file (${errorCode(error) ?? "error"})`);
+  }
+}
+
+export function removeWorkspaceDirectory(root: string, path: string): void {
+  const relative = normalizeWorkspacePath(path);
+  const stat = workspaceLstat(root, relative);
+  if (!stat) return;
+  if (stat.isSymbolicLink()) throw new Error(`${relative}: refusing to delete a symlink`);
+  if (!stat.isDirectory()) throw new Error(`${relative}: expected a directory`);
+  try {
+    rmSync(resolve(root, relative), { recursive: true });
+  } catch (error) {
+    throw new Error(`${relative}: could not delete directory (${errorCode(error) ?? "error"})`);
   }
 }
 

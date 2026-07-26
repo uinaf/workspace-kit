@@ -3,11 +3,21 @@
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 import { execSync, spawnSync } from "node:child_process";
-import { lstatSync, mkdtempSync, readFileSync, readlinkSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { initWorkspace } from "../src/init.ts";
+import { kitVersion } from "../src/version.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = join(root, "src", "cli.ts");
@@ -24,10 +34,19 @@ for (const profile of ["personal", "runtime", "work"] as const) {
     const agents = readFileSync(join(dir, "AGENTS.md"), "utf8");
     assert.match(agents, /TODO/);
     assert.match(agents, /## Skill Ownership/);
+    assert.match(agents, /npm run verify/);
+    const packageJson = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+      scripts: Record<string, string>;
+      devDependencies: Record<string, string>;
+    };
+    assert.equal(packageJson.devDependencies["@uinaf/workspace-kit"], kitVersion());
+    assert.equal(packageJson.scripts.doctor, "workspace-kit doctor");
     if (profile === "personal" || profile === "runtime") {
-      assert.match(agents, /workspace-kit registry validate/);
+      assert.match(agents, /npm run registry:check/);
       const hook = readFileSync(join(dir, ".githooks", "pre-commit"), "utf8");
-      assert.match(hook, /workspace-kit@[^ ]+ registry validate/);
+      assert.match(hook, /npm run verify/);
+      assert.doesNotMatch(hook, /npx/);
+      assert.equal(packageJson.scripts["registry:check"], "workspace-kit registry validate");
 
       const config = JSON.parse(readFileSync(join(dir, "workspace.json"), "utf8")) as {
         handoff?: { prefixes?: unknown };
@@ -45,7 +64,7 @@ for (const profile of ["personal", "runtime", "work"] as const) {
         });
       }
     } else {
-      assert.doesNotMatch(agents, /workspace-kit registry validate/);
+      assert.doesNotMatch(agents, /registry:check/);
     }
 
     execSync("git init -q", { cwd: dir });
@@ -67,6 +86,18 @@ for (const profile of ["personal", "runtime", "work"] as const) {
       });
       assert.equal(registry.status, 0, registry.stderr);
       assert.equal(registry.stdout, "registry ok\n");
+
+      const bin = join(dir, "node_modules", ".bin");
+      mkdirSync(bin, { recursive: true });
+      const shim = join(bin, "workspace-kit");
+      writeFileSync(shim, `#!/bin/sh\nexec "${process.execPath}" "${cli}" "$@"\n`);
+      chmodSync(shim, 0o755);
+      const hook = spawnSync(join(dir, ".githooks", "pre-commit"), [], {
+        cwd: dir,
+        encoding: "utf8",
+        env: { ...process.env, npm_config_offline: "true" },
+      });
+      assert.equal(hook.status, 0, `${hook.stdout}${hook.stderr}`);
     }
   });
 
@@ -79,4 +110,36 @@ for (const profile of ["personal", "runtime", "work"] as const) {
     assert.ok(second.skipped.includes("AGENTS.md"));
     assert.equal(readFileSync(join(dir, "AGENTS.md"), "utf8"), before);
   });
+}
+
+test("init reports an unusable destination with filesystem context", () => {
+  const root = scratchDirectory("init-blocked-");
+  const blocker = join(root, "not-a-directory");
+  writeFileSync(blocker, "occupied\n");
+
+  assert.throws(
+    () => initWorkspace(join(blocker, "workspace"), "work"),
+    /not-a-directory\/workspace is not a usable directory:/,
+  );
+});
+
+test("init stops before scaffolding around an incompatible existing package", () => {
+  const dir = scratchDirectory("init-existing-");
+  writeFileSync(join(dir, "package.json"), '{"scripts":{"test":"custom"}}\n');
+
+  assert.throws(
+    () => initWorkspace(dir, "personal"),
+    /package.json is not compatible.*existing-workspace adoption steps/,
+  );
+  assert.equal(existsSync(join(dir, "AGENTS.md")), false);
+});
+
+test("init explains malformed existing package metadata", () => {
+  const dir = scratchDirectory("init-malformed-");
+  writeFileSync(join(dir, "package.json"), "{");
+  assert.throws(() => initWorkspace(dir, "work"), /package.json is not usable by init/);
+});
+
+function scratchDirectory(prefix: string): string {
+  return mkdtempSync(join(tmpdir(), prefix));
 }

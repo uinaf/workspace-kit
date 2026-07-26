@@ -76,41 +76,59 @@ source:
 }
 ```
 
-`workspace-kit skills sync` materializes one discovery tree:
+`workspace-kit skills sync` keeps authored source and generated discovery
+separate:
 
 ```text
 skills/howdy/                         authored source
 skills/skills.json                    remote manifest
+skills/workspace-kit-lock.json        generated workspace-kit ownership
 .agents/skills/howdy                  link to ../../skills/howdy
 .agents/skills/workspace-helper/      copied remote skill
 .claude/skills                        link to ../.agents/skills
 ```
 
-[OpenClaw](https://docs.openclaw.ai/tools/skills) reads
-`<workspace>/.agents/skills` directly. The Claude link exposes the same unified
-tree without another copy.
+[OpenClaw](https://docs.openclaw.ai/skills) discovers both `skills/` and
+`.agents/skills`; the authored `skills/` root has higher precedence. Codex and
+other project-agent harnesses use `.agents/skills`, while the Claude link
+exposes that generated tree without another copy. A local link therefore makes
+one authored skill available across harnesses, and a remote copy remains
+workspace-local.
 
 Enable workspace skill management with `"skills": {}` in `workspace.json`,
 then run:
 
 ```bash
-npx -y @uinaf/workspace-kit skills sync
+npm exec -- workspace-kit skills sync
 ```
 
 Sync links every locally authored skill into `.agents/skills`, ensures the
 Claude discovery link, then delegates each remote entry to a pinned `skills`
 CLI with telemetry disabled, project scope, and copy mode. The dependency owns
 source retrieval, security assessment, copying, and content hashes.
-Workspace-kit scopes its writes to declared workspace skills and their
-discovery links. Machine-global skill directories and undeclared workspace
-content remain consumer-owned.
+After each successful install, workspace-kit verifies the copied directory and
+the dependency lock, then records that name and source in
+`skills/workspace-kit-lock.json`. When an entry leaves the manifest, sync
+removes it only when the manager lock and current dependency lock still record
+the same source. Generic `skills-lock.json` entries alone remain dependency
+metadata.
 
-Commit the generated `skills-lock.json` with the copied remote skills. Use
-`skills check` for an offline check of workspace declarations, runtime
-links/copies, and declared-versus-locked provenance. `doctor` includes the same
-check whenever the `skills` section exists.
+Commit both generated lock files with the copied remote skills. Use `skills
+check` for an offline check of workspace declarations, runtime links/copies,
+and declared-versus-locked provenance. `doctor` includes the same check whenever
+the `skills` section exists.
 
 Consumers own shared machine-global skill selection and installation.
+
+## Adopting an existing workspace
+
+1. Install `@uinaf/workspace-kit` as an exact development dependency.
+2. Add project-local package scripts for `doctor`, `test`, and `verify`.
+3. Describe the workspace's selected sections in `workspace.json`.
+4. Put authored skills in `skills/<name>/`, declare remote workspace skills in
+   `skills/skills.json`, and run `skills sync`.
+5. Run the full local `verify` script and the repository's CI before deploying
+   the checkout to a runtime.
 
 ## 4. Operations (optional)
 
@@ -238,11 +256,15 @@ repository-history security scans remain independently operated surfaces.
 
 ## Profiles (`init`)
 
-`init` scaffolds an owner-editable instruction skeleton with TODO markers,
-kit-owned validation commands, and the selected profile's structural files.
-Existing files remain unchanged.
+In an empty directory, `init` scaffolds an owner-editable instruction skeleton with TODO markers, an
+exact local `@uinaf/workspace-kit` development dependency, package scripts,
+and the selected profile's structural files. Run `npm install` once, then use
+`npm run verify`; generated hooks use the same local package and stay offline.
+Existing files remain unchanged. A re-run accepts a compatible `package.json`;
+an existing repository follows the adoption steps above, and init stops before
+writing when its package contract is incompatible.
 
-- `work` — AGENTS.md + CLAUDE.md symlink + docs/README.md + workspace.json.
+- `work` — AGENTS.md + CLAUDE.md symlink + package.json + docs/README.md + workspace.json.
 - `personal` — work + README, `.env.example`, project-registry stub,
   memory/wiki skeleton (lint-green), pre-commit hook wiring for both `doctor`
   and `registry validate`.

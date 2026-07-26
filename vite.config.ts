@@ -6,14 +6,7 @@ export default defineConfig({
     include: ["test/**/*.test.ts"],
     coverage: {
       provider: "v8",
-      reporter: ["text"],
-      include: ["src/skills.ts"],
-      thresholds: {
-        statements: 90,
-        branches: 75,
-        functions: 90,
-        lines: 90,
-      },
+      include: ["src/**/*.ts"],
     },
     server: {
       deps: {

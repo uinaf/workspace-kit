@@ -146,7 +146,7 @@ test("workspace writes support existing filenames near the filesystem limit", ()
 });
 
 test("workspace writes preserve read-only output protection", () => {
-  if (process.platform === "win32" || process.getuid?.() === 0) return;
+  if (process.getuid?.() === 0) return;
   const dir = scaffold();
   const path = join(dir, "read-only.md");
   writeFileSync(path, "protected\n");

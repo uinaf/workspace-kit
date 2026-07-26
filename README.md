@@ -5,23 +5,41 @@ repositories that give coding/assistant agents a stable operating context.
 This workspace model is distinct from package-manager workspaces and monorepo
 tooling.
 
+Supported execution environments are macOS and Linux.
+
 ## Install
 
-```
-npm install -D @uinaf/workspace-kit
+```bash
+npm install --save-dev --save-exact @uinaf/workspace-kit
 ```
 
-Or run one-shot with `npx -y @uinaf/workspace-kit`. Requires Node >= 24.18,
-plus git on PATH for the history-dependent checks. Pin exact versions.
+Use the project-local binary so contributors and CI use the version recorded
+by the workspace. Requires Node >= 24.18 plus git on PATH for the
+history-dependent checks.
+
+For a new workspace, start in an empty directory. The one-shot bootstrap
+records the resolved release as an exact local development dependency; ongoing
+commands then use that local pin:
+
+```bash
+npx --yes @uinaf/workspace-kit@latest init --profile personal
+npm install
+npm run verify
+```
+
+For a repository that already has `package.json`, follow
+[Adopting an existing workspace](docs/convention.md#adopting-an-existing-workspace)
+so its existing scripts and dependencies remain explicit. `init` validates a
+compatible package when re-run and stops before writing around an incompatible
+one.
 
 ## Quick usage
 
-```
-npx -y @uinaf/workspace-kit init --profile personal   # scaffold a workspace
-npx -y @uinaf/workspace-kit doctor                    # validate it
-npx -y @uinaf/workspace-kit wiki backfill --check     # detect catalog drift
-npx -y @uinaf/workspace-kit registry validate         # validate projects.json
-npx -y @uinaf/workspace-kit skills sync               # materialize workspace skills
+```bash
+npm exec -- workspace-kit doctor                    # validate it
+npm exec -- workspace-kit wiki backfill --check     # detect catalog drift
+npm exec -- workspace-kit registry validate         # validate projects.json
+npm exec -- workspace-kit skills sync               # materialize workspace skills
 ```
 
 `doctor` runs the configured structure, wiki-lint, ownership-contract,
@@ -55,7 +73,9 @@ frontmatter change is metadata: it does not make dependent pages stale.
 Consumers compose it with independently installed and released companion tools
 such as `uinaf/agents` and `uinaf/dotfiles`. The optional `skills sync` command
 links authored workspace skills and installs the workspace's declared remote
-skills while leaving machine-global capabilities to the consumer.
+skills. It records those copies in `skills/workspace-kit-lock.json` so later
+syncs retire only workspace-kit-managed copies. Machine-global capabilities
+remain consumer-owned.
 
 Workspace repositories run history-based secret detection in a dedicated CI
 workflow. Consumers can list that workflow in `workspace.json.required` when

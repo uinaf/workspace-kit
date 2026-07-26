@@ -2,7 +2,12 @@
 // kit-owned validation commands. Existing files remain unchanged.
 import { mkdirSync, realpathSync } from "node:fs";
 import { kitVersion } from "./version.ts";
-import { createWorkspaceLink, workspaceLstat, writeWorkspaceText } from "./lib/workspaceFs.ts";
+import {
+  createWorkspaceLink,
+  readWorkspaceText,
+  workspaceLstat,
+  writeWorkspaceText,
+} from "./lib/workspaceFs.ts";
 
 export type Profile = "personal" | "runtime" | "work";
 export type InitResult = { created: string[]; skipped: string[] };
@@ -10,7 +15,7 @@ export type InitResult = { created: string[]; skipped: string[] };
 function agentsSkeleton(profile: Profile): string {
   const registryValidation =
     profile === "personal" || profile === "runtime"
-      ? "\nRun `npx @uinaf/workspace-kit registry validate` before committing registry changes."
+      ? "\nRun `npm run registry:check` before committing registry changes."
       : "";
   return `# AGENTS.md
 
@@ -36,13 +41,61 @@ skills are owned. Installed machine-global copies are not workspace source.
 
 ## Validation
 
-Run \`npx @uinaf/workspace-kit doctor\` before committing.
+Run \`npm run verify\` before committing.
 ${registryValidation}
 
 ## Boundaries
 
 TODO: what is private, what may leave this workspace, and how.
 `;
+}
+
+function packageDefinition(profile: Profile) {
+  const scripts: Record<string, string> = {
+    doctor: "workspace-kit doctor",
+    test: "npm run doctor",
+    verify: "npm test",
+  };
+  if (profile === "personal" || profile === "runtime") {
+    scripts["registry:check"] = "workspace-kit registry validate";
+    scripts.verify = "npm test && npm run registry:check";
+  }
+  return {
+    private: true,
+    scripts,
+    devDependencies: { "@uinaf/workspace-kit": kitVersion() },
+    engines: { node: ">=24.18.0" },
+  };
+}
+
+function packageSkeleton(profile: Profile): string {
+  return `${JSON.stringify(packageDefinition(profile), null, 2)}\n`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function assertCompatiblePackage(root: string, profile: Profile): void {
+  if (!workspaceLstat(root, "package.json")) return;
+  let existing: unknown;
+  try {
+    existing = JSON.parse(readWorkspaceText(root, "package.json"));
+  } catch (error) {
+    throw new Error(`package.json is not usable by init: ${String(error)}`);
+  }
+  const expected = packageDefinition(profile);
+  const scripts = isRecord(existing) && isRecord(existing.scripts) ? existing.scripts : {};
+  const dependencies =
+    isRecord(existing) && isRecord(existing.devDependencies) ? existing.devDependencies : {};
+  const scriptsMatch = Object.entries(expected.scripts).every(
+    ([name, command]) => scripts[name] === command,
+  );
+  if (!scriptsMatch || dependencies["@uinaf/workspace-kit"] !== kitVersion()) {
+    throw new Error(
+      `package.json is not compatible with init --profile ${profile}; follow the existing-workspace adoption steps in docs/convention.md`,
+    );
+  }
 }
 
 function wikiPage(title: string, type: string, body: string, today: string): string {
@@ -71,6 +124,7 @@ export function initWorkspace(dir: string, profile: Profile): InitResult {
     );
   }
   const root = realpathSync(dir);
+  assertCompatiblePackage(root, profile);
 
   const put = (rel: string, content: string, mode?: number): void => {
     // lstat-based existence: a pre-existing dangling symlink must count as
@@ -100,9 +154,10 @@ export function initWorkspace(dir: string, profile: Profile): InitResult {
 
   put("AGENTS.md", agentsSkeleton(profile));
   link("CLAUDE.md", "AGENTS.md");
+  put("package.json", packageSkeleton(profile));
   put("docs/README.md", "# Docs\n\nTODO: index the documents that live under docs/.\n");
 
-  const required = ["AGENTS.md", "CLAUDE.md", "docs/README.md", "workspace.json"];
+  const required = ["AGENTS.md", "CLAUDE.md", "package.json", "docs/README.md", "workspace.json"];
   const links = [{ path: "CLAUDE.md", target: "AGENTS.md" }];
   const config: Record<string, unknown> = {
     minVersion: kitVersion(),
@@ -142,8 +197,7 @@ if ! command -v node >/dev/null 2>&1; then
   echo "pre-commit: node not found; skipping workspace-kit checks" >&2
   exit 0
 fi
-npx --yes @uinaf/workspace-kit@${kitVersion()} doctor
-npx --yes @uinaf/workspace-kit@${kitVersion()} registry validate
+npm run verify
 `,
       0o755,
     );

@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readlinkSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  lstatSync,
+  readFileSync,
+  readlinkSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -56,6 +64,21 @@ function writeLock(root: string, skills: ReadonlyArray<{ name: string; source: s
           skills.map(({ name, source }) => [name, { source, computedHash: "dependency-owned" }]),
         ),
       },
+      null,
+      2,
+    )}\n`,
+  );
+}
+
+function writeManagedLock(
+  root: string,
+  skills: ReadonlyArray<{ name: string; source: string }>,
+): void {
+  mkdirSync(join(root, "skills"), { recursive: true });
+  writeFileSync(
+    join(root, "skills", "workspace-kit-lock.json"),
+    `${JSON.stringify(
+      { version: 1, skills: Object.fromEntries(skills.map(({ name, source }) => [name, source])) },
       null,
       2,
     )}\n`,
@@ -212,9 +235,248 @@ test("workspace skill sync owns links and delegates remote installation to skill
       env: { DISABLE_TELEMETRY: "1", DO_NOT_TRACK: "1" },
     },
   ]);
+  assert.deepEqual(JSON.parse(readFileSync(join(root, "skills/workspace-kit-lock.json"), "utf8")), {
+    version: 1,
+    skills: { "remote-skill": "fixture/skills" },
+  });
 });
 
-test("workspace skill sync preserves conflicts, failures, and Windows delegation", () => {
+test("workspace skill sync removes only retired skills recorded in its lock", () => {
+  const root = scratch();
+  writeManifest(root, [{ name: "current-skill", source: "fixture/current" }]);
+  writeDiscovery(root);
+  writeSkill(root, ".agents/skills", "older-skill");
+  writeSkill(root, ".agents/skills", "retired-skill");
+  writeSkill(root, ".agents/skills", "untracked-skill");
+  writeLock(root, [
+    { name: "retired-skill", source: "fixture/retired" },
+    { name: "older-skill", source: "fixture/older" },
+  ]);
+  writeManagedLock(root, [
+    { name: "retired-skill", source: "fixture/retired" },
+    { name: "older-skill", source: "fixture/older" },
+  ]);
+  const calls: string[][] = [];
+  const runner: SkillsRunner = (_command, args) => {
+    calls.push([...args]);
+    if (args[2] === "remove") {
+      const removed = args[3];
+      writeLock(
+        root,
+        [
+          { name: "older-skill", source: "fixture/older" },
+          { name: "retired-skill", source: "fixture/retired" },
+        ].filter(({ name }) => name !== removed),
+      );
+    } else {
+      writeSkill(root, ".agents/skills", "current-skill");
+      writeLock(root, [{ name: "current-skill", source: "fixture/current" }]);
+    }
+    return { status: 0 };
+  };
+
+  assert.deepEqual(syncWorkspaceSkills(root, config, runner), []);
+  assert.deepEqual(calls, [
+    [
+      "--yes",
+      `skills@${SKILLS_CLI_VERSION}`,
+      "remove",
+      "older-skill",
+      "--agent",
+      "universal",
+      "--yes",
+    ],
+    [
+      "--yes",
+      `skills@${SKILLS_CLI_VERSION}`,
+      "remove",
+      "retired-skill",
+      "--agent",
+      "universal",
+      "--yes",
+    ],
+    [
+      "--yes",
+      `skills@${SKILLS_CLI_VERSION}`,
+      "add",
+      "fixture/current",
+      "--skill",
+      "current-skill",
+      "--agent",
+      "universal",
+      "--copy",
+      "--yes",
+    ],
+  ]);
+  assert.equal(workspaceLstatForTest(root, ".agents/skills/older-skill"), false);
+  assert.equal(workspaceLstatForTest(root, ".agents/skills/retired-skill"), false);
+  assert.ok(workspaceLstatForTest(root, ".agents/skills/untracked-skill"));
+});
+
+test("workspace skill sync replaces a retired remote copy with local source", () => {
+  const root = scratch();
+  writeSkill(root, "skills", "same-skill");
+  writeDiscovery(root);
+  writeSkill(root, ".agents/skills", "same-skill");
+  writeManifest(root, []);
+  writeLock(root, [{ name: "same-skill", source: "fixture/retired" }]);
+  writeManagedLock(root, [{ name: "same-skill", source: "fixture/retired" }]);
+  const runner: SkillsRunner = () => {
+    writeLock(root, []);
+    return { status: 0 };
+  };
+
+  assert.deepEqual(syncWorkspaceSkills(root, config, runner), []);
+  assert.equal(readlinkSync(join(root, ".agents/skills/same-skill")), "../../skills/same-skill");
+});
+
+test("workspace skill retirement fails closed and preserves the previous copy", () => {
+  const root = scratch();
+  writeManifest(root, []);
+  writeDiscovery(root);
+  writeSkill(root, ".agents/skills", "retired-skill");
+  writeLock(root, [{ name: "retired-skill", source: "fixture/retired" }]);
+  writeManagedLock(root, [{ name: "retired-skill", source: "fixture/retired" }]);
+
+  assert.deepEqual(
+    syncWorkspaceSkills(root, config, () => ({ status: 9, error: new Error("offline") })),
+    [
+      "retired-skill (fixture/retired) removal failed with exit 9: offline",
+      "skills-lock.json contains undeclared skill retired-skill",
+      "skills/workspace-kit-lock.json contains retired managed skill retired-skill",
+    ],
+  );
+  assert.ok(workspaceLstatForTest(root, ".agents/skills/retired-skill"));
+
+  writeFileSync(join(root, "skills-lock.json"), "{");
+  let called = false;
+  assert.match(
+    syncWorkspaceSkills(root, config, () => {
+      called = true;
+      return { status: 0 };
+    })[0] ?? "",
+    /JSON|Unexpected/,
+  );
+  assert.equal(called, false);
+});
+
+test("workspace skill retirement rejects unsafe lock provenance", () => {
+  const invalidName = scratch();
+  writeManifest(invalidName, []);
+  writeDiscovery(invalidName);
+  writeManagedLock(invalidName, [{ name: "Invalid", source: "fixture/retired" }]);
+  assert.deepEqual(syncWorkspaceSkills(invalidName, config), [
+    "skills/workspace-kit-lock.json contains an invalid managed skill entry Invalid",
+  ]);
+
+  const invalidSource = scratch();
+  writeManifest(invalidSource, []);
+  writeDiscovery(invalidSource);
+  writeManagedLock(invalidSource, [{ name: "retired-skill", source: "../private" }]);
+  assert.deepEqual(syncWorkspaceSkills(invalidSource, config), [
+    "skills/workspace-kit-lock.json records retired-skill with an invalid managed source",
+  ]);
+
+  const linkedCopy = scratch();
+  writeManifest(linkedCopy, []);
+  writeDiscovery(linkedCopy);
+  writeLock(linkedCopy, [{ name: "retired-skill", source: "fixture/retired" }]);
+  writeManagedLock(linkedCopy, [{ name: "retired-skill", source: "fixture/retired" }]);
+  symlinkSync("../../skills/retired-skill", join(linkedCopy, ".agents/skills/retired-skill"));
+  assert.deepEqual(syncWorkspaceSkills(linkedCopy, config), [
+    ".agents/skills/retired-skill is not a managed copied directory",
+  ]);
+});
+
+test("workspace skill sync clears a retired lock entry when its copy is already absent", () => {
+  const root = scratch();
+  writeManifest(root, []);
+  writeDiscovery(root);
+  writeLock(root, [{ name: "retired-skill", source: "fixture/retired" }]);
+  writeManagedLock(root, [{ name: "retired-skill", source: "fixture/retired" }]);
+  const runner: SkillsRunner = () => {
+    writeLock(root, []);
+    return { status: 0 };
+  };
+
+  assert.deepEqual(syncWorkspaceSkills(root, config, runner), []);
+});
+
+test("workspace skill sync preserves generic lock entries it did not manage", () => {
+  const root = scratch();
+  writeManifest(root, []);
+  writeDiscovery(root);
+  writeSkill(root, ".agents/skills", "external-skill");
+  writeLock(root, [{ name: "external-skill", source: "fixture/external" }]);
+  let called = false;
+
+  assert.deepEqual(
+    syncWorkspaceSkills(root, config, () => {
+      called = true;
+      return { status: 0 };
+    }),
+    ["skills-lock.json contains undeclared skill external-skill"],
+  );
+  assert.equal(called, false);
+  assert.ok(workspaceLstatForTest(root, ".agents/skills/external-skill"));
+});
+
+test("workspace skill retirement preserves a same-name consumer replacement", () => {
+  const root = scratch();
+  writeManifest(root, []);
+  writeDiscovery(root);
+  writeSkill(root, ".agents/skills", "shared-skill");
+  writeLock(root, [{ name: "shared-skill", source: "fixture/replacement" }]);
+  writeManagedLock(root, [{ name: "shared-skill", source: "fixture/original" }]);
+  let called = false;
+
+  assert.deepEqual(
+    syncWorkspaceSkills(root, config, () => {
+      called = true;
+      return { status: 0 };
+    }),
+    ["shared-skill retirement provenance does not match skills-lock.json"],
+  );
+  assert.equal(called, false);
+  assert.ok(workspaceLstatForTest(root, ".agents/skills/shared-skill"));
+});
+
+test("workspace skill sync records each successful install before a later failure", () => {
+  const root = scratch();
+  writeManifest(root, [
+    { name: "first-skill", source: "fixture/first" },
+    { name: "second-skill", source: "fixture/second" },
+  ]);
+  const runner: SkillsRunner = (_command, args) => {
+    const name = args[5];
+    if (name === "first-skill") {
+      writeSkill(root, ".agents/skills", name);
+      writeLock(root, [{ name, source: "fixture/first" }]);
+      return { status: 0 };
+    }
+    return { status: 9, error: new Error("offline") };
+  };
+
+  assert.deepEqual(syncWorkspaceSkills(root, config, runner), [
+    "second-skill (fixture/second) failed with exit 9: offline",
+    "missing .agents/skills/second-skill",
+    "skills-lock.json is missing second-skill",
+  ]);
+  assert.deepEqual(JSON.parse(readFileSync(join(root, "skills/workspace-kit-lock.json"), "utf8")), {
+    version: 1,
+    skills: { "first-skill": "fixture/first" },
+  });
+});
+
+function workspaceLstatForTest(root: string, path: string): boolean {
+  try {
+    return lstatSync(join(root, path)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+test("workspace skill sync preserves conflicts and failures", () => {
   const conflict = scratch();
   writeSkill(conflict, "skills", "local-skill");
   writeManifest(conflict, []);
@@ -259,18 +521,6 @@ test("workspace skill sync preserves conflicts, failures, and Windows delegation
       "skills-lock.json: file is missing",
     ],
   );
-
-  const windows = scratch();
-  writeManifest(windows, [{ name: "remote-skill", source: "fixture/skills" }]);
-  const commands: string[] = [];
-  const windowsRunner: SkillsRunner = (command) => {
-    commands.push(command);
-    writeSkill(windows, ".agents/skills", "remote-skill");
-    writeLock(windows, [{ name: "remote-skill", source: "fixture/skills" }]);
-    return { status: 0 };
-  };
-  assert.deepEqual(syncWorkspaceSkills(windows, config, windowsRunner, {}, "win32"), []);
-  assert.deepEqual(commands, ["npx.cmd"]);
 });
 
 test("skills check and doctor expose the offline contract", () => {

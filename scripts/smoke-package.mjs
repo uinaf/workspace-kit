@@ -14,7 +14,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+const npm = "npm";
 const scratch = mkdtempSync(join(tmpdir(), "workspace-kit-package-smoke-"));
 
 function run(command, args, cwd) {
@@ -128,9 +128,12 @@ try {
   const config = JSON.parse(readFileSync(join(fixtureDir, "workspace.json"), "utf8"));
   assert.equal(config.minVersion, sourceVersion);
   assert.ok(config.registry.entry.required.includes("mode"));
+  const fixturePackage = JSON.parse(readFileSync(join(fixtureDir, "package.json"), "utf8"));
+  assert.equal(fixturePackage.devDependencies["@uinaf/workspace-kit"], sourceVersion);
+  assert.equal(fixturePackage.scripts.verify, "npm test && npm run registry:check");
   const hook = readFileSync(join(fixtureDir, ".githooks", "pre-commit"), "utf8");
-  assert.match(hook, new RegExp(`@uinaf/workspace-kit@${sourceVersion.replaceAll(".", "\\.")}`));
-  assert.match(hook, /registry validate/);
+  assert.match(hook, /npm run verify/);
+  assert.doesNotMatch(hook, /npx/);
   run(process.execPath, [installedCli, "config", "validate"], fixtureDir);
   run(process.execPath, [installedCli, "registry", "validate"], fixtureDir);
   config.skills = {};

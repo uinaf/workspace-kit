@@ -1,33 +1,29 @@
-name: Verify
+name: Skills contract
 
-# Pull-request verification only: pushes to main verify inside release.yml
-# so verification and release stay coupled.
 on:
-  pull_request:
+  schedule:
+    - cron: "31 6 * * 1"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: verify-${{ github.workflow }}-${{ github.ref }}
+  group: skills-contract-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  verify:
+  smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 0
       - uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb # v1.15.0
         with:
           node-version-file: ".node-version"
-          cache: true
-          # vp install alone maps to `npm install`; frozen keeps CI on `npm ci`
-          # semantics so lockfile drift fails loudly instead of re-resolving.
           run-install: |
             - args: ["--frozen-lockfile"]
-      - run: vp run verify # vp check + vp test + vp pack + cli smoke
+      - run: vp pack
+      - run: node scripts/smoke-skills-contract.mjs

@@ -91,11 +91,6 @@ function canonicalPath(path: string): string {
   return realpathSync.native(path);
 }
 
-function samePath(left: string, right: string): boolean {
-  if (process.platform === "win32") return left.toUpperCase() === right.toUpperCase();
-  return left === right;
-}
-
 function parseEntries(value: unknown, project: ProjectRegistryConfig): ProjectEntry[] {
   if (!isRecord(value)) return [];
   const entries: ProjectEntry[] = [];
@@ -241,17 +236,16 @@ function checkoutErrors(
       continue;
     }
 
-    if (!samePath(expectedRoot, actualRoot)) {
+    if (expectedRoot !== actualRoot) {
       errors.push(
         `${file} ${entry.label}: registered path is inside another checkout: ${entry.path}`,
       );
       continue;
     }
 
-    const rootIdentity = process.platform === "win32" ? actualRoot.toUpperCase() : actualRoot;
-    const rootLabels = roots.get(rootIdentity) ?? [];
+    const rootLabels = roots.get(actualRoot) ?? [];
     rootLabels.push(entry.label);
-    roots.set(rootIdentity, rootLabels);
+    roots.set(actualRoot, rootLabels);
 
     const origin = git(projectPath, ["remote", "get-url", "origin"]);
     if (origin.status !== 0 || origin.stdout.trim().length === 0) {

@@ -6,7 +6,9 @@ import {
   readWorkspaceDirectory,
   readWorkspaceLink,
   readWorkspaceText,
+  removeWorkspaceDirectory,
   workspaceLstat,
+  writeWorkspaceText,
 } from "./lib/workspaceFs.ts";
 
 export const SKILLS_CLI_VERSION = "1.5.20";
@@ -14,6 +16,9 @@ export const SKILLS_CLI_VERSION = "1.5.20";
 type RemoteSkill = { name: string; source: string };
 type WorkspaceSkills = { local: string[]; remote: RemoteSkill[] };
 type RunResult = { status: number | null; error?: Error };
+type SkillLock = { skills: Record<string, unknown> };
+type ManagedSkillLock = Map<string, string>;
+const MANAGED_SKILLS_LOCK = "skills/workspace-kit-lock.json";
 const GITHUB_SOURCE =
   /^(?!\.{1,2}\/)(?!.*\/\.{1,2}$)(?!.*\.git$)[A-Za-z0-9](?:[A-Za-z0-9_.-]*[A-Za-z0-9])?\/[A-Za-z0-9](?:[A-Za-z0-9_.-]*[A-Za-z0-9])?$/;
 
@@ -117,7 +122,13 @@ function readRemoteSkills(repoRoot: string, config: SkillsConfig): RemoteSkill[]
 function readLocalSkills(repoRoot: string): string[] {
   const local: string[] = [];
   for (const entry of readWorkspaceDirectory(repoRoot, "skills")) {
-    if (entry.name === "skills.json" || entry.name === ".gitkeep") continue;
+    if (
+      entry.name === "skills.json" ||
+      entry.name === "workspace-kit-lock.json" ||
+      entry.name === ".gitkeep"
+    ) {
+      continue;
+    }
     if (entry.isSymbolicLink() || !entry.isDirectory()) {
       throw new Error(`skills/${entry.name}: expected a workspace-owned skill directory`);
     }
@@ -196,24 +207,67 @@ function staleLocalLinkErrors(repoRoot: string, local: readonly string[]): strin
   return errors;
 }
 
-function lockErrors(repoRoot: string, remote: readonly RemoteSkill[]): string[] {
+function readSkillLock(repoRoot: string): SkillLock | string | undefined {
   const lock = workspaceLstat(repoRoot, "skills-lock.json", "skills lock");
-  if (!lock) return remote.length === 0 ? [] : ["skills-lock.json: file is missing"];
+  if (!lock) return undefined;
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(readWorkspaceText(repoRoot, "skills-lock.json", "skills lock"));
   } catch (error) {
-    return [errorText(error)];
+    return errorText(error);
   }
   if (!isRecord(parsed) || parsed.version !== 1 || !isRecord(parsed.skills)) {
-    return ["skills-lock.json must contain version 1 and a skills object"];
+    return "skills-lock.json must contain version 1 and a skills object";
   }
+  return { skills: parsed.skills };
+}
+
+function readManagedSkillLock(repoRoot: string): ManagedSkillLock | string {
+  const lock = workspaceLstat(repoRoot, MANAGED_SKILLS_LOCK, "workspace-kit skills lock");
+  if (!lock) return new Map();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readWorkspaceText(repoRoot, MANAGED_SKILLS_LOCK));
+  } catch (error) {
+    return errorText(error);
+  }
+  if (!isRecord(parsed) || parsed.version !== 1 || !isRecord(parsed.skills)) {
+    return `${MANAGED_SKILLS_LOCK} must contain version 1 and a skills object`;
+  }
+  const managed = new Map<string, string>();
+  for (const [name, source] of Object.entries(parsed.skills)) {
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) || typeof source !== "string") {
+      return `${MANAGED_SKILLS_LOCK} contains an invalid managed skill entry ${name}`;
+    }
+    if (!GITHUB_SOURCE.test(source)) {
+      return `${MANAGED_SKILLS_LOCK} records ${name} with an invalid managed source`;
+    }
+    managed.set(name, source);
+  }
+  return managed;
+}
+
+function writeManagedSkillLock(repoRoot: string, managed: ReadonlyMap<string, string>): void {
+  const skills = Object.fromEntries(
+    [...managed.entries()].sort(([left], [right]) => left.localeCompare(right)),
+  );
+  writeWorkspaceText(
+    repoRoot,
+    MANAGED_SKILLS_LOCK,
+    `${JSON.stringify({ version: 1, skills }, null, 2)}\n`,
+  );
+}
+
+function lockErrors(repoRoot: string, remote: readonly RemoteSkill[]): string[] {
+  const lock = readSkillLock(repoRoot);
+  if (!lock) return remote.length === 0 ? [] : ["skills-lock.json: file is missing"];
+  if (typeof lock === "string") return [lock];
 
   const expected = new Map(remote.map(({ name, source }) => [name, source] as const));
   const errors: string[] = [];
   for (const [name, source] of expected) {
-    const entry = parsed.skills[name];
+    const entry = lock.skills[name];
     if (!isRecord(entry)) {
       errors.push(`skills-lock.json is missing ${name}`);
     } else if (entry.source !== source) {
@@ -222,8 +276,60 @@ function lockErrors(repoRoot: string, remote: readonly RemoteSkill[]): string[] 
       );
     }
   }
-  for (const name of Object.keys(parsed.skills).sort()) {
+  for (const name of Object.keys(lock.skills).sort()) {
     if (!expected.has(name)) errors.push(`skills-lock.json contains undeclared skill ${name}`);
+  }
+  return errors;
+}
+
+function retiredRemoteSkills(
+  repoRoot: string,
+  remote: readonly RemoteSkill[],
+  managed: ReadonlyMap<string, string>,
+  dependencyLock: SkillLock | undefined,
+): RemoteSkill[] | string {
+  const declared = new Set(remote.map(({ name }) => name));
+  const retired: RemoteSkill[] = [];
+  for (const [name, source] of [...managed.entries()].sort(([left], [right]) =>
+    left.localeCompare(right),
+  )) {
+    if (declared.has(name)) continue;
+    const dependencyEntry = dependencyLock?.skills[name];
+    if (!isRecord(dependencyEntry) || dependencyEntry.source !== source) {
+      return `${name} retirement provenance does not match skills-lock.json`;
+    }
+    const runtimePath = `.agents/skills/${name}`;
+    const stat = workspaceLstat(repoRoot, runtimePath, "retired runtime skill");
+    if (stat && (stat.isSymbolicLink() || !stat.isDirectory())) {
+      return `${runtimePath} is not a managed copied directory`;
+    }
+    retired.push({ name, source });
+  }
+  return retired;
+}
+
+function installedRemoteSkillError(repoRoot: string, skill: RemoteSkill): string | undefined {
+  const runtimeError = runtimeSkillError(repoRoot, skill.name, "remote");
+  if (runtimeError) return runtimeError;
+  const lock = readSkillLock(repoRoot);
+  if (!lock) return "skills-lock.json: file is missing";
+  if (typeof lock === "string") return lock;
+  const entry = lock.skills[skill.name];
+  if (!isRecord(entry) || entry.source !== skill.source) {
+    return `skills-lock.json does not record ${skill.name} from ${skill.source}`;
+  }
+  return undefined;
+}
+
+function managedLockErrors(repoRoot: string, remote: readonly RemoteSkill[]): string[] {
+  const managed = readManagedSkillLock(repoRoot);
+  if (typeof managed === "string") return [managed];
+  const declared = new Set(remote.map(({ name }) => name));
+  const errors: string[] = [];
+  for (const name of managed.keys()) {
+    if (!declared.has(name)) {
+      errors.push(`${MANAGED_SKILLS_LOCK} contains retired managed skill ${name}`);
+    }
   }
   return errors;
 }
@@ -261,6 +367,7 @@ export function workspaceSkillErrors(repoRoot: string, config: SkillsConfig): st
     errors.push(errorText(error));
   }
   errors.push(...lockErrors(repoRoot, skills.remote));
+  errors.push(...managedLockErrors(repoRoot, skills.remote));
   return errors;
 }
 
@@ -269,9 +376,10 @@ export function syncWorkspaceSkills(
   config: SkillsConfig,
   run: SkillsRunner = spawnSync,
   env: NodeJS.ProcessEnv = process.env,
-  platform: NodeJS.Platform = process.platform,
 ): string[] {
   let skills: WorkspaceSkills;
+  let retired: RemoteSkill[];
+  let managed: ManagedSkillLock;
   try {
     skills = readWorkspaceSkills(repoRoot, config);
 
@@ -284,12 +392,23 @@ export function syncWorkspaceSkills(
       const error = claudeLinkError(repoRoot);
       if (error) return [error];
     }
+    const dependencyLock = readSkillLock(repoRoot);
+    if (typeof dependencyLock === "string") return [dependencyLock];
+    const previousManaged = readManagedSkillLock(repoRoot);
+    if (typeof previousManaged === "string") return [previousManaged];
+    managed = previousManaged;
+    const previous = retiredRemoteSkills(repoRoot, skills.remote, managed, dependencyLock);
+    if (typeof previous === "string") return [previous];
+    retired = previous;
+    const retiredNames = new Set(retired.map(({ name }) => name));
+
     for (const name of skills.local) {
       const runtimePath = `.agents/skills/${name}`;
       const stat = workspaceLstat(repoRoot, runtimePath, "runtime skill");
       const expected = `../../skills/${name}`;
       if (
         stat &&
+        !retiredNames.has(name) &&
         (!stat.isSymbolicLink() || readWorkspaceLink(repoRoot, runtimePath) !== expected)
       ) {
         return [`${runtimePath} exists and is not a managed link to ${expected}`];
@@ -298,6 +417,51 @@ export function syncWorkspaceSkills(
 
     ensureWorkspaceDirectory(repoRoot, ".agents/skills");
     if (!claude) createWorkspaceLink(repoRoot, ".claude/skills", "../.agents/skills");
+  } catch (error) {
+    return [errorText(error)];
+  }
+
+  const failures: string[] = [];
+  const command = "npx";
+  const options = {
+    cwd: repoRoot,
+    env: { ...env, DISABLE_TELEMETRY: "1", DO_NOT_TRACK: "1" },
+    stdio: "inherit" as const,
+  };
+  for (const skill of retired) {
+    const result = run(
+      command,
+      [
+        "--yes",
+        `skills@${SKILLS_CLI_VERSION}`,
+        "remove",
+        skill.name,
+        "--agent",
+        "universal",
+        "--yes",
+      ],
+      options,
+    );
+    if (result.status !== 0) {
+      const detail = result.error?.message ? `: ${result.error.message}` : "";
+      failures.push(
+        `${skill.name} (${skill.source}) removal failed with exit ${result.status ?? 127}${detail}`,
+      );
+      failures.push(...workspaceSkillErrors(repoRoot, config));
+      return failures;
+    }
+    try {
+      removeWorkspaceDirectory(repoRoot, `.agents/skills/${skill.name}`);
+      managed.delete(skill.name);
+      writeManagedSkillLock(repoRoot, managed);
+    } catch (error) {
+      failures.push(errorText(error));
+      failures.push(...workspaceSkillErrors(repoRoot, config));
+      return failures;
+    }
+  }
+
+  try {
     for (const name of skills.local) {
       const runtimePath = `.agents/skills/${name}`;
       if (!workspaceLstat(repoRoot, runtimePath, "runtime skill")) {
@@ -305,13 +469,14 @@ export function syncWorkspaceSkills(
       }
     }
   } catch (error) {
-    return [errorText(error)];
+    failures.push(errorText(error));
+    failures.push(...workspaceSkillErrors(repoRoot, config));
+    return failures;
   }
 
-  const failures: string[] = [];
   for (const skill of skills.remote) {
     const result = run(
-      platform === "win32" ? "npx.cmd" : "npx",
+      command,
       [
         "--yes",
         `skills@${SKILLS_CLI_VERSION}`,
@@ -324,17 +489,26 @@ export function syncWorkspaceSkills(
         "--copy",
         "--yes",
       ],
-      {
-        cwd: repoRoot,
-        env: { ...env, DISABLE_TELEMETRY: "1", DO_NOT_TRACK: "1" },
-        stdio: "inherit",
-      },
+      options,
     );
     if (result.status !== 0) {
       const detail = result.error?.message ? `: ${result.error.message}` : "";
       failures.push(
         `${skill.name} (${skill.source}) failed with exit ${result.status ?? 127}${detail}`,
       );
+      continue;
+    }
+    try {
+      const error = installedRemoteSkillError(repoRoot, skill);
+      if (error) {
+        failures.push(`${skill.name} installation could not be recorded: ${error}`);
+        return failures;
+      }
+      managed.set(skill.name, skill.source);
+      writeManagedSkillLock(repoRoot, managed);
+    } catch (error) {
+      failures.push(errorText(error));
+      return failures;
     }
   }
 

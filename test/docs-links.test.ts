@@ -118,7 +118,6 @@ test("docs links resolves Git paths with POSIX semantics and exact traversal che
 });
 
 test("docs links rejects non-portable tracked Markdown paths", () => {
-  if (process.platform === "win32") return;
   const dir = repository();
   put(dir, "docs/literal.md", "# Portable spelling\n");
   put(dir, "docs\\literal.md", "[silently missed before](missing.md)\n");
