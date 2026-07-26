@@ -4,6 +4,17 @@ import { kitVersion } from "./src/version.ts";
 export default defineConfig({
   test: {
     include: ["test/**/*.test.ts"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text"],
+      include: ["src/skills.ts"],
+      thresholds: {
+        statements: 90,
+        branches: 75,
+        functions: 90,
+        lines: 90,
+      },
+    },
     server: {
       deps: {
         // vite-plus/test re-exports vitest; without inlining, the re-export

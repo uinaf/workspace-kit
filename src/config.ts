@@ -29,6 +29,7 @@ export type LimitRule = { pattern: string; maxLines: number };
 export type ContractConfig = { file: string };
 export type HandoffConfig = { paths: string[]; prefixes: string[] };
 export type DocsLinksConfig = { enabled: boolean; exclude: string[] };
+export type SkillsConfig = { manifest: "skills/skills.json" };
 
 export type WorkspaceConfig = {
   minVersion?: string;
@@ -42,6 +43,7 @@ export type WorkspaceConfig = {
   contract?: ContractConfig;
   handoff?: HandoffConfig;
   docsLinks?: DocsLinksConfig;
+  skills?: SkillsConfig;
 };
 
 export const CONFIG_FILE = "workspace.json";
@@ -138,6 +140,7 @@ const CONFIG_SHAPE: ConfigShape = {
   contract: { file: true },
   handoff: { paths: true, prefixes: true },
   docsLinks: { enabled: true, exclude: true },
+  skills: {},
 };
 
 function collectUnknownKeys(value: unknown, shape: ConfigShape, path: string, out: string[]): void {
@@ -338,6 +341,11 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
           ? workspacePathList(value.docsLinks.exclude, "docsLinks.exclude")
           : [],
     };
+  }
+
+  if ("skills" in value) {
+    if (!isRecord(value.skills)) fail("skills must be an object");
+    out.skills = { manifest: "skills/skills.json" };
   }
 
   return out;

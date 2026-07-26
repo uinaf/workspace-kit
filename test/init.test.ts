@@ -34,11 +34,15 @@ for (const profile of ["personal", "runtime", "work"] as const) {
       };
       const prefixes = config.handoff?.prefixes;
       assert.ok(Array.isArray(prefixes));
-      assert.ok(prefixes.includes(".agents/skills/"));
+      assert.ok(prefixes.includes("skills/"));
       if (profile === "runtime") {
+        assert.ok(lstatSync(join(dir, "skills")).isDirectory());
         assert.ok(lstatSync(join(dir, ".agents", "skills")).isDirectory());
         assert.ok(lstatSync(join(dir, ".claude", "skills")).isSymbolicLink());
         assert.equal(readlinkSync(join(dir, ".claude", "skills")), "../.agents/skills");
+        assert.deepEqual(JSON.parse(readFileSync(join(dir, "skills", "skills.json"), "utf8")), {
+          skills: [],
+        });
       }
     } else {
       assert.doesNotMatch(agents, /workspace-kit registry validate/);

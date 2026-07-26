@@ -20,15 +20,17 @@ npx -y @uinaf/workspace-kit init --profile personal   # scaffold a workspace
 npx -y @uinaf/workspace-kit doctor                    # validate it
 npx -y @uinaf/workspace-kit wiki backfill --check     # detect catalog drift
 npx -y @uinaf/workspace-kit registry validate         # validate projects.json
+npx -y @uinaf/workspace-kit skills sync               # materialize workspace skills
 ```
 
 `doctor` runs every repository-state check the workspace declares in its
 `workspace.json` — structure, wiki hygiene, ownership contracts,
-documentation links, and size limits. Candidate paths are screened separately
-with `contract handoff <paths...>` because passing that gate means only
-"eligible for human review." Absent config sections disable their checks,
-unknown files are always tolerated, and everything runs offline with zero
-runtime dependencies. `workspace-kit --help` lists all commands.
+documentation links, workspace-local skills, and size limits. Candidate paths
+are screened separately with `contract handoff <paths...>` because passing that
+gate means only "eligible for human review." Absent config sections disable
+their checks, unknown files are always tolerated, and all validation runs
+offline with zero runtime dependencies. `workspace-kit --help` lists all
+commands.
 
 `registry validate` is an explicit project-registry gate. It validates the
 entire declared entry shape before inspecting any locally present checkout,
@@ -51,7 +53,9 @@ frontmatter change is metadata: it does not make dependent pages stale.
 `workspace-kit` only owns workspace structure and validation. It does not
 install or invoke `uinaf/agents` or `uinaf/dotfiles`; those are optional
 companion tools with independent installation, releases, and verification.
-Consumers choose whether and how to combine them.
+Consumers choose whether and how to combine them. Its optional `skills sync`
+command links authored workspace skills and installs only the remote skills
+declared by that workspace.
 
 ## Docs
 

@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -125,6 +133,38 @@ try {
   assert.match(hook, /registry validate/);
   run(process.execPath, [installedCli, "config", "validate"], fixtureDir);
   run(process.execPath, [installedCli, "registry", "validate"], fixtureDir);
+  config.skills = {};
+  writeFileSync(join(fixtureDir, "workspace.json"), `${JSON.stringify(config, null, 2)}\n`);
+  mkdirSync(join(fixtureDir, ".agents", "skills", "fixture-skill"), { recursive: true });
+  mkdirSync(join(fixtureDir, ".claude"), { recursive: true });
+  symlinkSync("../.agents/skills", join(fixtureDir, ".claude", "skills"));
+  const fixtureManifest = "---\nname: fixture-skill\ndescription: Packaged smoke fixture.\n---\n";
+  writeFileSync(
+    join(fixtureDir, ".agents", "skills", "fixture-skill", "SKILL.md"),
+    fixtureManifest,
+  );
+  mkdirSync(join(fixtureDir, "skills"), { recursive: true });
+  writeFileSync(
+    join(fixtureDir, "skills", "skills.json"),
+    '{\n  "skills": [\n    {\n      "name": "fixture-skill",\n      "source": "fixture/skills"\n    }\n  ]\n}\n',
+  );
+  writeFileSync(
+    join(fixtureDir, "skills-lock.json"),
+    `${JSON.stringify(
+      {
+        version: 1,
+        skills: {
+          "fixture-skill": {
+            source: "fixture/skills",
+            computedHash: "dependency-owned",
+          },
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  run(process.execPath, [installedCli, "skills", "check"], fixtureDir);
   run(process.execPath, [installedCli, "wiki", "backfill"], fixtureDir);
   run(process.execPath, [installedCli, "wiki", "backfill", "--check"], fixtureDir);
 

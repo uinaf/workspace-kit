@@ -26,6 +26,7 @@ import { docsLinkErrors } from "./checks/docsLinks.ts";
 import { limitWarnings } from "./checks/limits.ts";
 import { projectRegistryErrors } from "./checks/registry.ts";
 import { initWorkspace } from "./init.ts";
+import { syncWorkspaceSkills, workspaceSkillErrors } from "./skills.ts";
 import { kitVersion } from "./version.ts";
 import {
   assertWorkspaceLinkTarget,
@@ -49,6 +50,7 @@ commands:
   links check | fix        verify or recreate configured alias symlinks
   docs links               check relative links in tracked markdown
   registry validate        validate project-registry policy and local checkouts
+  skills check | sync      verify or install configured workspace-local skills
   config validate          validate ${CONFIG_FILE} itself
   init [--profile personal|runtime|work] [--dir <path>]  scaffold a workspace
   --version                print the kit version
@@ -199,6 +201,18 @@ function doctor(config: WorkspaceConfig, json: boolean): never {
     } else {
       stdout("docs-links ok");
       checks.docsLinks = "ok";
+    }
+  }
+
+  if (config.skills) {
+    const errors = workspaceSkillErrors(".", config.skills);
+    if (errors.length > 0) {
+      stderr(errors);
+      bad.push("skills check failed (exit 1)");
+      checks.skills = "fail";
+    } else {
+      stdout("skills ok");
+      checks.skills = "ok";
     }
   }
 
@@ -438,6 +452,30 @@ function main(): void {
       process.exit(1);
     }
     console.log("registry ok");
+    process.exit(0);
+  }
+
+  if (command === "skills") {
+    const [mode, ...args] = rest;
+    if (args.length > 0 || (mode !== "check" && mode !== "sync")) usageExit();
+    const config = loadConfigOrFail();
+    const skills = requireSection(config.skills, "skills");
+    if (mode === "check") {
+      const errors = workspaceSkillErrors(".", skills);
+      if (errors.length > 0) {
+        console.error(errors.join("\n"));
+        process.exit(1);
+      }
+      console.log("skills ok");
+      process.exit(0);
+    }
+
+    const failures = syncWorkspaceSkills(".", skills);
+    if (failures.length > 0) {
+      console.error(`skill sync failed:\n${failures.map((failure) => `- ${failure}`).join("\n")}`);
+      process.exit(1);
+    }
+    console.log("skills synced");
     process.exit(0);
   }
 

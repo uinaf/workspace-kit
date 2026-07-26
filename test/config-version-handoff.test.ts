@@ -32,12 +32,14 @@ test("config reports nested unknown keys and canonicalizes repository paths", ()
     },
     contract: { file: ".\\workspace.contract.json" },
     handoff: { paths: [], prefixes: ["memory/"], prefxies: [] },
+    skills: { typo: true },
   };
 
   assert.deepEqual(unknownConfigKeys(raw), [
     "links[0].targt",
     "wiki.indexCoverge",
     "handoff.prefxies",
+    "skills.typo",
   ]);
 
   const parsed = parseWorkspaceConfig(raw);
@@ -50,6 +52,14 @@ test("config reports nested unknown keys and canonicalizes repository paths", ()
   assert.equal(parsed.wiki?.root, "memory/wiki");
   assert.equal(parsed.wiki?.revisionStaleness, true);
   assert.equal(parsed.contract?.file, "workspace.contract.json");
+  assert.deepEqual(parsed.skills, { manifest: "skills/skills.json" });
+});
+
+test("config enables the conventional workspace skill manifest", () => {
+  assert.deepEqual(parseWorkspaceConfig({ skills: {} }).skills, {
+    manifest: "skills/skills.json",
+  });
+  assert.throws(() => parseWorkspaceConfig({ skills: true }), /skills must be an object/);
 });
 
 test("revision staleness is opt-in and must be boolean", () => {

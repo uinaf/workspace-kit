@@ -177,12 +177,20 @@ npx --yes @uinaf/workspace-kit@${kitVersion()} registry validate
         "workspace.contract.json",
         "workspace.json",
       ],
-      prefixes: [".agents/skills/", "docs/reference/", "docs/runbooks/", "memory/", "user/"],
+      prefixes: [
+        ".agents/skills/",
+        "skills/",
+        "docs/reference/",
+        "docs/runbooks/",
+        "memory/",
+        "user/",
+      ],
     };
     // contract: deliberately absent until an origin remote and a peer exist.
   }
 
   if (profile === "runtime") {
+    put("skills/skills.json", '{\n  "skills": []\n}\n');
     put(".agents/skills/.gitkeep", "");
     link(".claude/skills", "../.agents/skills");
     put(
@@ -190,8 +198,15 @@ npx --yes @uinaf/workspace-kit@${kitVersion()} registry validate
       "# HEARTBEAT.md\n\nTODO: the minimal liveness checks this runtime should run.\n",
     );
     put("IDENTITY.md", "# IDENTITY.md\n\nTODO: this runtime's identity.\n");
-    required.push(".agents/skills", ".claude/skills", "HEARTBEAT.md", "IDENTITY.md");
+    required.push(
+      "skills/skills.json",
+      ".agents/skills",
+      ".claude/skills",
+      "HEARTBEAT.md",
+      "IDENTITY.md",
+    );
     links.push({ path: ".claude/skills", target: "../.agents/skills" });
+    config.skills = {};
   }
 
   put("workspace.json", `${JSON.stringify(config, null, 2)}\n`);

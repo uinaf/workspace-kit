@@ -64,26 +64,51 @@ The kit checks presence and link integrity only — never prose.
 
 ## 3. Skills (optional)
 
-Workspace-specific skill source belongs in
-`.agents/skills/<name>/SKILL.md`. Keep it in the workspace repository.
-When Claude-compatible discovery is needed, use one relative link:
-`.claude/skills -> ../.agents/skills`.
+Locally authored skills live in `skills/<name>/SKILL.md`. Remote GitHub skills
+are declared in `skills/skills.json` with an explicit name and `owner/repo`
+source:
 
-[OpenClaw discovers `<workspace>/.agents/skills`](https://docs.openclaw.ai/tools/skills)
-directly, so no second workspace skill tree or compatibility copy is needed.
+```json
+{
+  "skills": [{ "name": "workspace-helper", "source": "example/skill-library" }]
+}
+```
 
-Shared skills are a different concern. They belong in their own upstream
-repository and may be installed into machine-global directories by
-consumer-owned tooling. Those installed copies are capabilities, not the
-source of workspace-specific behavior.
+`workspace-kit skills sync` materializes one discovery tree:
 
-`workspace-kit` only scaffolds and validates repository structure. It never
-installs skills or edits machine-global directories. A consumer that adopts
-local skills should:
+```text
+skills/howdy/                         authored source
+skills/skills.json                    remote manifest
+.agents/skills/howdy                  link to ../../skills/howdy
+.agents/skills/workspace-helper/      copied remote skill
+.claude/skills                        link to ../.agents/skills
+```
 
-- list `.agents/skills` and `.claude/skills` in `required`;
-- declare the Claude symlink in `links`;
-- never put either local skill path in `forbidden`.
+[OpenClaw](https://docs.openclaw.ai/tools/skills) reads
+`<workspace>/.agents/skills` directly. The Claude link exposes the same unified
+tree without another copy.
+
+Enable workspace skill management with `"skills": {}` in `workspace.json`,
+then run:
+
+```bash
+npx -y @uinaf/workspace-kit skills sync
+```
+
+Sync links every locally authored skill into `.agents/skills`, ensures the
+Claude discovery link, then delegates each remote entry to a pinned `skills`
+CLI with telemetry disabled, project scope, and copy mode. The dependency owns
+source retrieval, security assessment, copying, and content hashes.
+Workspace-kit never writes to machine-global skill directories or removes
+undeclared content.
+
+Commit the generated `skills-lock.json` with the copied remote skills. Use
+`skills check` for an offline check of workspace declarations, runtime
+links/copies, and declared-versus-locked provenance. `doctor` includes the same
+check whenever the `skills` section exists.
+
+Shared machine-global skills are a separate consumer choice and remain outside
+workspace-kit.
 
 ## 4. Operations (optional)
 
@@ -154,6 +179,7 @@ local skills should:
   "contract": { "file": "workspace.contract.json" },
   "handoff": { "paths": ["AGENTS.md"], "prefixes": ["memory/"] },
   "docsLinks": { "enabled": false, "exclude": [] },
+  "skills": {},
 }
 ```
 
@@ -214,8 +240,9 @@ origin remote and a peer actually exist.
 
 After scaffolding, the workspace owner must replace the `AGENTS.md` TODOs
 before treating the repository as operational. The runtime profile creates an
-empty `.agents/skills/` source root and links `.claude/skills` to it. It does
-not install or enable any skill.
+empty `skills/skills.json` remote manifest, a `.agents/skills/` discovery
+directory, and the `.claude/skills` compatibility link. It does not install or
+enable any skill.
 
 ## Exact check semantics
 

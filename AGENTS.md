@@ -14,16 +14,18 @@ the mechanism and its public documentation only.
   brand, employer, hostname, or private path — in code, fixtures, docs,
   comments, commit messages, or issues. All fixtures are synthetic
   (`fixture-owner/fixture-workspace` style).
-- **Zero runtime dependencies. No postinstall scripts. No network calls, no
-  telemetry.** devDependencies are allowed for build/test only.
+- **Zero runtime dependencies. No postinstall scripts or telemetry.**
+  Validation and scaffolding stay offline. The explicitly invoked `skills sync`
+  command is the only networked path and delegates to a pinned `skills` CLI.
+  devDependencies are allowed for build/test only.
 - Keep this repository standalone. Do not add package, script, CI, checkout, or
   validation dependencies on `uinaf/agents` or `uinaf/dotfiles`. Optional
   documentation links are fine; composition belongs to the consumer.
 - The kit never authors instruction content and never touches machine-global
   state (`~/.claude/`, `~/.codex/`, `~/.agents/skills`).
-- Scaffolds may prompt owners to declare skill ownership, but must never
-  install, copy, or choose consumer-specific skills or make an installed
-  machine-global copy authoritative.
+- Skill sync may link only local skills under `skills/` and copy only remote
+  skills explicitly declared in `skills/skills.json`. It must never choose
+  skills, install them globally, or remove undeclared workspace content.
 - **Parity is law.** The ported validators must reproduce `parity/goldens/`
   byte-for-byte; new behavior ships config-gated and default-off. Never edit
   a golden by hand — see [parity/README.md](parity/README.md) before
@@ -34,10 +36,12 @@ the mechanism and its public documentation only.
 The repo runs on the [Vite+](https://github.com/voidzero-dev/vite-plus)
 toolchain; all tool config lives in `vite.config.ts`.
 
-`vp run verify` runs `vp check` (format, lint, type check), `vp test run`,
-`vp pack`, and an installed-tarball CLI smoke. After `pnpm install`, run
-`vp config --no-agent` to install the pre-commit hook; it runs `vp staged`
-plus the full gate. Fix issues with `vp check --fix`; `parity/legacy/` and
+`vp run verify` runs `vp check` (format, lint, type check), `vp test run`, the
+focused workspace-skill coverage gate, `vp pack`, and an installed-tarball CLI
+smoke. The skill gate requires at least 90% statements, functions, and lines;
+branch coverage stays pragmatic at 75%. After `pnpm install`, run
+`vp config --no-agent` to install the pre-commit hook; it runs `vp staged` plus
+the full gate. Fix issues with `vp check --fix`; `parity/legacy/` and
 `parity/fixtures/` are exempt from lint/format — they are frozen.
 
 ## Releases
