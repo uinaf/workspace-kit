@@ -24,8 +24,6 @@ type Source = {
 
 type WriteOperation = { path: string; content: string };
 
-const WORKSPACE_ROOT = ".";
-
 function firstHeading(text: string): string | undefined {
   return text.match(/^#\s+(.+)$/m)?.[1]?.trim();
 }
@@ -68,8 +66,8 @@ function tagsFor(path: string, fm: Record<string, unknown>): string[] {
   return [...derived].sort();
 }
 
-function directDailyLogs(): string[] {
-  return readWorkspaceDirectory(WORKSPACE_ROOT, "memory", "empty")
+function directDailyLogs(repoRoot: string): string[] {
+  return readWorkspaceDirectory(repoRoot, "memory", "empty")
     .flatMap((entry) => {
       if (!/^\d{4}-\d{2}-\d{2}\.md$/.test(entry.name)) return [];
       const path = posix.join("memory", entry.name);
@@ -81,22 +79,22 @@ function directDailyLogs(): string[] {
     .sort();
 }
 
-function optionalRootFile(path: string): boolean {
-  const stat = workspaceLstat(WORKSPACE_ROOT, path, "source path");
+function optionalRootFile(repoRoot: string, path: string): boolean {
+  const stat = workspaceLstat(repoRoot, path, "source path");
   if (!stat) return false;
   if (stat.isSymbolicLink()) throw new Error(`${path}: symbolic-link file is not allowed`);
   if (!stat.isFile()) throw new Error(`${path}: expected a regular file`);
   return true;
 }
 
-function allSources(root: string): Source[] {
+function allSources(repoRoot: string, root: string): Source[] {
   const paths = [
-    ...walkWorkspaceMarkdown(WORKSPACE_ROOT, "memory/intake", "empty"),
-    ...walkWorkspaceMarkdown(WORKSPACE_ROOT, "memory/notes", "empty"),
-    ...walkWorkspaceMarkdown(WORKSPACE_ROOT, "docs", "empty"),
-    ...walkWorkspaceMarkdown(WORKSPACE_ROOT, "user", "empty"),
-    ...walkWorkspaceMarkdown(WORKSPACE_ROOT, "memory/contexts", "empty"),
-    ...directDailyLogs(),
+    ...walkWorkspaceMarkdown(repoRoot, "memory/intake", "empty"),
+    ...walkWorkspaceMarkdown(repoRoot, "memory/notes", "empty"),
+    ...walkWorkspaceMarkdown(repoRoot, "docs", "empty"),
+    ...walkWorkspaceMarkdown(repoRoot, "user", "empty"),
+    ...walkWorkspaceMarkdown(repoRoot, "memory/contexts", "empty"),
+    ...directDailyLogs(repoRoot),
     "AGENTS.md",
     "MEMORY.md",
     "USER.md",
@@ -108,11 +106,14 @@ function allSources(root: string): Source[] {
     // Root convention files are optional: a scaffold without SOUL.md et al.
     // must not crash the generator (recorded fix vs legacy).
     (p, i, a) =>
-      a.indexOf(p) === i && p !== root && !p.startsWith(`${root}/`) && optionalRootFile(p),
+      a.indexOf(p) === i &&
+      p !== root &&
+      !p.startsWith(`${root}/`) &&
+      optionalRootFile(repoRoot, p),
   );
 
   return paths.sort().map((path) => {
-    const text = readWorkspaceText(WORKSPACE_ROOT, path, "source path");
+    const text = readWorkspaceText(repoRoot, path, "source path");
     const fm = parseFrontmatter(text);
     return {
       path,
@@ -130,7 +131,12 @@ function yamlList(items: string[]): string {
 
 export type BackfillResult = { out: string[]; planned: string[] };
 
-export function wikiBackfill(options: { root: string; dryRun: boolean }): BackfillResult {
+export function wikiBackfill(options: {
+  root: string;
+  dryRun: boolean;
+  repoRoot?: string;
+}): BackfillResult {
+  const repoRoot = options.repoRoot ?? ".";
   const root = normalizeWorkspacePath(options.root, "wiki.root");
   const today = new Date().toLocaleDateString("sv-SE");
   const planned: string[] = [];
@@ -140,13 +146,13 @@ export function wikiBackfill(options: { root: string; dryRun: boolean }): Backfi
   function planWrite(path: string, content: string): void {
     const outputPath = normalizeWorkspacePath(path, "generated path");
     const next = content.endsWith("\n") ? content : `${content}\n`;
-    const stat = workspaceLstat(WORKSPACE_ROOT, outputPath, "generated path");
+    const stat = workspaceLstat(repoRoot, outputPath, "generated path");
     if (stat) {
       if (stat.isSymbolicLink()) {
         throw new Error(`${outputPath}: refusing to write through a symlink`);
       }
       if (!stat.isFile()) throw new Error(`${outputPath}: expected a regular file`);
-      const current = readWorkspaceText(WORKSPACE_ROOT, outputPath, "generated path");
+      const current = readWorkspaceText(repoRoot, outputPath, "generated path");
       const stripDates = (value: string) =>
         value
           .split("\n")
@@ -169,13 +175,13 @@ export function wikiBackfill(options: { root: string; dryRun: boolean }): Backfi
   }
 
   function preflightWrite(path: string): void {
-    const stat = workspaceLstat(WORKSPACE_ROOT, path, "generated path");
+    const stat = workspaceLstat(repoRoot, path, "generated path");
     if (stat?.isSymbolicLink()) throw new Error(`${path}: refusing to write through a symlink`);
     if (stat && !stat.isFile()) throw new Error(`${path}: expected a regular file`);
   }
 
   function preflightDelete(path: string): void {
-    const stat = workspaceLstat(WORKSPACE_ROOT, path, "generated path");
+    const stat = workspaceLstat(repoRoot, path, "generated path");
     if (!stat) throw new Error(`${path}: file is missing`);
     if (stat.isSymbolicLink()) throw new Error(`${path}: refusing to delete a symlink`);
     if (!stat.isFile()) throw new Error(`${path}: expected a regular file`);
@@ -195,7 +201,7 @@ export function wikiBackfill(options: { root: string; dryRun: boolean }): Backfi
     ].join("\n");
   }
 
-  const sources = allSources(root);
+  const sources = allSources(repoRoot, root);
   const byTag = new Map<string, Source[]>();
   const byKind = new Map<string, Source[]>();
   for (const s of sources) {
@@ -273,7 +279,7 @@ ${tagEntries.map(([tag, list]) => (list.length >= 2 ? `- [[${tag}]] — ${list.l
   // Purge stale tag pages (tags that no longer materialize)
   const keepTags = new Set(materializedTagEntries.map(([tag]) => tag));
   const tagsDir = posix.join(root, "tags");
-  for (const entry of readWorkspaceDirectory(WORKSPACE_ROOT, tagsDir, "empty")) {
+  for (const entry of readWorkspaceDirectory(repoRoot, tagsDir, "empty")) {
     const name = entry.name;
     if (!name.endsWith(".md") || name === "index.md") continue;
     const tag = name.replace(/\.md$/, "");
@@ -312,6 +318,11 @@ ${table(list)}
   }
 
   const daily = sources.filter((s) => s.kind === "daily-log");
+  const dailySources =
+    daily.length > 0 ? `\n${yamlList(daily.map((source) => source.path))}` : ` [${root}/index.md]`;
+  const writeBackLink = workspaceLstat(repoRoot, `${root}/agents/write-backs.md`)
+    ? '\n  - "[[../agents/write-backs]]"'
+    : "";
   planWrite(
     `${root}/sources/daily-log.md`,
     `---
@@ -320,11 +331,9 @@ type: wiki-index
 status: active
 updated: ${today}
 tags: [daily-log, backfill, timeline]
-sources:
-${yamlList(daily.map((s) => s.path))}
+sources:${dailySources}
 related:
-  - "[[index]]"
-  - "[[../agents/write-backs]]"
+  - "[[index]]"${writeBackLink}
 ---
 
 # Daily Log Backfill
@@ -342,11 +351,11 @@ ${table(daily)}
   for (const path of deletes) preflightDelete(path);
   if (!options.dryRun) {
     for (const operation of writes) {
-      writeWorkspaceText(WORKSPACE_ROOT, operation.path, operation.content);
+      writeWorkspaceText(repoRoot, operation.path, operation.content);
     }
     // Deletions are deliberately last: a purge error must surface, but should
     // never prevent a newly computed catalog from being fully materialized.
-    for (const path of deletes) unlinkWorkspaceFile(WORKSPACE_ROOT, path);
+    for (const path of deletes) unlinkWorkspaceFile(repoRoot, path);
   }
 
   const out = [

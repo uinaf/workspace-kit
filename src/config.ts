@@ -3,13 +3,16 @@ import {
   normalizeWorkspacePath,
   readWorkspaceText,
 } from "./lib/workspaceFs.ts";
-import { normalizeGitHost } from "./lib/gitRemote.ts";
+import { isGitRepositoryPath, normalizeGitHost } from "./lib/gitRemote.ts";
 
 export type LinkRule = { path: string; target: string };
 export type ProjectRegistryConfig = {
   pathPrefix: string;
   modes: string[];
   originHosts: string[];
+  allowedOwners?: string[];
+  mustContain?: Array<{ repo: string; mode: string }>;
+  maxEntries?: number;
   catalog?: { field: string; modes: string[] };
 };
 export type RegistryConfig = {
@@ -125,6 +128,9 @@ const CONFIG_SHAPE: ConfigShape = {
       pathPrefix: true,
       modes: true,
       originHosts: true,
+      allowedOwners: true,
+      mustContain: [{ repo: true, mode: true }],
+      maxEntries: true,
       catalog: { field: true, modes: true },
     },
   },
@@ -242,6 +248,71 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
         modes,
         originHosts,
       };
+      if ("allowedOwners" in project) {
+        const allowedOwners = nonEmptyUniqueStringList(
+          project.allowedOwners,
+          "registry.project.allowedOwners",
+        );
+        if (
+          allowedOwners.some(
+            (owner) => owner.includes("/") || !isGitRepositoryPath(`${owner}/repository`),
+          )
+        ) {
+          fail("registry.project.allowedOwners must contain valid Git repository owners");
+        }
+        registry.project.allowedOwners = allowedOwners;
+      }
+      if ("mustContain" in project) {
+        if (!Array.isArray(project.mustContain)) {
+          fail("registry.project.mustContain must be an array");
+        }
+        const seen = new Set<string>();
+        registry.project.mustContain = project.mustContain.map((entry, index) => {
+          if (!isRecord(entry)) fail(`registry.project.mustContain[${index}] must be an object`);
+          const repo = text(entry.repo, `registry.project.mustContain[${index}].repo`);
+          const mode = text(entry.mode, `registry.project.mustContain[${index}].mode`);
+          if (!isGitRepositoryPath(repo)) {
+            fail(`registry.project.mustContain[${index}].repo must be a Git repository path`);
+          }
+          if (!modes.includes(mode)) {
+            fail(
+              `registry.project.mustContain[${index}].mode must be included in registry.project.modes`,
+            );
+          }
+          const identity = `${repo}\0${mode}`;
+          if (seen.has(identity)) {
+            fail("registry.project.mustContain must not contain duplicate repo and mode pairs");
+          }
+          seen.add(identity);
+          return { repo, mode };
+        });
+      }
+      if ("maxEntries" in project) {
+        if (
+          typeof project.maxEntries !== "number" ||
+          !Number.isInteger(project.maxEntries) ||
+          project.maxEntries < 0
+        ) {
+          fail("registry.project.maxEntries must be a non-negative integer");
+        }
+        registry.project.maxEntries = project.maxEntries;
+      }
+      const allowedOwners = registry.project.allowedOwners;
+      const requiredEntries = registry.project.mustContain ?? [];
+      if (
+        allowedOwners &&
+        requiredEntries.some(
+          ({ repo }) => !allowedOwners.includes(repo.slice(0, repo.indexOf("/"))),
+        )
+      ) {
+        fail("registry.project.mustContain repository owners must be included in allowedOwners");
+      }
+      if (
+        registry.project.maxEntries !== undefined &&
+        requiredEntries.length > registry.project.maxEntries
+      ) {
+        fail("registry.project.maxEntries must allow every mustContain entry");
+      }
       if ("catalog" in project) {
         if (!isRecord(project.catalog)) fail("registry.project.catalog must be an object");
         const field = text(project.catalog.field, "registry.project.catalog.field");

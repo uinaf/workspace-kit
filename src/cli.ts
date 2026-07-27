@@ -7,7 +7,7 @@ import { chdir } from "node:process";
 import {
   CONFIG_FILE,
   compareVersions,
-  loadWorkspaceConfig,
+  parseWorkspaceConfig,
   readRawConfig,
   unknownConfigKeys,
   type WorkspaceConfig,
@@ -39,6 +39,7 @@ import {
 const USAGE = `usage: workspace-kit <command>
 
 commands:
+  verify [--json]          run the complete offline validation gate
   doctor [--json]          run all checks configured in ${CONFIG_FILE}
   wiki lint                lint the wiki layer
   wiki stale               report wiki pages older than their sources
@@ -87,10 +88,14 @@ function chdirToRepoRoot(): void {
   if (result.status === 0) chdir(result.stdout.trim());
 }
 
-function loadConfigOrFail(json = false): WorkspaceConfig {
+type LoadedConfig = { config: WorkspaceConfig; unknownKeys: string[] };
+
+function loadConfigStateOrFail(json = false): LoadedConfig {
+  let raw: unknown;
   let config: WorkspaceConfig;
   try {
-    config = loadWorkspaceConfig();
+    raw = readRawConfig();
+    config = parseWorkspaceConfig(raw);
   } catch (error) {
     doctorFailure(error instanceof Error ? error.message : String(error), json);
   }
@@ -100,7 +105,11 @@ function loadConfigOrFail(json = false): WorkspaceConfig {
       json,
     );
   }
-  return config;
+  return { config, unknownKeys: unknownConfigKeys(raw) };
+}
+
+function loadConfigOrFail(json = false): WorkspaceConfig {
+  return loadConfigStateOrFail(json).config;
 }
 
 function requireSection<T>(value: T | undefined, section: string): T {
@@ -142,22 +151,31 @@ function runContractCheck(file: string): number {
   }
 }
 
-function doctor(config: WorkspaceConfig, json: boolean): never {
+type DoctorReport = {
+  bad: string[];
+  checks: Record<string, string>;
+  detail: string[];
+  immediateErrors: string[];
+  output: string[];
+  warnings: string[];
+};
+
+function doctorReport(config: WorkspaceConfig): DoctorReport {
   const bad: string[] = [];
   const checks: Record<string, string> = {};
   const detail: string[] = [];
+  const immediateErrors: string[] = [];
+  const output: string[] = [];
 
   const structural = structureErrors(config);
   bad.push(...structural);
   detail.push(...structural);
   checks.structure = structural.length === 0 ? "ok" : "fail";
 
-  const stdout = (line: string) => {
-    if (!json) console.log(line);
-  };
+  const stdout = (line: string) => output.push(line);
   const stderr = (lines: string[]) => {
     detail.push(...lines);
-    if (!json) console.error(lines.join("\n"));
+    immediateErrors.push(...lines);
   };
 
   if (config.wiki) {
@@ -218,27 +236,110 @@ function doctor(config: WorkspaceConfig, json: boolean): never {
 
   // Soft limits are warnings by design: printed, counted, never fatal.
   const warnings = config.limits ? limitWarnings(config.limits) : [];
+
+  return { bad, checks, detail, immediateErrors, output, warnings };
+}
+
+function doctor(config: WorkspaceConfig, json: boolean): never {
+  const report = doctorReport(config);
+
+  if (!json) {
+    for (const line of report.output) console.log(line);
+    if (report.immediateErrors.length > 0) console.error(report.immediateErrors.join("\n"));
+  }
+  const warnings = report.warnings;
   if (warnings.length > 0 && !json) console.error(warnings.join("\n"));
 
   if (json) {
-    const failed = Object.values(checks).filter((v) => v === "fail").length;
+    const failed = Object.values(report.checks).filter((v) => v === "fail").length;
     console.log(
       JSON.stringify({
-        status: bad.length > 0 ? "fail" : "pass",
+        status: report.bad.length > 0 ? "fail" : "pass",
         failed,
         warnings: warnings.length,
-        checks,
-        errors: detail,
+        checks: report.checks,
+        errors: report.detail,
       }),
     );
-    process.exit(bad.length > 0 ? 1 : 0);
+    process.exit(report.bad.length > 0 ? 1 : 0);
   }
 
-  if (bad.length > 0) {
-    console.error(bad.join("\n"));
+  if (report.bad.length > 0) {
+    console.error(report.bad.join("\n"));
     process.exit(1);
   }
   console.log("doctor ok");
+  process.exit(0);
+}
+
+function verify(state: LoadedConfig, json: boolean): never {
+  const report = doctorReport(state.config);
+  const checks: Record<string, string> = { config: "ok", ...report.checks };
+  const output = ["config ok", ...report.output];
+  const errors = [...report.detail];
+  const immediateErrors = [...report.immediateErrors];
+  const failures = [...report.bad];
+  const warnings = [
+    ...state.unknownKeys.map(
+      (key) => `warning: unrecognized key ${key} (ignored by this kit version)`,
+    ),
+    ...report.warnings,
+  ];
+
+  if (state.config.registry?.project) {
+    const registryErrors = projectRegistryErrors(".", state.config.registry);
+    checks.registry = registryErrors.length === 0 ? "ok" : "fail";
+    if (registryErrors.length === 0) {
+      output.push("registry ok");
+    } else {
+      errors.push(...registryErrors);
+      immediateErrors.push(...registryErrors);
+      failures.push("registry validation failed (exit 1)");
+    }
+  }
+
+  if (state.config.wiki) {
+    try {
+      const result = wikiBackfill({ root: state.config.wiki.root, dryRun: true });
+      checks.wikiBackfill = result.planned.length === 0 ? "ok" : "fail";
+      if (result.planned.length === 0) {
+        output.push("wiki-backfill ok");
+      } else {
+        errors.push(...result.planned);
+        immediateErrors.push(...result.planned);
+        failures.push("wiki backfill check failed (exit 1)");
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      checks.wikiBackfill = "fail";
+      errors.push(message);
+      immediateErrors.push(message);
+      failures.push("wiki backfill check failed (exit 1)");
+    }
+  }
+
+  if (json) {
+    const failed = Object.values(checks).filter((value) => value === "fail").length;
+    console.log(
+      JSON.stringify({
+        status: failures.length === 0 ? "pass" : "fail",
+        failed,
+        warnings: warnings.length,
+        checks,
+        errors,
+      }),
+    );
+    process.exit(failures.length === 0 ? 0 : 1);
+  }
+
+  for (const line of output) console.log(line);
+  if (immediateErrors.length > 0) console.error(immediateErrors.join("\n"));
+  if (warnings.length > 0) console.error(warnings.join("\n"));
+  if (failures.length > 0) {
+    console.error(failures.join("\n"));
+    process.exit(1);
+  }
+  console.log("verify ok");
   process.exit(0);
 }
 
@@ -284,6 +385,16 @@ function main(): void {
   }
 
   chdirToRepoRoot();
+
+  if (command === "verify") {
+    const json = rest.includes("--json");
+    if (rest.some((arg) => arg !== "--json")) usageExit();
+    try {
+      verify(loadConfigStateOrFail(json), json);
+    } catch (error) {
+      doctorFailure(error instanceof Error ? error.message : String(error), json);
+    }
+  }
 
   if (command === "doctor") {
     const json = rest.includes("--json");
@@ -492,13 +603,9 @@ function main(): void {
   if (command === "config") {
     const [mode, ...args] = rest;
     if (mode !== "validate" || args.length > 0) usageExit();
-    loadConfigOrFail(); // includes the minVersion gate
-    try {
-      for (const key of unknownConfigKeys(readRawConfig())) {
-        console.error(`warning: unrecognized key ${key} (ignored by this kit version)`);
-      }
-    } catch {
-      // unreachable: loadConfigOrFail already parsed the file
+    const state = loadConfigStateOrFail();
+    for (const key of state.unknownKeys) {
+      console.error(`warning: unrecognized key ${key} (ignored by this kit version)`);
     }
     console.log("config ok");
     process.exit(0);

@@ -36,30 +36,33 @@ one.
 ## Quick usage
 
 ```bash
-npm exec -- workspace-kit doctor                    # validate it
+npm exec -- workspace-kit verify                    # complete offline gate
+npm exec -- workspace-kit doctor                    # configured core checks
 npm exec -- workspace-kit wiki backfill --check     # detect catalog drift
 npm exec -- workspace-kit registry validate         # validate projects.json
 npm exec -- workspace-kit skills sync               # materialize workspace skills
 ```
 
-`doctor` runs the configured structure, wiki-lint, ownership-contract,
-documentation-link, workspace-skill, and soft-limit checks. Project-registry
-validation and wiki freshness remain explicit commands because they have
-separate operational contracts. Candidate paths are screened with
-`contract handoff <paths...>` for human review eligibility. Absent config
-sections disable their checks, unknown files are always tolerated, and all
-validation runs offline with zero runtime dependencies.
+`verify` is the canonical local and CI gate. It validates the config, runs the
+configured `doctor` checks, validates a configured project registry, and checks
+that configured wiki catalogs are current. `doctor` covers structure,
+wiki-lint, ownership-contract, documentation-link, workspace-skill, and
+soft-limit checks. Git-history-based wiki staleness remains an explicit
+operation. Candidate paths are screened with `contract handoff <paths...>` for
+human review eligibility. Absent config sections disable their checks, unknown
+files are always tolerated, and all validation runs offline with zero runtime
+dependencies.
 `workspace-kit --help` lists all commands.
 
 `registry validate` is an explicit project-registry gate. It validates the
 entire declared entry shape before inspecting any locally present checkout,
 then checks project paths against the configured home-relative prefix, allowed
 Git origin hosts, repository paths, portable case/Unicode aliases, canonical
-roots, and optional catalog pointers. The explicit `registry.project` policy
-enables this command; `originHosts` defaults to `["github.com"]`, and missing
-checkouts are allowed.
-Personal and runtime scaffolds include this gate in their generated pre-commit
-hook and validation instructions.
+roots, optional catalog pointers, allowed repository owners, required entries,
+and an optional entry limit. The explicit `registry.project` policy enables
+this check; `originHosts` defaults to `["github.com"]`, and missing checkouts
+are allowed. `verify` includes it whenever that policy is present. Personal and
+runtime scaffolds use `verify` in their generated pre-commit hook.
 
 For Git-aware wiki freshness, opt in with `wiki.revisionStaleness`. The check
 then evaluates the current working tree, including staged and unstaged edits,

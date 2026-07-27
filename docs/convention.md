@@ -123,11 +123,12 @@ Consumers own shared machine-global skill selection and installation.
 ## Adopting an existing workspace
 
 1. Install `@uinaf/workspace-kit` as an exact development dependency.
-2. Add project-local package scripts for `doctor`, `test`, and `verify`.
+2. Add a project-local `verify` script for `workspace-kit verify`; add direct
+   check shortcuts only when people use them independently.
 3. Describe the workspace's selected sections in `workspace.json`.
 4. Put authored skills in `skills/<name>/`, declare remote workspace skills in
    `skills/skills.json`, and run `skills sync`.
-5. Run the full local `verify` script and the repository's CI before deploying
+5. Run the local `verify` script and the repository's CI before deploying
    the checkout to a runtime.
 
 ## 4. Operations (optional)
@@ -135,12 +136,13 @@ Consumers own shared machine-global skill selection and installation.
 - **Registry** — a JSON file mapping project categories to entries
   (`{name, repo, path, owns, mode, …}`); the entry shape is config-declared.
   `registry.project` enables `registry validate` and declares allowed modes,
-  checkout prefix, and Git origin hosts (`["github.com"]` by default). Repository
-  paths may include nested groups. Existing checkouts must match both the path
-  and an allowed host using HTTPS, SCP-style SSH, or `ssh://`; credentials and
-  unsafe URL/path syntax are rejected. Portable path aliases, duplicate checkout
-  roots, and unsafe catalogs also fail. Missing checkouts are valid. This command
-  is opt-in and is not part of parity-locked `doctor` output.
+  checkout prefix, Git origin hosts (`["github.com"]` by default), repository
+  owners, required entries, and an optional entry limit. Repository paths may
+  include nested groups. Existing checkouts must match both the path and an
+  allowed host using HTTPS, SCP-style SSH, or `ssh://`; credentials and unsafe
+  URL/path syntax are rejected. Portable path aliases, duplicate checkout roots,
+  and unsafe catalogs also fail. Missing checkouts are valid. `verify` includes
+  this gate whenever `registry.project` is configured.
 - **Ownership contract** — for peered workspaces descended from one
   historical ancestor: `workspace.contract.json` names the repository, its
   peer, the shared ancestor commit, and required/forbidden owner paths.
@@ -180,6 +182,9 @@ Consumers own shared machine-global skill selection and installation.
       "pathPrefix": "~/projects/",
       "modes": ["managed", "route-only"],
       "originHosts": ["github.com"],
+      "allowedOwners": ["fixture-owner"],
+      "mustContain": [{ "repo": "fixture-owner/workspace", "mode": "managed" }],
+      "maxEntries": 25,
       "catalog": { "field": "catalog", "modes": ["managed"] },
     },
   },
@@ -219,12 +224,17 @@ backfill` scans a fixed raw-source layout (`memory/intake`, `memory/notes`,
 convention files when present) — that layout _is_ the convention, and the
 generated catalogs land under the configured `wiki.root`.
 
+`registry.project.allowedOwners` matches the first segment of every repository
+path. Each `mustContain` pair requires exactly one entry with that repository
+and mode. `maxEntries` counts entries across every top-level registry category;
+zero defines an intentionally empty registry.
+
 ## Output contract
 
 Errors print one per line to stderr and exit 1 (two parity-locked
 exceptions: the daily-log check prints one `missing H1:` block, and a green
 handoff prints the eligible paths as a list); success prints a terse
-`<check> ok`; usage errors exit 2. `doctor --json` emits exactly one
+`<check> ok`; usage errors exit 2. `doctor --json` and `verify --json` each emit exactly one
 newline-terminated `{"status","failed","warnings","checks","errors"}` object
 on stdout and keeps stderr empty, including configuration and operational
 failures. It never includes file-content excerpts. Checks are deterministic,
@@ -238,9 +248,14 @@ the parity-locked legacy fallback and output.
 operation and exits 1 when any are present; a clean generated catalog exits 0.
 `--dry-run` prints the same plan but exits 0 whether or not work is pending.
 
-`registry validate` also exits 1 for malformed entries or unsafe local checkout
-state and prints `registry ok` on success. It reads Git metadata only; it never
-clones, fetches, pulls, or changes a checkout.
+`verify` loads and validates `workspace.json` once, runs the configured
+`doctor` checks, includes `registry validate` when `registry.project` exists,
+and runs `wiki backfill --check` when `wiki` exists. It does not run `wiki
+stale`, which is a separate history-based operation.
+
+`registry validate` exits 1 for malformed entries, ownership-policy failures,
+or unsafe local checkout state and prints `registry ok` on success. It reads
+Git metadata only; it never clones, fetches, pulls, or changes a checkout.
 
 ## Repository security composition
 
@@ -266,14 +281,12 @@ writing when its package contract is incompatible.
 
 - `work` — AGENTS.md + CLAUDE.md symlink + package.json + docs/README.md + workspace.json.
 - `personal` — work + README, `.env.example`, project-registry stub,
-  memory/wiki skeleton (lint-green), pre-commit hook wiring for both `doctor`
-  and `registry validate`.
+  memory/wiki skeleton and generated catalogs, and a `verify` pre-commit hook.
 - `runtime` — personal + HEARTBEAT.md and IDENTITY.md placeholders for
   always-on runtime identities.
 
-A fresh scaffold is doctor-green immediately, and personal/runtime scaffolds
-are also registry-green. The ownership contract stays unconfigured until an
-origin remote and a peer actually exist.
+A fresh scaffold is verify-green immediately. The ownership contract stays
+unconfigured until an origin remote and a peer actually exist.
 
 After scaffolding, the workspace owner replaces the `AGENTS.md` TODOs before
 treating the repository as operational. The runtime profile creates an empty

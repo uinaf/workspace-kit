@@ -123,6 +123,12 @@ function staticEntryErrors(
   const labels = new Map<string, string[]>();
   const paths = new Map<string, Array<{ label: string; path: string }>>();
 
+  if (project.maxEntries !== undefined && entries.length > project.maxEntries) {
+    errors.push(
+      `${file}: contains ${entries.length} project entries (maximum ${project.maxEntries})`,
+    );
+  }
+
   for (const entry of entries) {
     const entryLabels = labels.get(entry.label) ?? [];
     entryLabels.push(entry.path);
@@ -140,6 +146,13 @@ function staticEntryErrors(
     }
     if (!isGitRepositoryPath(entry.repo)) {
       errors.push(`${file} ${entry.label}: invalid Git repository path ${entry.repo}`);
+    } else if (project.allowedOwners) {
+      const owner = entry.repo.split("/", 1)[0]!;
+      if (!project.allowedOwners.includes(owner)) {
+        errors.push(
+          `${file} ${entry.label}: repository owner is not allowed (found ${owner}; allowed ${project.allowedOwners.join(", ")})`,
+        );
+      }
     }
     if (unsafeProjectPath(entry.path, project.pathPrefix)) {
       errors.push(`${file} ${entry.label}: unsafe project path ${entry.path}`);
@@ -167,6 +180,16 @@ function staticEntryErrors(
         `${file}: duplicate project path ${pathEntries[0]!.path}: ${pathEntries
           .map(({ label, path }) => `${label}=${path}`)
           .join(", ")}`,
+      );
+    }
+  }
+  for (const required of project.mustContain ?? []) {
+    const matches = entries.filter(
+      (entry) => entry.repo === required.repo && entry.mode === required.mode,
+    ).length;
+    if (matches !== 1) {
+      errors.push(
+        `${file}: must contain exactly one ${required.repo} entry in ${required.mode} mode (found ${matches})`,
       );
     }
   }

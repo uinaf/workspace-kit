@@ -130,12 +130,11 @@ try {
   assert.ok(config.registry.entry.required.includes("mode"));
   const fixturePackage = JSON.parse(readFileSync(join(fixtureDir, "package.json"), "utf8"));
   assert.equal(fixturePackage.devDependencies["@uinaf/workspace-kit"], sourceVersion);
-  assert.equal(fixturePackage.scripts.verify, "npm test && npm run registry:check");
+  assert.equal(fixturePackage.scripts.verify, "workspace-kit verify");
   const hook = readFileSync(join(fixtureDir, ".githooks", "pre-commit"), "utf8");
   assert.match(hook, /npm run verify/);
   assert.doesNotMatch(hook, /npx/);
-  run(process.execPath, [installedCli, "config", "validate"], fixtureDir);
-  run(process.execPath, [installedCli, "registry", "validate"], fixtureDir);
+  run(process.execPath, [installedCli, "verify"], fixtureDir);
   config.skills = {};
   writeFileSync(join(fixtureDir, "workspace.json"), `${JSON.stringify(config, null, 2)}\n`);
   mkdirSync(join(fixtureDir, ".agents", "skills", "fixture-skill"), { recursive: true });
