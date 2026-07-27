@@ -1,4 +1,4 @@
-// Every init profile must produce a doctor-green workspace out of the box
+// Every init profile must produce a verify-green workspace out of the box
 // (contract deliberately deferred until an origin remote exists).
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
@@ -23,7 +23,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = join(root, "src", "cli.ts");
 
 for (const profile of ["personal", "runtime", "work"] as const) {
-  test(`init --profile ${profile} scaffolds a doctor-green workspace`, () => {
+  test(`init --profile ${profile} scaffolds a verify-green workspace`, () => {
     const dir = mkdtempSync(join(tmpdir(), `init-${profile}-`));
     const result = initWorkspace(dir, profile);
     assert.ok(result.created.includes("AGENTS.md"));
@@ -41,8 +41,9 @@ for (const profile of ["personal", "runtime", "work"] as const) {
     };
     assert.equal(packageJson.devDependencies["@uinaf/workspace-kit"], kitVersion());
     assert.equal(packageJson.scripts.doctor, "workspace-kit doctor");
+    assert.equal(packageJson.scripts.test, "npm run verify");
+    assert.equal(packageJson.scripts.verify, "workspace-kit verify");
     if (profile === "personal" || profile === "runtime") {
-      assert.match(agents, /npm run registry:check/);
       const hook = readFileSync(join(dir, ".githooks", "pre-commit"), "utf8");
       assert.match(hook, /npm run verify/);
       assert.doesNotMatch(hook, /npx/);
@@ -63,30 +64,21 @@ for (const profile of ["personal", "runtime", "work"] as const) {
           skills: [],
         });
       }
-    } else {
-      assert.doesNotMatch(agents, /registry:check/);
     }
 
     execSync("git init -q", { cwd: dir });
-    const doctor = spawnSync(process.execPath, [cli, "doctor"], {
+    const verify = spawnSync(process.execPath, [cli, "verify"], {
       cwd: dir,
       encoding: "utf8",
     });
     assert.equal(
-      doctor.status,
+      verify.status,
       0,
-      `doctor must pass on a fresh ${profile} scaffold:\n${doctor.stderr}`,
+      `verify must pass on a fresh ${profile} scaffold:\n${verify.stderr}`,
     );
-    assert.match(doctor.stdout, /doctor ok/);
+    assert.match(verify.stdout, /verify ok/);
 
     if (profile === "personal" || profile === "runtime") {
-      const registry = spawnSync(process.execPath, [cli, "registry", "validate"], {
-        cwd: dir,
-        encoding: "utf8",
-      });
-      assert.equal(registry.status, 0, registry.stderr);
-      assert.equal(registry.stdout, "registry ok\n");
-
       const bin = join(dir, "node_modules", ".bin");
       mkdirSync(bin, { recursive: true });
       const shim = join(bin, "workspace-kit");

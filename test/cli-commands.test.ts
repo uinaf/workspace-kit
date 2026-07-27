@@ -47,6 +47,8 @@ test("wiki backfill runs green on the kit's own scaffold (P0 regression)", () =>
 
 test("wiki backfill honors a configured wiki.root", () => {
   const dir = scaffold("personal");
+  rmSync(join(dir, "memory", "wiki", "sources"), { recursive: true });
+  rmSync(join(dir, "memory", "wiki", "tags"), { recursive: true });
   const config = JSON.parse(readFileSync(join(dir, "workspace.json"), "utf8"));
   config.wiki = { root: "notes/wiki" };
   writeFileSync(join(dir, "workspace.json"), JSON.stringify(config, null, 2));
@@ -60,6 +62,7 @@ test("wiki backfill honors a configured wiki.root", () => {
 test("wiki backfill --check reports drift without mutating and --dry-run stays green", () => {
   const dir = scaffold("personal");
   commitAll(dir);
+  rmSync(join(dir, "memory", "wiki", "sources", "index.md"));
 
   const check = kit(dir, "wiki", "backfill", "--check");
   assert.equal(check.status, 1);
@@ -216,6 +219,29 @@ test("doctor --json carries errors and always emits JSON", () => {
   const noConfig = kit(dir, "doctor", "--json");
   assert.equal(noConfig.status, 1);
   assert.equal(JSON.parse(noConfig.stdout).status, "fail");
+});
+
+test("verify composes configured offline checks and emits one JSON result", () => {
+  const dir = scaffold("personal");
+  const pass = kit(dir, "verify", "--json");
+  assert.equal(pass.status, 0, pass.stderr);
+  assert.equal(pass.stderr, "");
+  assert.equal(pass.stdout.trimEnd().includes("\n"), false);
+  const passPayload = JSON.parse(pass.stdout);
+  assert.equal(passPayload.status, "pass");
+  assert.equal(passPayload.checks.config, "ok");
+  assert.equal(passPayload.checks.registry, "ok");
+  assert.equal(passPayload.checks.wikiBackfill, "ok");
+
+  rmSync(join(dir, "memory", "wiki", "sources", "index.md"));
+  const fail = kit(dir, "verify", "--json");
+  assert.equal(fail.status, 1);
+  assert.equal(fail.stderr, "");
+  assert.equal(fail.stdout.trimEnd().includes("\n"), false);
+  const failPayload = JSON.parse(fail.stdout);
+  assert.equal(failPayload.status, "fail");
+  assert.equal(failPayload.checks.wikiBackfill, "fail");
+  assert.ok(failPayload.errors.includes("would write memory/wiki/sources/index.md"), fail.stdout);
 });
 
 test("links check and fix, including refusal and subdirectory creation", () => {

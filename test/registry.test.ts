@@ -368,3 +368,55 @@ test("registry project paths use the configured home-relative prefix", () => {
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout, "registry ok\n");
 });
+
+test("registry validate enforces owner, required-entry, and size policies", () => {
+  const home = scratch("registry-home-");
+  const valid = workspace({
+    tools: [project("workspace"), project("tool")],
+  });
+  const configPath = join(valid, "workspace.json");
+  const config = JSON.parse(readFileSync(configPath, "utf8"));
+  Object.assign(config.registry.project, {
+    allowedOwners: ["fixture-owner"],
+    mustContain: [{ repo: "fixture-owner/workspace", mode: "managed" }],
+    maxEntries: 2,
+  });
+  writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
+  assert.equal(kit(valid, home, "registry", "validate").status, 0);
+
+  const invalid = workspace({
+    tools: [
+      project("one", { repo: "other-owner/one" }),
+      project("workspace-route", {
+        repo: "fixture-owner/workspace",
+        mode: "route-only",
+      }),
+    ],
+  });
+  const invalidConfigPath = join(invalid, "workspace.json");
+  const invalidConfig = JSON.parse(readFileSync(invalidConfigPath, "utf8"));
+  Object.assign(invalidConfig.registry.project, {
+    allowedOwners: ["fixture-owner"],
+    mustContain: [{ repo: "fixture-owner/workspace", mode: "managed" }],
+    maxEntries: 1,
+  });
+  writeFileSync(invalidConfigPath, `${JSON.stringify(invalidConfig, null, 2)}\n`);
+
+  const result = kit(invalid, home, "registry", "validate");
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /contains 2 project entries \(maximum 1\)/);
+  assert.match(result.stderr, /repository owner is not allowed \(found other-owner/);
+  assert.match(
+    result.stderr,
+    /must contain exactly one fixture-owner\/workspace entry in managed mode \(found 0\)/,
+  );
+
+  invalidConfig.registry.project = {
+    ...invalidConfig.registry.project,
+    mustContain: [],
+    maxEntries: 0,
+  };
+  writeFileSync(invalidConfigPath, `${JSON.stringify(invalidConfig, null, 2)}\n`);
+  writeFileSync(join(invalid, "projects.json"), "{}\n");
+  assert.equal(kit(invalid, home, "registry", "validate").status, 0);
+});

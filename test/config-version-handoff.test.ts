@@ -21,6 +21,9 @@ test("config reports nested unknown keys and canonicalizes repository paths", ()
         pathPrefix: "~/projects/",
         modes: ["managed"],
         originHosts: ["GitLab.com"],
+        allowedOwners: ["fixture-owner"],
+        mustContain: [{ repo: "fixture-owner/workspace", mode: "managed" }],
+        maxEntries: 1,
       },
     },
     dailyLogs: { root: "./memory", contexts: "memory\\contexts" },
@@ -48,6 +51,7 @@ test("config reports nested unknown keys and canonicalizes repository paths", ()
   assert.deepEqual(parsed.links, [{ path: "nested/CLAUDE.md", target: "../AGENTS.md" }]);
   assert.equal(parsed.registry?.file, "projects.json");
   assert.deepEqual(parsed.registry?.project?.originHosts, ["gitlab.com"]);
+  assert.deepEqual(parsed.registry?.project?.allowedOwners, ["fixture-owner"]);
   assert.deepEqual(parsed.dailyLogs, { root: "memory", contexts: "memory/contexts" });
   assert.equal(parsed.wiki?.root, "memory/wiki");
   assert.equal(parsed.wiki?.revisionStaleness, true);
@@ -89,6 +93,77 @@ test("config rejects duplicate origin hosts after normalization", () => {
         },
       }),
     /registry\.project\.originHosts must not contain duplicates after normalization/,
+  );
+});
+
+test("config validates declarative project ownership policies", () => {
+  const registry = {
+    file: "projects.json",
+    entry: { required: [], optional: [] },
+    project: {
+      pathPrefix: "~/projects/",
+      modes: ["managed", "route-only"],
+      allowedOwners: ["fixture-owner"],
+      mustContain: [{ repo: "fixture-owner/workspace", mode: "managed" }],
+      maxEntries: 3,
+    },
+  };
+  const parsed = parseWorkspaceConfig({ registry });
+  assert.deepEqual(parsed.registry?.project?.allowedOwners, ["fixture-owner"]);
+  assert.deepEqual(parsed.registry?.project?.mustContain, [
+    { repo: "fixture-owner/workspace", mode: "managed" },
+  ]);
+  assert.equal(parsed.registry?.project?.maxEntries, 3);
+
+  assert.throws(
+    () =>
+      parseWorkspaceConfig({
+        registry: {
+          ...registry,
+          project: { ...registry.project, allowedOwners: ["nested/owner"] },
+        },
+      }),
+    /allowedOwners must contain valid Git repository owners/,
+  );
+  assert.throws(
+    () =>
+      parseWorkspaceConfig({
+        registry: {
+          ...registry,
+          project: {
+            ...registry.project,
+            mustContain: [{ repo: "fixture-owner/workspace", mode: "unknown" }],
+          },
+        },
+      }),
+    /mustContain\[0\]\.mode must be included/,
+  );
+  assert.throws(
+    () =>
+      parseWorkspaceConfig({
+        registry: { ...registry, project: { ...registry.project, maxEntries: -1 } },
+      }),
+    /maxEntries must be a non-negative integer/,
+  );
+  assert.throws(
+    () =>
+      parseWorkspaceConfig({
+        registry: {
+          ...registry,
+          project: {
+            ...registry.project,
+            mustContain: [{ repo: "other-owner/workspace", mode: "managed" }],
+          },
+        },
+      }),
+    /mustContain repository owners must be included in allowedOwners/,
+  );
+  assert.throws(
+    () =>
+      parseWorkspaceConfig({
+        registry: { ...registry, project: { ...registry.project, maxEntries: 0 } },
+      }),
+    /maxEntries must allow every mustContain entry/,
   );
 });
 

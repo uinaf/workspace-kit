@@ -2,6 +2,7 @@
 // kit-owned validation commands. Existing files remain unchanged.
 import { mkdirSync, realpathSync } from "node:fs";
 import { kitVersion } from "./version.ts";
+import { wikiBackfill } from "./checks/wikiBackfill.ts";
 import {
   createWorkspaceLink,
   readWorkspaceText,
@@ -12,11 +13,7 @@ import {
 export type Profile = "personal" | "runtime" | "work";
 export type InitResult = { created: string[]; skipped: string[] };
 
-function agentsSkeleton(profile: Profile): string {
-  const registryValidation =
-    profile === "personal" || profile === "runtime"
-      ? "\nRun `npm run registry:check` before committing registry changes."
-      : "";
+function agentsSkeleton(): string {
   return `# AGENTS.md
 
 <!-- Owner-authored: workspace-kit scaffolds structure only and never edits
@@ -42,7 +39,6 @@ skills are owned. Installed machine-global copies are not workspace source.
 ## Validation
 
 Run \`npm run verify\` before committing.
-${registryValidation}
 
 ## Boundaries
 
@@ -53,12 +49,11 @@ TODO: what is private, what may leave this workspace, and how.
 function packageDefinition(profile: Profile) {
   const scripts: Record<string, string> = {
     doctor: "workspace-kit doctor",
-    test: "npm run doctor",
-    verify: "npm test",
+    test: "npm run verify",
+    verify: "workspace-kit verify",
   };
   if (profile === "personal" || profile === "runtime") {
     scripts["registry:check"] = "workspace-kit registry validate";
-    scripts.verify = "npm test && npm run registry:check";
   }
   return {
     private: true,
@@ -125,6 +120,11 @@ export function initWorkspace(dir: string, profile: Profile): InitResult {
   }
   const root = realpathSync(dir);
   assertCompatiblePackage(root, profile);
+  const seedWikiCatalog =
+    profile !== "work" &&
+    !workspaceLstat(root, "workspace.json") &&
+    !workspaceLstat(root, "memory/wiki/sources") &&
+    !workspaceLstat(root, "memory/wiki/tags");
 
   const put = (rel: string, content: string, mode?: number): void => {
     // lstat-based existence: a pre-existing dangling symlink must count as
@@ -152,7 +152,7 @@ export function initWorkspace(dir: string, profile: Profile): InitResult {
     created.push(rel);
   };
 
-  put("AGENTS.md", agentsSkeleton(profile));
+  put("AGENTS.md", agentsSkeleton());
   link("CLAUDE.md", "AGENTS.md");
   put("package.json", packageSkeleton(profile));
   put("docs/README.md", "# Docs\n\nTODO: index the documents that live under docs/.\n");
@@ -263,6 +263,12 @@ npm run verify
   }
 
   put("workspace.json", `${JSON.stringify(config, null, 2)}\n`);
+  if (seedWikiCatalog && created.includes("workspace.json")) {
+    const options = { root: "memory/wiki", repoRoot: root };
+    const plan = wikiBackfill({ ...options, dryRun: true });
+    wikiBackfill({ ...options, dryRun: false });
+    created.push(...plan.planned.map((line) => line.replace(/^would write /, "")));
+  }
 
   return { created, skipped };
 }
