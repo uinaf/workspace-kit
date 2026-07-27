@@ -15,8 +15,9 @@ consumers own their workspace policy and composition.
   comments, commit messages, or issues. All fixtures are synthetic
   (`fixture-owner/fixture-workspace` style).
 - **Zero runtime dependencies. No postinstall scripts or telemetry.**
-  Validation and scaffolding stay offline. The explicitly invoked `skills sync`
-  command is the only networked path and delegates to a pinned `skills` CLI.
+  Validation and scaffolding stay offline. Network access happens only through
+  explicitly invoked operations: `skills sync` delegates to a pinned `skills`
+  CLI, while `registry clone` and `registry pull` delegate to `gh` and `git`.
   devDependencies are allowed for build/test only.
 - Supported execution environments are macOS and Linux. Windows runtime
   compatibility is outside the release contract. Continue rejecting

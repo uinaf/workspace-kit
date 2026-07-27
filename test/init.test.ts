@@ -48,6 +48,10 @@ for (const profile of ["personal", "runtime", "work"] as const) {
       assert.match(hook, /npm run verify/);
       assert.doesNotMatch(hook, /npx/);
       assert.equal(packageJson.scripts["registry:check"], "workspace-kit registry validate");
+      assert.equal(packageJson.scripts["registry:clone"], "workspace-kit registry clone");
+      assert.equal(packageJson.scripts["registry:status"], "workspace-kit registry status");
+      assert.equal(packageJson.scripts["registry:pull"], "workspace-kit registry pull");
+      assert.equal(packageJson.scripts["hooks:install"], "workspace-kit hooks install");
 
       const config = JSON.parse(readFileSync(join(dir, "workspace.json"), "utf8")) as {
         handoff?: { prefixes?: unknown };

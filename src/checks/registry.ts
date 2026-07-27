@@ -15,11 +15,12 @@ import { registryErrors } from "./structure.ts";
 const PROJECT_FIELDS = ["name", "repo", "path", "mode"] as const;
 
 type GitResult = { status: number; stdout: string };
-type ProjectEntry = {
+export type ProjectEntry = {
   label: string;
   repo: string;
   path: string;
   mode: string;
+  branch?: string;
   catalog?: string;
 };
 
@@ -109,6 +110,7 @@ function parseEntries(value: unknown, project: ProjectRegistryConfig): ProjectEn
         repo: value.repo as string,
         path: value.path as string,
         mode: value.mode as string,
+        ...(typeof value.branch === "string" ? { branch: value.branch } : {}),
         ...(catalogField !== undefined && typeof value[catalogField] === "string"
           ? { catalog: value[catalogField] }
           : {}),
@@ -314,6 +316,14 @@ function checkoutErrors(
   return errors;
 }
 
+export function projectRegistryEntries(repoRoot: string, registry: RegistryConfig): ProjectEntry[] {
+  if (!registry.project) {
+    throw new Error("registry project operations require a registry.project policy");
+  }
+  const parsed: unknown = JSON.parse(readWorkspaceText(repoRoot, registry.file));
+  return parseEntries(parsed, registry.project);
+}
+
 export function projectRegistryErrors(
   repoRoot: string,
   registry: RegistryConfig,
@@ -335,8 +345,7 @@ export function projectRegistryErrors(
     return ["registry validate requires a registry.project policy"];
   }
 
-  const parsed: unknown = JSON.parse(readWorkspaceText(repoRoot, registry.file));
-  const entries = parseEntries(parsed, registry.project);
+  const entries = projectRegistryEntries(repoRoot, registry);
   const staticErrors = staticEntryErrors(registry.file, entries, registry.project);
   if (staticErrors.length > 0) return staticErrors;
   return checkoutErrors(registry.file, entries, registry.project, options);

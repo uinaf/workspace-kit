@@ -40,6 +40,10 @@ npm exec -- workspace-kit verify                    # complete offline gate
 npm exec -- workspace-kit doctor                    # configured core checks
 npm exec -- workspace-kit wiki backfill --check     # detect catalog drift
 npm exec -- workspace-kit registry validate         # validate projects.json
+npm exec -- workspace-kit registry status           # inspect registered checkouts
+npm exec -- workspace-kit registry clone            # clone missing managed checkouts
+npm exec -- workspace-kit registry pull             # fast-forward managed checkouts
+npm exec -- workspace-kit hooks install              # enable tracked Git hooks
 npm exec -- workspace-kit skills sync               # materialize workspace skills
 ```
 
@@ -63,6 +67,15 @@ and an optional entry limit. The explicit `registry.project` policy enables
 this check; `originHosts` defaults to `["github.com"]`, and missing checkouts
 are allowed. `verify` includes it whenever that policy is present. Personal and
 runtime scaffolds use `verify` in their generated pre-commit hook.
+
+The explicit `registry clone`, `registry status`, and `registry pull` commands
+run the same validation first, then operate on the configured lifecycle modes.
+Clone and pull affect only entries whose mode is `managed`; status also shows
+locally present route-only entries. Pull is always fast-forward-only and
+refuses a configured branch mismatch. `registry path <category/name>` resolves
+one validated checkout for consumer-owned composition without teaching the
+package about a particular repository. `hooks install` configures the tracked
+`.githooks` directory for the current checkout.
 
 For Git-aware wiki freshness, opt in with `wiki.revisionStaleness`. The check
 then evaluates the current working tree, including staged and unstaged edits,

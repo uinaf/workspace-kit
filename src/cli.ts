@@ -25,7 +25,15 @@ import {
 import { docsLinkErrors } from "./checks/docsLinks.ts";
 import { limitWarnings } from "./checks/limits.ts";
 import { projectRegistryErrors } from "./checks/registry.ts";
+import { projectRegistryEntries } from "./checks/registry.ts";
 import { initWorkspace } from "./init.ts";
+import { installHooks } from "./hooks.ts";
+import {
+  cloneProjects,
+  pullProjects,
+  resolveProjectPath,
+  statusProjects,
+} from "./registryLifecycle.ts";
 import { syncWorkspaceSkills, workspaceSkillErrors } from "./skills.ts";
 import { kitVersion } from "./version.ts";
 import {
@@ -51,6 +59,9 @@ commands:
   links check | fix        verify or recreate configured alias symlinks
   docs links               check relative links in tracked markdown
   registry validate        validate project-registry policy and local checkouts
+  registry clone | status | pull  operate configured project checkouts
+  registry path <category/name> [--mode <mode>]  resolve a configured checkout
+  hooks install            configure this checkout's tracked Git hooks
   skills check | sync      verify or install configured workspace-local skills
   config validate          validate ${CONFIG_FILE} itself
   init [--profile personal|runtime|work] [--dir <path>]  scaffold a workspace
@@ -379,7 +390,7 @@ function main(): void {
     console.log(`workspace scaffolded (${profile} profile)`);
     console.log("next: replace the AGENTS.md TODOs using @uinaf/workspace-kit/docs/convention.md");
     if (result.created.includes(".githooks/pre-commit")) {
-      console.log("enable the hook with: git config core.hooksPath .githooks");
+      console.log("enable the hook with: npm run hooks:install");
     }
     process.exit(0);
   }
@@ -554,7 +565,6 @@ function main(): void {
 
   if (command === "registry") {
     const [mode, ...args] = rest;
-    if (mode !== "validate" || args.length > 0) usageExit();
     const config = loadConfigOrFail();
     const registry = requireSection(config.registry, "registry");
     const errors = projectRegistryErrors(".", registry);
@@ -562,8 +572,42 @@ function main(): void {
       console.error(errors.join("\n"));
       process.exit(1);
     }
-    console.log("registry ok");
-    process.exit(0);
+    if (mode === "validate" && args.length === 0) {
+      console.log("registry ok");
+      process.exit(0);
+    }
+    const entries = projectRegistryEntries(".", registry);
+    if (mode === "clone" && args.length === 0) process.exit(cloneProjects(entries));
+    if (mode === "status" && args.length === 0) process.exit(statusProjects(entries));
+    if (mode === "pull" && args.length === 0) process.exit(pullProjects(entries));
+    if (mode === "path") {
+      const label = args[0];
+      if (!label) usageExit();
+      let requiredMode: string | undefined;
+      if (args.length === 3 && args[1] === "--mode" && args[2]) {
+        requiredMode = args[2];
+      } else if (args.length !== 1) {
+        usageExit();
+      }
+      try {
+        console.log(resolveProjectPath(entries, label, requiredMode));
+        process.exit(0);
+      } catch (error) {
+        failWith(error instanceof Error ? error.message : String(error));
+      }
+    }
+    usageExit();
+  }
+
+  if (command === "hooks") {
+    const [mode, ...args] = rest;
+    if (mode !== "install" || args.length > 0) usageExit();
+    try {
+      console.log(installHooks(process.cwd()));
+      process.exit(0);
+    } catch (error) {
+      failWith(error instanceof Error ? error.message : String(error));
+    }
   }
 
   if (command === "skills") {

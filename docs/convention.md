@@ -143,6 +143,12 @@ Consumers own shared machine-global skill selection and installation.
   URL/path syntax are rejected. Portable path aliases, duplicate checkout roots,
   and unsafe catalogs also fail. Missing checkouts are valid. `verify` includes
   this gate whenever `registry.project` is configured.
+  `registry clone`, `registry status`, and `registry pull` validate the same
+  contract before operating on checkouts. Clone and pull are restricted to
+  `managed` entries; pull uses `--ff-only` and enforces a configured branch.
+  `registry path <category/name> [--mode <mode>]` prints one validated absolute
+  checkout path so consumers can compose owner-specific commands without
+  copying registry parsing into local scripts.
 - **Ownership contract** — for peered workspaces descended from one
   historical ancestor: `workspace.contract.json` names the repository, its
   peer, the shared ancestor commit, and required/forbidden owner paths.
@@ -256,6 +262,10 @@ stale`, which is a separate history-based operation.
 `registry validate` exits 1 for malformed entries, ownership-policy failures,
 or unsafe local checkout state and prints `registry ok` on success. It reads
 Git metadata only; it never clones, fetches, pulls, or changes a checkout.
+`registry status` is read-only. `registry clone` invokes `gh repo clone` for
+missing managed entries, while `registry pull` invokes `git pull --ff-only` for
+present managed entries. `hooks install` sets `core.hooksPath` to `.githooks`
+and makes the tracked pre-commit hook executable.
 
 ## Repository security composition
 
@@ -280,8 +290,9 @@ an existing repository follows the adoption steps above, and init stops before
 writing when its package contract is incompatible.
 
 - `work` — AGENTS.md + CLAUDE.md symlink + package.json + docs/README.md + workspace.json.
-- `personal` — work + README, `.env.example`, project-registry stub,
-  memory/wiki skeleton and generated catalogs, and a `verify` pre-commit hook.
+- `personal` — work + README, `.env.example`, project-registry stub and
+  lifecycle scripts, hook installer, memory/wiki skeleton and generated
+  catalogs, and a `verify` pre-commit hook.
 - `runtime` — personal + HEARTBEAT.md and IDENTITY.md placeholders for
   always-on runtime identities.
 

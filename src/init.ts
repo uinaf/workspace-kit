@@ -54,6 +54,10 @@ function packageDefinition(profile: Profile) {
   };
   if (profile === "personal" || profile === "runtime") {
     scripts["registry:check"] = "workspace-kit registry validate";
+    scripts["registry:clone"] = "workspace-kit registry clone";
+    scripts["registry:status"] = "workspace-kit registry status";
+    scripts["registry:pull"] = "workspace-kit registry pull";
+    scripts["hooks:install"] = "workspace-kit hooks install";
   }
   return {
     private: true,

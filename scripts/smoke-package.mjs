@@ -135,6 +135,10 @@ try {
   assert.match(hook, /npm run verify/);
   assert.doesNotMatch(hook, /npx/);
   run(process.execPath, [installedCli, "verify"], fixtureDir);
+  run(process.execPath, [installedCli, "registry", "status"], fixtureDir);
+  run("git", ["init", "-q"], fixtureDir);
+  run(process.execPath, [installedCli, "hooks", "install"], fixtureDir);
+  assert.equal(run("git", ["config", "--get", "core.hooksPath"], fixtureDir).trim(), ".githooks");
   config.skills = {};
   writeFileSync(join(fixtureDir, "workspace.json"), `${JSON.stringify(config, null, 2)}\n`);
   mkdirSync(join(fixtureDir, ".agents", "skills", "fixture-skill"), { recursive: true });
