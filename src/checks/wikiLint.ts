@@ -53,7 +53,7 @@ export function wikiLintErrors(options: string | WikiLintOptions): WikiLintResul
   const known = new Set<string>();
   const byLeaf = new Map<string, string[]>();
   for (const path of pages) {
-    const rel = relative(root, path).replace(/\.md$/, "").replaceAll("\\\\", "/");
+    const rel = relative(root, path).replace(/\.md$/, "").replaceAll("\\", "/");
     known.add(rel);
     const leaf = basename(path, ".md");
     if (!byLeaf.has(leaf)) byLeaf.set(leaf, []);
@@ -61,11 +61,11 @@ export function wikiLintErrors(options: string | WikiLintOptions): WikiLintResul
   }
 
   function normalizeWikiTarget(value: string): string {
-    return normalize(value).replaceAll("\\\\", "/").replace(/^\.\//, "").replace(/\.md$/, "");
+    return normalize(value).replaceAll("\\", "/").replace(/^\.\//, "").replace(/\.md$/, "");
   }
 
   function resolveWikiTarget(fromPath: string, rawTarget: string): string[] {
-    const fromRel = relative(root, fromPath).replace(/\.md$/, "").replaceAll("\\\\", "/");
+    const fromRel = relative(root, fromPath).replace(/\.md$/, "").replaceAll("\\", "/");
     const fromDir = dirname(fromRel);
     const target = normalizeWikiTarget(rawTarget.trim().replace(/^\/+/, ""));
     const candidates = [normalizeWikiTarget(join(fromDir, target)), target];
@@ -78,12 +78,14 @@ export function wikiLintErrors(options: string | WikiLintOptions): WikiLintResul
 
   const bad: string[] = [];
   const inbound = new Map<string, Set<string>>();
+  const isGeneratedCatalog = (rel: string) => rel.startsWith("sources/") || rel.startsWith("tags/");
   for (const path of pages) {
-    const rel = relative(root, path).replace(/\.md$/, "").replaceAll("\\\\", "/");
+    const rel = relative(root, path).replace(/\.md$/, "").replaceAll("\\", "/");
     inbound.set(rel, new Set());
   }
 
   for (const path of pages) {
+    const rel = relative(root, path).replace(/\.md$/, "").replaceAll("\\", "/");
     const text = readWorkspaceText(".", path);
     if (!text.startsWith("---\n")) bad.push(`${path}: missing frontmatter`);
     if (!text.slice(4).includes("\n---\n")) bad.push(`${path}: unterminated frontmatter`);
@@ -92,7 +94,9 @@ export function wikiLintErrors(options: string | WikiLintOptions): WikiLintResul
       if (!(key in fm)) bad.push(`${path}: missing frontmatter field ${key}`);
     }
     for (const key of ["tags", "sources"]) {
-      if (asList(fm[key]).length === 0) bad.push(`${path}: empty frontmatter field ${key}`);
+      if (asList(fm[key]).length === 0 && !(key === "sources" && isGeneratedCatalog(rel))) {
+        bad.push(`${path}: empty frontmatter field ${key}`);
+      }
     }
     const status = fm.status;
     if (typeof status === "string" && !["active", "draft", "archived"].includes(status)) {
@@ -137,7 +141,7 @@ export function wikiLintErrors(options: string | WikiLintOptions): WikiLintResul
       }
       if (!targetExists) bad.push(`${path}: broken markdown link (${rawHref})`);
       if (target.startsWith(root) && target.endsWith(".md")) {
-        const rel = relative(root, target).replace(/\.md$/, "").replaceAll("\\\\", "/");
+        const rel = relative(root, target).replace(/\.md$/, "").replaceAll("\\", "/");
         inbound.get(rel)?.add(path);
       }
     }
@@ -146,7 +150,7 @@ export function wikiLintErrors(options: string | WikiLintOptions): WikiLintResul
   function isOrphanExempt(rel: string): boolean {
     if (rel === "index" || rel === "log" || rel === "schema") return true;
     if (rel.endsWith("/index")) return true;
-    if (rel.startsWith("sources/") || rel.startsWith("tags/")) return true;
+    if (isGeneratedCatalog(rel)) return true;
     return false;
   }
 

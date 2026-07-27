@@ -25,7 +25,9 @@ owner-reviewed.
   `tags`, `sources`) and forming a link graph. Wikilinks resolve
   page-relative, then root-relative, then by unique leaf basename;
   ambiguity is an error. Every non-index page needs an inbound link.
-  `sources:` entries must exist (external URLs and `[[links]]` exempt).
+  Authored pages need at least one `sources:` entry; generated source and tag
+  catalogs may use `sources: []` when the represented set is empty. Listed
+  sources must exist (external URLs and `[[links]]` exempt).
   `log.md` records changes with `## [YYYY-MM-DD] slug | summary` headings.
 - **Generated catalogs** — `wiki backfill` maintains `sources/` and `tags/`
   indexes from the raw layer (tag pages materialize at two or more sources;
