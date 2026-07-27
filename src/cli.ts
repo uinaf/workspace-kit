@@ -162,31 +162,56 @@ function runContractCheck(file: string): number {
   }
 }
 
+type OutputEvent = {
+  stream: "stdout" | "stderr";
+  text: string;
+};
+
 type DoctorReport = {
   bad: string[];
   checks: Record<string, string>;
   detail: string[];
-  immediateErrors: string[];
-  output: string[];
+  events: OutputEvent[];
   warnings: string[];
 };
+
+function emitOutputEvents(events: readonly OutputEvent[]): void {
+  for (const event of events) {
+    if (event.stream === "stdout") {
+      console.log(event.text);
+    } else {
+      console.error(event.text);
+    }
+  }
+}
+
+function appendUnique(target: string[], values: readonly string[]): string[] {
+  const seen = new Set(target);
+  const added: string[] = [];
+  for (const value of values) {
+    if (seen.has(value)) continue;
+    seen.add(value);
+    target.push(value);
+    added.push(value);
+  }
+  return added;
+}
 
 function doctorReport(config: WorkspaceConfig): DoctorReport {
   const bad: string[] = [];
   const checks: Record<string, string> = {};
   const detail: string[] = [];
-  const immediateErrors: string[] = [];
-  const output: string[] = [];
+  const events: OutputEvent[] = [];
 
   const structural = structureErrors(config);
   bad.push(...structural);
   detail.push(...structural);
   checks.structure = structural.length === 0 ? "ok" : "fail";
 
-  const stdout = (line: string) => output.push(line);
+  const stdout = (line: string) => events.push({ stream: "stdout", text: line });
   const stderr = (lines: string[]) => {
     detail.push(...lines);
-    immediateErrors.push(...lines);
+    if (lines.length > 0) events.push({ stream: "stderr", text: lines.join("\n") });
   };
 
   if (config.wiki) {
@@ -248,16 +273,13 @@ function doctorReport(config: WorkspaceConfig): DoctorReport {
   // Soft limits are warnings by design: printed, counted, never fatal.
   const warnings = config.limits ? limitWarnings(config.limits) : [];
 
-  return { bad, checks, detail, immediateErrors, output, warnings };
+  return { bad, checks, detail, events, warnings };
 }
 
 function doctor(config: WorkspaceConfig, json: boolean): never {
   const report = doctorReport(config);
 
-  if (!json) {
-    for (const line of report.output) console.log(line);
-    if (report.immediateErrors.length > 0) console.error(report.immediateErrors.join("\n"));
-  }
+  if (!json) emitOutputEvents(report.events);
   const warnings = report.warnings;
   if (warnings.length > 0 && !json) console.error(warnings.join("\n"));
 
@@ -286,9 +308,8 @@ function doctor(config: WorkspaceConfig, json: boolean): never {
 function verify(state: LoadedConfig, json: boolean): never {
   const report = doctorReport(state.config);
   const checks: Record<string, string> = { config: "ok", ...report.checks };
-  const output = ["config ok", ...report.output];
+  const events: OutputEvent[] = [{ stream: "stdout", text: "config ok" }, ...report.events];
   const errors = [...report.detail];
-  const immediateErrors = [...report.immediateErrors];
   const failures = [...report.bad];
   const warnings = [
     ...state.unknownKeys.map(
@@ -301,10 +322,10 @@ function verify(state: LoadedConfig, json: boolean): never {
     const registryErrors = projectRegistryErrors(".", state.config.registry);
     checks.registry = registryErrors.length === 0 ? "ok" : "fail";
     if (registryErrors.length === 0) {
-      output.push("registry ok");
+      events.push({ stream: "stdout", text: "registry ok" });
     } else {
-      errors.push(...registryErrors);
-      immediateErrors.push(...registryErrors);
+      const added = appendUnique(errors, registryErrors);
+      if (added.length > 0) events.push({ stream: "stderr", text: added.join("\n") });
       failures.push("registry validation failed (exit 1)");
     }
   }
@@ -314,17 +335,17 @@ function verify(state: LoadedConfig, json: boolean): never {
       const result = wikiBackfill({ root: state.config.wiki.root, dryRun: true });
       checks.wikiBackfill = result.planned.length === 0 ? "ok" : "fail";
       if (result.planned.length === 0) {
-        output.push("wiki-backfill ok");
+        events.push({ stream: "stdout", text: "wiki-backfill ok" });
       } else {
-        errors.push(...result.planned);
-        immediateErrors.push(...result.planned);
+        const added = appendUnique(errors, result.planned);
+        if (added.length > 0) events.push({ stream: "stderr", text: added.join("\n") });
         failures.push("wiki backfill check failed (exit 1)");
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       checks.wikiBackfill = "fail";
-      errors.push(message);
-      immediateErrors.push(message);
+      const added = appendUnique(errors, [message]);
+      if (added.length > 0) events.push({ stream: "stderr", text: added.join("\n") });
       failures.push("wiki backfill check failed (exit 1)");
     }
   }
@@ -343,8 +364,7 @@ function verify(state: LoadedConfig, json: boolean): never {
     process.exit(failures.length === 0 ? 0 : 1);
   }
 
-  for (const line of output) console.log(line);
-  if (immediateErrors.length > 0) console.error(immediateErrors.join("\n"));
+  emitOutputEvents(events);
   if (warnings.length > 0) console.error(warnings.join("\n"));
   if (failures.length > 0) {
     console.error(failures.join("\n"));

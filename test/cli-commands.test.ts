@@ -4,10 +4,12 @@ import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 import { execFileSync, execSync, spawnSync } from "node:child_process";
 import {
+  closeSync,
   existsSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   rmSync,
   symlinkSync,
@@ -23,6 +25,17 @@ const cli = join(root, "src", "cli.ts");
 
 function kit(cwd: string, ...args: string[]) {
   return spawnSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8" });
+}
+
+function kitCombined(cwd: string, ...args: string[]) {
+  const outputPath = join(mkdtempSync(join(tmpdir(), "cli-output-")), "combined.log");
+  const output = openSync(outputPath, "w");
+  const result = spawnSync(process.execPath, [cli, ...args], {
+    cwd,
+    stdio: ["ignore", output, output],
+  });
+  closeSync(output);
+  return { status: result.status, output: readFileSync(outputPath, "utf8") };
 }
 
 function scaffold(profile: "personal" | "work" = "personal"): string {
@@ -43,6 +56,11 @@ test("wiki backfill runs green on the kit's own scaffold (P0 regression)", () =>
   const result = kit(dir, "wiki", "backfill");
   assert.equal(result.status, 0, result.stderr);
   assert.ok(existsSync(join(dir, "memory", "wiki", "sources", "index.md")));
+  assert.match(
+    readFileSync(join(dir, "memory", "wiki", "sources", "daily-log.md"), "utf8"),
+    /^sources: \[\]$/m,
+  );
+  assert.equal(kit(dir, "wiki", "lint").status, 0);
 });
 
 test("wiki backfill honors a configured wiki.root", () => {
@@ -221,6 +239,27 @@ test("doctor --json carries errors and always emits JSON", () => {
   assert.equal(JSON.parse(noConfig.stdout).status, "fail");
 });
 
+test("doctor preserves check output order and authored pages still require sources", () => {
+  const dir = scaffold("personal");
+  const configPath = join(dir, "workspace.json");
+  const config = JSON.parse(readFileSync(configPath, "utf8"));
+  config.docsLinks = { enabled: true };
+  writeFileSync(configPath, JSON.stringify(config, null, 2));
+  const indexPath = join(dir, "memory", "wiki", "index.md");
+  writeFileSync(
+    indexPath,
+    readFileSync(indexPath, "utf8").replace("sources: [AGENTS.md]", "sources: []"),
+  );
+
+  const result = kitCombined(dir, "doctor");
+  const wikiError = "memory/wiki/index.md: empty frontmatter field sources";
+  const laterSuccess = "docs-links ok";
+  assert.equal(result.status, 1);
+  assert.ok(result.output.includes(wikiError), result.output);
+  assert.ok(result.output.includes(laterSuccess), result.output);
+  assert.ok(result.output.indexOf(wikiError) < result.output.indexOf(laterSuccess), result.output);
+});
+
 test("verify composes configured offline checks and emits one JSON result", () => {
   const dir = scaffold("personal");
   const pass = kit(dir, "verify", "--json");
@@ -242,6 +281,25 @@ test("verify composes configured offline checks and emits one JSON result", () =
   assert.equal(failPayload.status, "fail");
   assert.equal(failPayload.checks.wikiBackfill, "fail");
   assert.ok(failPayload.errors.includes("would write memory/wiki/sources/index.md"), fail.stdout);
+});
+
+test("verify reports registry shape errors once", () => {
+  const dir = scaffold("personal");
+  writeFileSync(join(dir, "projects.json"), '{"invalid":{}}\n');
+  const message = "projects.json category invalid should be an array";
+
+  const jsonResult = kit(dir, "verify", "--json");
+  assert.equal(jsonResult.status, 1);
+  const payload = JSON.parse(jsonResult.stdout);
+  assert.equal(
+    payload.errors.filter((error: string) => error === message).length,
+    1,
+    jsonResult.stdout,
+  );
+
+  const plainResult = kit(dir, "verify");
+  assert.equal(plainResult.status, 1);
+  assert.equal(plainResult.stderr.split(message).length - 1, 1, plainResult.stderr);
 });
 
 test("links check and fix, including refusal and subdirectory creation", () => {

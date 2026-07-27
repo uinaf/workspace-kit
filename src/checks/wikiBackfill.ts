@@ -319,7 +319,7 @@ ${table(list)}
 
   const daily = sources.filter((s) => s.kind === "daily-log");
   const dailySources =
-    daily.length > 0 ? `\n${yamlList(daily.map((source) => source.path))}` : ` [${root}/index.md]`;
+    daily.length > 0 ? `\n${yamlList(daily.map((source) => source.path))}` : " []";
   const writeBackLink = workspaceLstat(repoRoot, `${root}/agents/write-backs.md`)
     ? '\n  - "[[../agents/write-backs]]"'
     : "";
