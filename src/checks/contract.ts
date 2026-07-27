@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 import { posix, resolve, win32 } from "node:path";
 import type { HandoffConfig } from "../config.ts";
 import { parseGitRemote } from "../lib/gitRemote.ts";
+import { gitEnvironmentForRepository } from "../lib/gitProcess.ts";
 import { readWorkspaceText } from "../lib/workspaceFs.ts";
 
 export type Contract = {
@@ -18,7 +19,10 @@ export type Contract = {
 type GitResult = { status: number; stdout: string; stderr: string };
 
 function git(repoRoot: string, args: string[]): GitResult {
-  const result = spawnSync("git", ["-C", repoRoot, ...args], { encoding: "utf8" });
+  const result = spawnSync("git", ["-C", repoRoot, ...args], {
+    encoding: "utf8",
+    env: gitEnvironmentForRepository(),
+  });
   return {
     status: result.status ?? 1,
     stdout: result.stdout ?? "",

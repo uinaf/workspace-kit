@@ -8,6 +8,7 @@ import {
   type RegistryConfig,
 } from "../config.ts";
 import { isGitRepositoryPath, parseGitRemote } from "../lib/gitRemote.ts";
+import { gitEnvironmentForRepository } from "../lib/gitProcess.ts";
 import { readWorkspaceText, workspaceLstat } from "../lib/workspaceFs.ts";
 import { registryErrors } from "./structure.ts";
 
@@ -32,7 +33,10 @@ function errorCode(error: unknown): string | undefined {
 }
 
 function git(repoRoot: string, args: string[]): GitResult {
-  const result = spawnSync("git", ["-C", repoRoot, ...args], { encoding: "utf8" });
+  const result = spawnSync("git", ["-C", repoRoot, ...args], {
+    encoding: "utf8",
+    env: gitEnvironmentForRepository(),
+  });
   return {
     status: result.status ?? 1,
     stdout: result.stdout ?? "",
