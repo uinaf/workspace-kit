@@ -188,6 +188,31 @@ test("registry validate accepts supported GitHub origins and an existing catalog
   assert.equal(result.status, 0, result.stderr);
 });
 
+test("registry validate ignores the calling hook's Git repository environment", () => {
+  const home = scratch("registry-home-");
+  checkout(home, "alpha", "git@github.com:fixture-owner/alpha.git");
+  const dir = workspace({ tools: [project("alpha")] });
+
+  const result = spawnSync(process.execPath, [cli, "registry", "validate"], {
+    cwd: dir,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      HOME: home,
+      USERPROFILE: home,
+      GIT_DIR: join(dir, ".git"),
+      GIT_WORK_TREE: dir,
+      GIT_INDEX_FILE: join(dir, ".git", "index"),
+      GIT_CONFIG_COUNT: "1",
+      GIT_CONFIG_KEY_0: "url.git@github.com:wrong/.insteadOf",
+      GIT_CONFIG_VALUE_0: "git@github.com:",
+    },
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "registry ok\n");
+});
+
 test("registry validate accepts a configured host and nested repository path", () => {
   const home = scratch("registry-home-");
   checkout(home, "alpha", "ssh://git@git.example.com/platform/ai/alpha.git");
