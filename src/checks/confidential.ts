@@ -39,9 +39,11 @@ const BATCH_OBJECT_LIMIT = 1024 * 1024;
 // Encrypting the files that define policy silently disables that policy. Names
 // are folded like every other path comparison here, so a case variant that is
 // the real policy file on a case-insensitive checkout cannot slip through.
-const POLICY_BASENAMES = new Set(
-  [".gitattributes", ".gitignore", ".gitmodules", CONFIG_FILE].map(portablePathIdentity),
-);
+// `.gitattributes` and `.gitignore` are per-directory policy at any depth; the
+// other two are policy only at the repository root, where a nested file of the
+// same name is ordinary content.
+const POLICY_BASENAMES = new Set([".gitattributes", ".gitignore"].map(portablePathIdentity));
+const POLICY_PATHS = new Set([".gitmodules", CONFIG_FILE].map(portablePathIdentity));
 // `git-crypt init -k <name>` installs a per-key filter, so coverage is the
 // default filter or one of that namespace.
 const PROVIDER_FILTER = /^git-crypt(-[A-Za-z0-9._-]+)?$/;
@@ -473,7 +475,10 @@ function report(config: ConfidentialConfig, repoRoot: string): ConfidentialRepor
   for (const entry of protectedEntries) {
     if (unmerged.includes(entry.path)) continue; // Reported with the unmerged paths.
     const header = headers.get(entry.oid);
-    if (POLICY_BASENAMES.has(portablePathIdentity(basename(entry.path)))) {
+    if (
+      POLICY_BASENAMES.has(portablePathIdentity(basename(entry.path))) ||
+      POLICY_PATHS.has(portablePathIdentity(entry.path))
+    ) {
       errors.push(`protected path must not cover Git or workspace policy: ${entry.path}`);
     } else if (!entry.mode.startsWith("100")) {
       errors.push(`protected path is not a regular file: ${entry.path}`);

@@ -309,15 +309,24 @@ test("the policy being enforced must be the policy being committed", () => {
   ]);
 });
 
-test("a case variant of a policy file is still policy", () => {
-  const dir = workspace();
-  const oid = execFileSync("git", ["-C", dir, "hash-object", "-w", "--stdin"], {
-    encoding: "utf8",
-    input: ciphertext().toString("latin1"),
-  }).trim();
-  git(dir, "update-index", "--add", "--cacheinfo", "100644", oid, "memory/private/Workspace.json");
-  assert.deepEqual(errors(dir), [
-    "protected path must not cover Git or workspace policy: memory/private/Workspace.json",
+test("root policy files are protected by path, nested namesakes are content", () => {
+  // Only the root `workspace.json` binds this contract, so a nested file of the
+  // same name is ordinary protected content.
+  const nested = workspace();
+  put(nested, "memory/private/workspace.json", ciphertext());
+  git(nested, "add", "-A");
+  assert.deepEqual(errors(nested), []);
+
+  // At the root, including its case variants, it is policy that must stay
+  // readable — encrypting it would leave a clone unable to load the contract.
+  const dir = mkdtempSync(join(tmpdir(), "confidential-rootpolicy-"));
+  const config: ConfidentialConfig = { provider: "git-crypt", paths: ["*.json"] };
+  git(dir, "init", "-q");
+  writeFileSync(join(dir, "workspace.json"), JSON.stringify({ confidential: config }));
+  writeFileSync(join(dir, ".gitattributes"), "*.json filter=git-crypt\n");
+  git(dir, "add", "-A");
+  assert.deepEqual(confidentialReport(config, dir).errors, [
+    "protected path must not cover Git or workspace policy: workspace.json",
   ]);
 });
 
