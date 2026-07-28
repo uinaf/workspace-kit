@@ -186,8 +186,10 @@ Consumers own shared machine-global skill selection and installation.
   Key-material findings verify the provider's key header, so prose that merely
   names it is not flagged; that also bounds them to git-crypt's headered key
   format, since a pre-0.4 key is raw bytes and cannot be told apart from any
-  other small binary blob offline. The check reads only object headers; it never reports
-  file content, never decrypts, and never changes state.
+  other small binary blob offline. Findings name paths only: the check keeps
+  provider headers rather than content, though finding key candidates does scan
+  indexed content inside Git and object reads are buffered whole up to an
+  internal limit. Nothing is emitted, stored, or decrypted, and no state changes.
 - **Documentation links** — when enabled, `docs links` validates relative
   destinations in tracked Markdown inline links, images, and reference
   definitions. It supports angle-bracket destinations, balanced parentheses,
