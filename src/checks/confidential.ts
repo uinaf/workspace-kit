@@ -117,12 +117,18 @@ function repository(repoRoot: string): Repository {
   // plaintext object the tree actually records.
   env.GIT_ATTR_NOSYSTEM = "1";
   env.GIT_NO_REPLACE_OBJECTS = "1";
-  const [top = "", gitDir = "", common = ""] = gitOutput(
-    repoRoot,
-    env,
-    ["rev-parse", "--show-toplevel", "--absolute-git-dir", "--git-common-dir"],
-    NOT_A_REPOSITORY,
-  )
+  // Git refusing the directory is the only answer that proves there is no
+  // repository. Git failing to run at all proves nothing, so the two must not
+  // collapse into one error.
+  const revParse = gitText(repoRoot, env, [
+    "rev-parse",
+    "--show-toplevel",
+    "--absolute-git-dir",
+    "--git-common-dir",
+  ]);
+  if (!revParse.completed) throw new Error("could not run git");
+  if (revParse.status !== 0) throw new Error(NOT_A_REPOSITORY);
+  const [top = "", gitDir = "", common = ""] = revParse.stdout
     .split("\n")
     .map((line) => line.trim());
   if (!top || !gitDir) throw new Error("could not resolve the repository root");

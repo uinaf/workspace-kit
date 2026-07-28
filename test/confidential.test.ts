@@ -501,6 +501,16 @@ test("a rejected index is not read as an absent policy either", () => {
   assert.equal(JSON.parse(result.stdout).checks.confidential, "fail");
 });
 
+test("a directory that is not a repository disables the check rather than failing", () => {
+  const dir = mkdtempSync(join(tmpdir(), "confidential-nogit-"));
+  writeFileSync(join(dir, "workspace.json"), JSON.stringify({ required: ["workspace.json"] }));
+  // Git refusing the directory proves nothing is staged; a workspace that never
+  // adopted the section must not start failing because it has no repository yet.
+  const result = kit(dir, "doctor", "--json");
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.ok(!("confidential" in JSON.parse(result.stdout).checks), result.stdout);
+});
+
 test("an unreadable staged policy is not read as an absent one", () => {
   const dir = workspace();
   writeFileSync(join(dir, "workspace.json"), "{ this is not json");
