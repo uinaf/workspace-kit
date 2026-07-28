@@ -144,6 +144,7 @@ test("an [attr] macro and a quoted pattern still count as coverage", () => {
 test("a pattern matching no tracked content fails instead of passing quietly", () => {
   const dir = mkdtempSync(join(tmpdir(), "confidential-empty-"));
   git(dir, "init", "-q");
+  writeFileSync(join(dir, "workspace.json"), JSON.stringify({ confidential: CONFIG }));
   writeFileSync(join(dir, ".gitattributes"), "memory/private/** filter=git-crypt\n");
   git(dir, "add", "-A");
   assert.deepEqual(errors(dir), ["no tracked content matches protected path: memory/private/**"]);
@@ -152,9 +153,10 @@ test("a pattern matching no tracked content fails instead of passing quietly", (
 test("uncommitted policy is reported even when the content looks encrypted", () => {
   const dir = mkdtempSync(join(tmpdir(), "confidential-untracked-"));
   git(dir, "init", "-q");
+  writeFileSync(join(dir, "workspace.json"), JSON.stringify({ confidential: CONFIG }));
   writeFileSync(join(dir, ".gitattributes"), "memory/private/** filter=git-crypt\n");
   put(dir, "memory/private/notes.md", ciphertext());
-  git(dir, "add", "memory/private/notes.md");
+  git(dir, "add", "workspace.json", "memory/private/notes.md");
   // Index-resolved attributes are the trust boundary: a rule that is only in
   // the working tree protects nothing in a clone.
   assert.deepEqual(errors(dir), [
@@ -329,6 +331,10 @@ test("a named git-crypt key counts as coverage", () => {
 test("a submodule under a wildcard protected route is reported", () => {
   const dir = mkdtempSync(join(tmpdir(), "confidential-wildcard-"));
   git(dir, "init", "-q");
+  writeFileSync(
+    join(dir, "workspace.json"),
+    JSON.stringify({ confidential: { provider: "git-crypt", paths: ["teams/*/private/**"] } }),
+  );
   writeFileSync(join(dir, ".gitattributes"), "teams/*/private/** filter=git-crypt\n");
   put(dir, "teams/beta/private/notes.md", ciphertext());
   git(dir, "add", "-A");
@@ -343,6 +349,10 @@ test("a submodule under a wildcard protected route is reported", () => {
 test("a submodule below a globstar protected route is reported", () => {
   const dir = mkdtempSync(join(tmpdir(), "confidential-globstar-"));
   git(dir, "init", "-q");
+  writeFileSync(
+    join(dir, "workspace.json"),
+    JSON.stringify({ confidential: { provider: "git-crypt", paths: ["teams/**/private/**"] } }),
+  );
   writeFileSync(join(dir, ".gitattributes"), "teams/**/private/** filter=git-crypt\n");
   put(dir, "teams/beta/private/notes.md", ciphertext());
   git(dir, "add", "-A");
@@ -434,6 +444,41 @@ test("an absent section makes the explicit command a configuration error", () =>
   assert.match(result.stderr, /workspace\.json has no confidential section/);
   assert.equal(kit(dir, "confidential").status, 2);
   assert.equal(kit(dir, "confidential", "check", "--json").status, 2);
+});
+
+test("an untracked or aliased policy file is not a committed policy", () => {
+  const dir = workspace();
+  git(dir, "rm", "-q", "--cached", "workspace.json");
+  assert.deepEqual(errors(dir), [
+    "workspace.json is not tracked: the confidential policy is not committed",
+  ]);
+
+  // A case alias can be the real configuration on one filesystem and a decoy on
+  // another, so it is reported instead of being read as the binding policy.
+  const oid = execFileSync("git", ["-C", dir, "hash-object", "-w", "--stdin"], {
+    encoding: "utf8",
+    input: JSON.stringify({ confidential: CONFIG }),
+  }).trim();
+  git(dir, "update-index", "--add", "--cacheinfo", "100644", oid, "Workspace.json");
+  assert.deepEqual(errors(dir), [
+    "workspace.json has a tracked case alias: Workspace.json",
+    "workspace.json is not tracked: the confidential policy is not committed",
+  ]);
+});
+
+test("an unreadable staged policy is not read as an absent one", () => {
+  const dir = workspace();
+  writeFileSync(join(dir, "workspace.json"), "{ this is not json");
+  git(dir, "add", "workspace.json");
+  // The working tree is restored to a valid config with no section, so only the
+  // index could show whether this commit declares a policy — and it cannot.
+  writeFileSync(join(dir, "workspace.json"), JSON.stringify({ required: [".gitattributes"] }));
+  const result = kit(dir, "doctor", "--json");
+  assert.equal(result.status, 1, result.stdout);
+  const parsed = JSON.parse(result.stdout);
+  assert.equal(parsed.checks.confidential, "fail");
+  assert.ok(parsed.errors.includes("workspace.json in the index could not be read"), result.stdout);
+  assert.match(kit(dir, "confidential", "check").stderr, /in the index could not be read/);
 });
 
 test("full git-crypt framing is required, not just the magic", () => {

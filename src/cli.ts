@@ -279,7 +279,8 @@ function doctorReport(config: WorkspaceConfig): DoctorReport {
   // Activation follows the index as well as the working tree: dropping the
   // section from an unstaged edit must not switch the gate off for a commit
   // whose own configuration still declares a policy.
-  const confidential = config.confidential ?? indexedConfidentialPolicy();
+  const staged = config.confidential ? undefined : indexedConfidentialPolicy();
+  const confidential = config.confidential ?? staged?.policy;
   if (confidential) {
     const result = confidentialReport(confidential);
     if (result.errors.length > 0) {
@@ -290,6 +291,12 @@ function doctorReport(config: WorkspaceConfig): DoctorReport {
       stdout(confidentialSummary(confidential, result));
       checks.confidential = "ok";
     }
+  } else if (staged?.unreadable) {
+    // Absence must be proven, not assumed: an unreadable staged configuration
+    // cannot show that this commit declares no confidential policy.
+    stderr([`${CONFIG_FILE} in the index could not be read`]);
+    bad.push("confidential check failed (exit 1)");
+    checks.confidential = "fail";
   }
 
   // Soft limits are warnings by design: printed, counted, never fatal.
@@ -609,10 +616,9 @@ function main(): void {
     const [mode, ...args] = rest;
     if (mode !== "check" || args.length > 0) usageExit();
     const config = loadConfigOrFail();
-    const confidential = requireSection(
-      config.confidential ?? indexedConfidentialPolicy(),
-      "confidential",
-    );
+    const staged = config.confidential ? undefined : indexedConfidentialPolicy();
+    if (staged?.unreadable) failWith(`${CONFIG_FILE} in the index could not be read`);
+    const confidential = requireSection(config.confidential ?? staged?.policy, "confidential");
     const result = confidentialReport(confidential);
     if (result.errors.length > 0) {
       console.error(result.errors.join("\n"));

@@ -202,22 +202,46 @@ function samePolicy(a: ConfidentialConfig, b: ConfidentialConfig): boolean {
   );
 }
 
+// Only the exact path binds. A case alias such as `Workspace.json` can be the
+// real configuration on one filesystem and a decoy on another, so it is
+// reported rather than read.
 function stagedConfigEntry(tracked: readonly IndexEntry[]): IndexEntry | undefined {
+  return tracked.find((entry) => entry.path === CONFIG_FILE && entry.mode.startsWith("100"));
+}
+
+function stagedConfigAliases(tracked: readonly IndexEntry[]): string[] {
   const wanted = portablePathIdentity(CONFIG_FILE);
-  return tracked.find((entry) => portablePathIdentity(entry.path) === wanted);
+  return tracked
+    .filter((entry) => entry.path !== CONFIG_FILE && portablePathIdentity(entry.path) === wanted)
+    .map((entry) => entry.path);
 }
 
 // The commit carries its own policy, so a workspace whose working-tree config
 // has dropped the section is still bound by the declaration in its index: the
 // alternative lets an unstaged config edit switch the gate off for a partial
-// commit. Absent from both is genuinely disabled.
-export function indexedConfidentialPolicy(repoRoot = "."): ConfidentialConfig | undefined {
+// commit. Absent from both is genuinely disabled — but "could not tell" is not
+// absence, so an unreadable staged config is reported separately.
+export type IndexedPolicy = { policy: ConfidentialConfig | undefined; unreadable: boolean };
+
+export function indexedConfidentialPolicy(repoRoot = "."): IndexedPolicy {
+  let repo: Repository;
+  let entry: IndexEntry | undefined;
   try {
-    const repo = repository(repoRoot);
-    const entry = stagedConfigEntry(indexEntries(repo).filter((item) => item.stage === "0"));
-    return entry ? stagedPolicy(repo, entry.oid) : undefined;
+    repo = repository(repoRoot);
+    entry = stagedConfigEntry(indexEntries(repo).filter((item) => item.stage === "0"));
   } catch {
-    return undefined; // No repository or no readable index: nothing is staged.
+    return { policy: undefined, unreadable: false }; // No repository or index.
+  }
+  if (!entry) return { policy: undefined, unreadable: false };
+  const result = gitText(repo.root, repo.env, ["cat-file", "blob", entry.oid]);
+  if (!result.completed || result.status !== 0) return { policy: undefined, unreadable: true };
+  try {
+    return {
+      policy: parseWorkspaceConfig(JSON.parse(result.stdout)).confidential,
+      unreadable: false,
+    };
+  } catch {
+    return { policy: undefined, unreadable: true };
   }
 }
 
@@ -393,8 +417,13 @@ function report(config: ConfidentialConfig, repoRoot: string): ConfidentialRepor
   if (localAttributeOverride(repo)) {
     errors.push("attribute policy comes from an untracked source: info/attributes");
   }
+  for (const alias of stagedConfigAliases(tracked)) {
+    errors.push(`${CONFIG_FILE} has a tracked case alias: ${alias}`);
+  }
   const stagedConfig = stagedConfigEntry(tracked);
-  if (stagedConfig) {
+  if (!stagedConfig) {
+    errors.push(`${CONFIG_FILE} is not tracked: the confidential policy is not committed`);
+  } else {
     const staged = stagedPolicy(repo, stagedConfig.oid);
     if (staged === undefined || !samePolicy(staged, config)) {
       errors.push(`${CONFIG_FILE} declares a different confidential policy than the one checked`);
