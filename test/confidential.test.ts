@@ -676,3 +676,50 @@ test("confidential behavior remains default-off", () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("confidential behavior stays default-off when Git discovery fails", () => {
+  const dir = mkdtempSync(join(tmpdir(), "workspace-confidential-default-off-"));
+  try {
+    mkdirSync(join(dir, ".git"));
+    writeFileSync(join(dir, "workspace.json"), `${JSON.stringify(config(false), null, 2)}\n`);
+
+    assert.deepEqual(check(dir), { enabled: false, errors: [] });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("confidential behavior fails closed on operational Git errors in a repository", () => {
+  const dir = fixture();
+  const previousPath = process.env.PATH;
+  try {
+    writeFileSync(join(dir, "workspace.json"), `${JSON.stringify(config(false), null, 2)}\n`);
+    process.env.PATH = "/workspace-kit-missing-git";
+
+    const result = check(dir);
+    assert.equal(result.enabled, true);
+    assert.match(result.errors.join("\n"), /ENOENT|could not inspect the Git repository/);
+  } finally {
+    if (previousPath === undefined) delete process.env.PATH;
+    else process.env.PATH = previousPath;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("confidential behavior fails closed when Git metadata is unreadable", () => {
+  const dir = mkdtempSync(join(tmpdir(), "workspace-confidential-unreadable-"));
+  const dotGit = join(dir, ".git");
+  try {
+    mkdirSync(dotGit);
+    writeFileSync(join(dotGit, "HEAD"), "ref: refs/heads/main\n");
+    writeFileSync(join(dir, "workspace.json"), `${JSON.stringify(config(false), null, 2)}\n`);
+    chmodSync(dotGit, 0);
+
+    const result = check(dir);
+    assert.equal(result.enabled, true);
+    assert.match(result.errors.join("\n"), /Git repository|not a git repository/i);
+  } finally {
+    chmodSync(dotGit, 0o755);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

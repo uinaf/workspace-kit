@@ -1,5 +1,13 @@
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, isAbsolute, join, resolve } from "node:path";
 import {
@@ -307,6 +315,31 @@ function displayPath(path: string): string {
   return JSON.stringify(path);
 }
 
+function gitRepositoryMetadataState(repoRoot: string): "absent" | "present" | "unreadable" {
+  const dotGit = join(repoRoot, ".git");
+  let metadata: ReturnType<typeof statSync>;
+  try {
+    metadata = statSync(dotGit);
+  } catch (error) {
+    return error instanceof Error && "code" in error && error.code === "ENOENT"
+      ? "absent"
+      : "unreadable";
+  }
+  if (metadata.isDirectory()) {
+    try {
+      return readdirSync(dotGit).length === 0 ? "absent" : "present";
+    } catch {
+      return "unreadable";
+    }
+  }
+  if (!metadata.isFile()) return "absent";
+  try {
+    return /^gitdir: (.+)$/m.test(readFileSync(dotGit, "utf8")) ? "present" : "absent";
+  } catch {
+    return "unreadable";
+  }
+}
+
 function stagedPolicyErrors(
   repoRoot: string,
   entries: readonly IndexEntry[],
@@ -472,7 +505,9 @@ export function confidentialCheck(
   if (!current.confidential) {
     const prefix = git(repoRoot, ["rev-parse", "--show-prefix"]);
     if (prefix.status !== 0) {
-      if (!existsSync(join(repoRoot, ".git"))) return { enabled: false, errors: [] };
+      if (gitRepositoryMetadataState(repoRoot) === "absent") {
+        return { enabled: false, errors: [] };
+      }
       return {
         enabled: true,
         errors: [gitFailure(prefix, "could not inspect the Git repository")],
