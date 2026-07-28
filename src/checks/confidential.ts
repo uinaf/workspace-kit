@@ -31,6 +31,10 @@ export type ConfidentialReport = {
   // staged edit, removal, or deletion is in flight, so the worktree copy's
   // problems must not mask the staged state.
   staged: boolean;
+  // The effective config's minVersion, resolved with the same
+  // staged-governs semantics as the section, so the standalone command can
+  // apply the CLI's standard version gate.
+  minVersion?: string | undefined;
 };
 
 type IndexEntry = { mode: string; sha: string; path: string };
@@ -705,9 +709,10 @@ function filterAttributes(repoRoot: string, paths: string[]): Map<string, string
 
 export function confidentialReport(
   repoRoot: string,
-  section: ConfidentialConfig | undefined,
+  worktree: { section?: ConfidentialConfig | undefined; minVersion?: string | undefined } = {},
 ): ConfidentialReport {
   const errors: string[] = [];
+  const section = worktree.section;
   // With no worktree section and an unreadable index (not a git repository),
   // nothing is declared anywhere and the gate stays inert. A declared section
   // with an unreadable index still fails closed below.
@@ -722,6 +727,7 @@ export function confidentialReport(
         state: `no confidential section in ${CONFIG_FILE}`,
         active: false,
         staged: false,
+        minVersion: worktree.minVersion,
       };
     }
     throw error;
@@ -742,6 +748,7 @@ export function confidentialReport(
   // a steady tracked config is just the workspace's ordinary declaration.
   const declarationInFlight = stagedConfigEntry?.sha !== headConfigSha;
   let config = configDeleted ? undefined : section;
+  let minVersion = configDeleted ? undefined : worktree.minVersion;
   let warnings: string[] = [];
   if (stagedConfigEntry) {
     const stagedText = fullBlobText(
@@ -752,7 +759,9 @@ export function confidentialReport(
     );
     try {
       const stagedRaw: unknown = JSON.parse(stagedText);
-      config = parseWorkspaceConfig(stagedRaw).confidential;
+      const stagedConfig = parseWorkspaceConfig(stagedRaw);
+      config = stagedConfig.confidential;
+      minVersion = stagedConfig.minVersion;
       warnings = unknownConfigKeys(stagedRaw).map(
         (key) =>
           `warning: staged ${CONFIG_FILE} has unrecognized key ${JSON.stringify(key)} (ignored by this kit version)`,
@@ -790,6 +799,7 @@ export function confidentialReport(
           : `no confidential section in ${CONFIG_FILE}`,
       active: false,
       staged: standDown,
+      minVersion,
     };
   }
 
@@ -836,6 +846,11 @@ export function confidentialReport(
     }
   }
 
+  if (config.provider === "git-crypt") {
+    // Local-only git-crypt policy is audited even with zero currently
+    // matching files: it is latent fail-open for the next staged match.
+    errors.push(...localOnlyAttributeErrors(repoRoot, entries));
+  }
   if (config.provider === "git-crypt" && protectedEntries.length > 0) {
     // Coverage is resolved from the staged attribute policy and proven
     // versioned by construction: local-only sources are screened for git-crypt
@@ -850,7 +865,6 @@ export function confidentialReport(
         errors.push(`missing git-crypt filter attribute: ${displayPath(entry.path)}`);
       }
     }
-    errors.push(...localOnlyAttributeErrors(repoRoot, entries));
   }
 
   const protectedPaths = new Set(protectedEntries.map((entry) => entry.path));
@@ -890,5 +904,6 @@ export function confidentialReport(
     state,
     active: true,
     staged: declarationInFlight,
+    minVersion,
   };
 }

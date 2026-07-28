@@ -96,6 +96,22 @@ test("git-crypt rejects staged plaintext under a protected path", () => {
   assert.match(result.stderr, /plaintext staged in protected path: "memory\/private\/draft\.md/);
 });
 
+test("confidential check enforces minVersion from the effective config", () => {
+  const dir = workspace("age");
+  write(
+    dir,
+    "workspace.json",
+    `${JSON.stringify({
+      minVersion: "999.0.0",
+      confidential: { provider: "age", paths: ["memory/private/**"] },
+    })}\n`,
+  );
+  commitAll(dir);
+  const result = kit(dir, "confidential", "check");
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /workspace\.json requires workspace-kit >= 999\.0\.0/);
+});
+
 test("diagnostics quote contributor-controlled paths", () => {
   const dir = workspace("git-crypt");
   write(dir, ".gitattributes", "memory/** filter=git-crypt diff=git-crypt\n");
@@ -271,6 +287,16 @@ test("git-crypt accepts named-key filter spellings in versioned policy", () => {
 
   const result = kit(dir, "confidential", "check");
   assert.equal(result.status, 0, result.stderr);
+});
+
+test("git-crypt audits local-only policy even with no matching protected files", () => {
+  const dir = workspace("git-crypt");
+  commitAll(dir);
+  writeFileSync(join(dir, ".git", "info", "attributes"), "anything filter=git-crypt\n");
+  const result = kit(dir, "confidential", "check");
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /local-only git attributes assign git-crypt filters/);
+  assert.match(result.stderr, /\.git\/info\/attributes/);
 });
 
 test("git-crypt tolerates unrelated local attribute rules and scans core.attributesFile", () => {

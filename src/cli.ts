@@ -250,7 +250,7 @@ function doctorReport(config: WorkspaceConfig): DoctorReport {
 
   const confidentialWarnings: string[] = [];
   try {
-    const report = confidentialReport(".", config.confidential);
+    const report = confidentialReport(".", { section: config.confidential });
     confidentialWarnings.push(...report.warnings);
     if (report.active) {
       if (report.errors.length > 0) {
@@ -668,16 +668,27 @@ function main(): void {
     // only the adoption fallback for an untracked workspace.json, and a
     // missing or unstaged-broken worktree copy must not mask a valid staged
     // one.
-    let worktreeSection: ConfidentialConfig | undefined;
+    let worktreeConfig: {
+      section?: ConfidentialConfig | undefined;
+      minVersion?: string | undefined;
+    } = {};
     let worktreeConfigError: string | undefined;
     try {
-      worktreeSection = parseWorkspaceConfig(readRawConfig()).confidential;
+      const parsed = parseWorkspaceConfig(readRawConfig());
+      worktreeConfig = { section: parsed.confidential, minVersion: parsed.minVersion };
     } catch (error) {
       worktreeConfigError = error instanceof Error ? error.message : String(error);
     }
     try {
-      const report = confidentialReport(".", worktreeSection);
+      const report = confidentialReport(".", worktreeConfig);
       if (report.warnings.length > 0) console.error(report.warnings.join("\n"));
+      // The standard version gate applies to the effective (staged-governs)
+      // config, like every other command.
+      if (report.minVersion && compareVersions(kitVersion(), report.minVersion) < 0) {
+        failWith(
+          `${CONFIG_FILE} requires workspace-kit >= ${report.minVersion} (running ${kitVersion()})`,
+        );
+      }
       if (!report.active && !report.staged) {
         // Nothing declared the contract and no section drop is in flight:
         // an unstaged adoption edit does not count, so an explicitly
