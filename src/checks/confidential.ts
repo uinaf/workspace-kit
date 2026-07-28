@@ -262,7 +262,10 @@ export function indexedConfidentialPolicy(repoRoot = "."): IndexedPolicy {
   const probe = gitText(repo.root, repo.env, ["cat-file", "--batch-check"], `:${CONFIG_FILE}\n`);
   if (!probe.completed || probe.status !== 0) return { policy: undefined, unreadable: true };
   const [oid, type] = probe.stdout.trim().split(" ");
-  if (!oid || type !== "blob") return { policy: undefined, unreadable: false };
+  // `missing` is the only answer that means no staged configuration. A gitlink
+  // there reports `submodule`, and reading that as absence would skip the gate.
+  if (type === "missing") return { policy: undefined, unreadable: false };
+  if (!oid || type !== "blob") return { policy: undefined, unreadable: true };
 
   const result = gitText(repo.root, repo.env, ["cat-file", "blob", oid]);
   if (!result.completed || result.status !== 0) return { policy: undefined, unreadable: true };
@@ -397,6 +400,22 @@ function keyMaterialCandidates({ root, env }: Repository): Set<string> {
   return new Set(result.stdout.split("\0").filter(Boolean));
 }
 
+// Git treats a `**` path segment as zero or more directories, so `a/**/b` covers
+// `a/b` as well as `a/x/b`. Enumerating the variants where such a segment is
+// absent keeps that semantic here without teaching the shared glob translation a
+// second dialect. A trailing `**` is not omissible: it requires content inside.
+function patternVariants(pattern: string): string[] {
+  const segments = pattern.split("/");
+  let variants: string[][] = [[]];
+  segments.forEach((segment, index) => {
+    variants =
+      segment === "**" && index < segments.length - 1
+        ? variants.flatMap((prefix) => [[...prefix, segment], prefix])
+        : variants.map((prefix) => [...prefix, segment]);
+  });
+  return [...new Set(variants.map((parts) => parts.join("/")).filter(Boolean))];
+}
+
 // Whether a directory could sit on a route a pattern matches, i.e. whether
 // `<directory>/…` can still satisfy the pattern. Used to spot a submodule
 // mounted above a protected root. `**` consumes any number of segments, so this
@@ -430,21 +449,23 @@ function report(config: ConfidentialConfig, repoRoot: string): ConfidentialRepor
   // differs from a declared pattern only by spelling is treated as protected,
   // so a case-insensitive author and a case-sensitive collaborator cannot
   // disagree about what is covered.
-  const patterns = config.paths.map((path) => ({
-    path,
-    identity: portablePathIdentity(path),
-    regex: globToRegExp(portablePathIdentity(path)),
-  }));
+  const patterns = config.paths.map((path) => {
+    const variants = patternVariants(path).map(portablePathIdentity);
+    return { path, variants, regexes: variants.map((variant) => globToRegExp(variant)) };
+  });
+  const matches = (pattern: (typeof patterns)[number], identity: string): boolean =>
+    pattern.regexes.some((regex) => regex.test(identity));
   const declares = (path: string): boolean => {
     const identity = portablePathIdentity(path);
-    return patterns.some((pattern) => pattern.regex.test(identity));
+    return patterns.some((pattern) => matches(pattern, identity));
   };
 
   const tracked = entries.filter((entry) => entry.stage === "0");
   const unmerged = [...new Set(entries.filter((e) => e.stage !== "0").map((e) => e.path))].sort();
   const protectedEntries = tracked
     .filter((entry) => declares(entry.path))
-    .sort((a, b) => a.path.localeCompare(b.path));
+    // Ordering must not depend on the host locale, so compare code units.
+    .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
   const protectedPaths = new Set(protectedEntries.map((entry) => entry.path));
 
   if (!tracked.some((entry) => basename(entry.path) === ".gitattributes")) {
@@ -470,7 +491,7 @@ function report(config: ConfidentialConfig, repoRoot: string): ConfidentialRepor
   // meaningless, so it fails rather than passing quietly.
   for (const pattern of patterns) {
     const covered = [...protectedPaths, ...unmerged].some((path) =>
-      pattern.regex.test(portablePathIdentity(path)),
+      matches(pattern, portablePathIdentity(path)),
     );
     if (!covered) errors.push(`no tracked content matches protected path: ${pattern.path}`);
   }
@@ -482,7 +503,10 @@ function report(config: ConfidentialConfig, repoRoot: string): ConfidentialRepor
     // path that is not a regular file.
     if (entry.mode !== "160000" || protectedPaths.has(entry.path)) continue;
     const identity = portablePathIdentity(entry.path);
-    if (patterns.some((pattern) => couldContain(pattern.identity, identity))) {
+    const reaches = patterns.some((pattern) =>
+      pattern.variants.some((variant) => couldContain(variant, identity)),
+    );
+    if (reaches) {
       errors.push(`protected content is inside a tracked submodule: ${entry.path}`);
     }
   }

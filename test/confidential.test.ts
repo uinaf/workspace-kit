@@ -501,6 +501,36 @@ test("a rejected index is not read as an absent policy either", () => {
   assert.equal(JSON.parse(result.stdout).checks.confidential, "fail");
 });
 
+test("a globstar segment covers zero directories, as Git treats it", () => {
+  const dir = mkdtempSync(join(tmpdir(), "confidential-zerodir-"));
+  const config: ConfidentialConfig = { provider: "git-crypt", paths: ["memory/**/private/**"] };
+  git(dir, "init", "-q");
+  writeFileSync(join(dir, "workspace.json"), JSON.stringify({ confidential: config }));
+  writeFileSync(join(dir, ".gitattributes"), "memory/**/private/** filter=git-crypt\n");
+  // Git applies the filter to both, so both must count as declared.
+  put(dir, "memory/private/direct.md", ciphertext());
+  put(dir, "memory/nested/private/deep.md", ciphertext());
+  git(dir, "add", "-A");
+  assert.deepEqual(confidentialReport(config, dir).errors, []);
+
+  put(dir, "memory/private/leak.md", "plaintext\n");
+  git(dir, "add", "-A");
+  assert.deepEqual(confidentialReport(config, dir).errors, [
+    "protected path is staged as plaintext: memory/private/leak.md",
+  ]);
+});
+
+test("a staged gitlink at the config path is unreadable, not absent", () => {
+  const dir = workspace();
+  writeFileSync(join(dir, "workspace.json"), JSON.stringify({ required: [".gitattributes"] }));
+  git(dir, "rm", "-q", "-f", "--cached", "workspace.json");
+  // `cat-file --batch-check` answers `submodule` here, which is not `missing`.
+  git(dir, "update-index", "--add", "--cacheinfo", "160000", "1".repeat(40), "workspace.json");
+  const result = kit(dir, "doctor", "--json");
+  assert.equal(result.status, 1, result.stdout);
+  assert.equal(JSON.parse(result.stdout).checks.confidential, "fail");
+});
+
 test("a directory that is not a repository disables the check rather than failing", () => {
   const dir = mkdtempSync(join(tmpdir(), "confidential-nogit-"));
   writeFileSync(join(dir, "workspace.json"), JSON.stringify({ required: ["workspace.json"] }));
