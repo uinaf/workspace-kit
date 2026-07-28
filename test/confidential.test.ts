@@ -259,6 +259,17 @@ test("policy from an untracked info/attributes is not accepted as coverage", () 
   assert.deepEqual(errors(dir), []);
 });
 
+test("an untracked local rule is found when run from a subdirectory too", () => {
+  const dir = workspace();
+  put(dir, ".git/info/attributes", "memory/private/** filter=git-crypt\n");
+  mkdirSync(join(dir, "docs"), { recursive: true });
+  // `--git-common-dir` answers relatively to the directory git ran in, so
+  // resolving it anywhere else inspects a sibling `.git` and finds nothing.
+  assert.deepEqual(confidentialReport(CONFIG, join(dir, "docs")).errors, [
+    "attribute policy comes from an untracked source: info/attributes",
+  ]);
+});
+
 test("policy from the user's global attributes file is not accepted as coverage", () => {
   const dir = workspace({ attributes: "unrelated.txt text\n" });
   const globalAttributes = join(dir, "global-attributes");

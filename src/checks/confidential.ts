@@ -132,7 +132,10 @@ function repository(repoRoot: string): Repository {
     }
     env.GIT_INDEX_FILE = indexFile;
   }
-  return { root, commonDir: resolve(root, common), env };
+  // `--git-common-dir` can be relative, and it is relative to the directory Git
+  // ran in — `repoRoot`, not the top level. Resolving it against the top level
+  // would inspect a sibling `.git` whenever this runs from a subdirectory.
+  return { root, commonDir: resolve(repoRoot, common), env };
 }
 
 function indexEntries({ root, env }: Repository): IndexEntry[] {
