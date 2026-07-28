@@ -267,6 +267,58 @@ test("policy from the user's global attributes file is not accepted as coverage"
   ]);
 });
 
+test("a local replacement ref cannot stand in for the indexed object", () => {
+  const dir = workspace();
+  put(dir, "memory/private/leak.md", "plaintext\n");
+  git(dir, "add", "-A");
+  const plaintext = git(dir, "rev-parse", ":memory/private/leak.md").trim();
+  const decoy = execFileSync("git", ["-C", dir, "hash-object", "-w", "--stdin"], {
+    encoding: "utf8",
+    input: ciphertext().toString("latin1"),
+  }).trim();
+  // Replacement refs are local and are not pushed, so honouring one would pass
+  // a commit whose tree still records the plaintext object.
+  git(dir, "update-ref", `refs/replace/${plaintext}`, decoy);
+  assert.deepEqual(errors(dir), ["protected path is staged as plaintext: memory/private/leak.md"]);
+});
+
+test("the policy being enforced must be the policy being committed", () => {
+  const dir = workspace();
+  put(dir, "memory/private/leak.md", "plaintext\n");
+  git(dir, "add", "-A");
+  // Narrowing the policy in the working tree only: the commit would still carry
+  // the broad declaration, so the narrow one must not be what gets enforced.
+  const narrowed: ConfidentialConfig = { provider: "git-crypt", paths: ["nothing/**"] };
+  writeFileSync(join(dir, "workspace.json"), JSON.stringify({ confidential: narrowed }));
+  assert.deepEqual(confidentialReport(narrowed, dir).errors, [
+    "workspace.json declares a different confidential policy than the one checked",
+    "no tracked content matches protected path: nothing/**",
+    // Inverse coverage keeps the abandoned paths visible rather than silent.
+    "git-crypt covers an undeclared path: memory/private/leak.md",
+    "git-crypt covers an undeclared path: memory/private/notes.md",
+  ]);
+  // Staging the narrowed policy makes the declaration and the commit agree; the
+  // content it abandoned is still reported.
+  git(dir, "add", "workspace.json");
+  assert.deepEqual(confidentialReport(narrowed, dir).errors, [
+    "no tracked content matches protected path: nothing/**",
+    "git-crypt covers an undeclared path: memory/private/leak.md",
+    "git-crypt covers an undeclared path: memory/private/notes.md",
+  ]);
+});
+
+test("a case variant of a policy file is still policy", () => {
+  const dir = workspace();
+  const oid = execFileSync("git", ["-C", dir, "hash-object", "-w", "--stdin"], {
+    encoding: "utf8",
+    input: ciphertext().toString("latin1"),
+  }).trim();
+  git(dir, "update-index", "--add", "--cacheinfo", "100644", oid, "memory/private/Workspace.json");
+  assert.deepEqual(errors(dir), [
+    "protected path must not cover Git or workspace policy: memory/private/Workspace.json",
+  ]);
+});
+
 test("a named git-crypt key counts as coverage", () => {
   const dir = workspace({
     attributes: "memory/private/** filter=git-crypt-personal diff=git-crypt-personal\n",
@@ -285,6 +337,22 @@ test("a submodule under a wildcard protected route is reported", () => {
   const config: ConfidentialConfig = { provider: "git-crypt", paths: ["teams/*/private/**"] };
   assert.deepEqual(confidentialReport(config, dir).errors, [
     "protected content is inside a tracked submodule: teams/acme",
+  ]);
+});
+
+test("a submodule below a globstar protected route is reported", () => {
+  const dir = mkdtempSync(join(tmpdir(), "confidential-globstar-"));
+  git(dir, "init", "-q");
+  writeFileSync(join(dir, ".gitattributes"), "teams/**/private/** filter=git-crypt\n");
+  put(dir, "teams/beta/private/notes.md", ciphertext());
+  git(dir, "add", "-A");
+  // A globstar consumes a variable number of segments, so the mount point can
+  // sit deeper than the pattern has segments.
+  git(dir, "update-index", "--add", "--cacheinfo", "160000", "1".repeat(40), "teams/acme/service");
+
+  const config: ConfidentialConfig = { provider: "git-crypt", paths: ["teams/**/private/**"] };
+  assert.deepEqual(confidentialReport(config, dir).errors, [
+    "protected content is inside a tracked submodule: teams/acme/service",
   ]);
 });
 

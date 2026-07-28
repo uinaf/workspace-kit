@@ -177,7 +177,9 @@ Consumers own shared machine-global skill selection and installation.
   policy, when a declared pattern matches nothing, when git-crypt covers a path
   the workspace never declared, when a protected entry is a symlink, submodule,
   or unmerged, when a declared pattern would encrypt Git or workspace policy
-  files, and when git-crypt key material is tracked anywhere in the index.
+  files, when the indexed `workspace.json` declares a different confidential
+  policy than the one being checked, and when git-crypt key material is tracked
+  anywhere in the index.
   Key-material findings verify the provider's key header, so prose that merely
   names it is not flagged. The check reads only object headers; it never reports
   file content, never decrypts, and never changes state.

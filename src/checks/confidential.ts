@@ -12,7 +12,12 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve, sep } from "node:path";
-import { portablePathIdentity, type ConfidentialConfig } from "../config.ts";
+import {
+  CONFIG_FILE,
+  parseWorkspaceConfig,
+  portablePathIdentity,
+  type ConfidentialConfig,
+} from "../config.ts";
 import { gitEnvironmentForRepository } from "../lib/gitProcess.ts";
 import { globToRegExp } from "./limits.ts";
 
@@ -27,8 +32,12 @@ const BATCH_BUDGET = 8 * 1024 * 1024;
 // An object above this is read on its own with a bounded buffer, so a large
 // protected archive costs a header read rather than its own size in memory.
 const BATCH_OBJECT_LIMIT = 1024 * 1024;
-// Encrypting the files that define policy silently disables that policy.
-const POLICY_BASENAMES = new Set([".gitattributes", ".gitignore", ".gitmodules", "workspace.json"]);
+// Encrypting the files that define policy silently disables that policy. Names
+// are folded like every other path comparison here, so a case variant that is
+// the real policy file on a case-insensitive checkout cannot slip through.
+const POLICY_BASENAMES = new Set(
+  [".gitattributes", ".gitignore", ".gitmodules", CONFIG_FILE].map(portablePathIdentity),
+);
 // `git-crypt init -k <name>` installs a per-key filter, so coverage is the
 // default filter or one of that namespace.
 const PROVIDER_FILTER = /^git-crypt(-[A-Za-z0-9._-]+)?$/;
@@ -89,8 +98,11 @@ type Repository = { root: string; commonDir: string; env: NodeJS.ProcessEnv };
 // inherited index only when it belongs to this repository.
 function repository(repoRoot: string): Repository {
   const env = gitEnvironmentForRepository();
-  // Attribute rules from outside the repository are not part of any clone.
+  // Attribute rules from outside the repository are not part of any clone, and
+  // a local replacement ref could otherwise substitute ciphertext for the
+  // plaintext object the tree actually records.
   env.GIT_ATTR_NOSYSTEM = "1";
+  env.GIT_NO_REPLACE_OBJECTS = "1";
   const [top = "", gitDir = "", common = ""] = gitOutput(
     repoRoot,
     env,
@@ -166,6 +178,25 @@ function localAttributeOverride({ commonDir }: Repository): boolean {
   return content
     .split("\n")
     .some((line) => line.trim().length > 0 && !line.trimStart().startsWith("#"));
+}
+
+// The commit carries its own policy, so the declaration being enforced must be
+// the declaration being committed. An unstaged edit that narrows `paths` would
+// otherwise let a partial commit pass against a policy the commit does not have.
+function stagedPolicyMismatch(repo: Repository, config: ConfidentialConfig, oid: string): boolean {
+  const result = gitText(repo.root, repo.env, ["cat-file", "blob", oid]);
+  if (!result.completed || result.status !== 0) return true;
+  try {
+    const staged = parseWorkspaceConfig(JSON.parse(result.stdout)).confidential;
+    return (
+      staged === undefined ||
+      staged.provider !== config.provider ||
+      staged.paths.length !== config.paths.length ||
+      staged.paths.some((path, index) => path !== config.paths[index])
+    );
+  } catch {
+    return true;
+  }
 }
 
 function objectSizes({ root, env }: Repository, oids: string[]): Map<string, number> {
@@ -284,14 +315,28 @@ function keyMaterialCandidates({ root, env }: Repository): Set<string> {
   return new Set(result.stdout.split("\0").filter(Boolean));
 }
 
-// Whether a directory could sit on a route a pattern matches — the pattern
-// truncated to that directory's depth still matching it. Used to spot a
-// submodule mounted at or above a protected root, including under a wildcard.
+// Whether a directory could sit on a route a pattern matches, i.e. whether
+// `<directory>/…` can still satisfy the pattern. Used to spot a submodule
+// mounted above a protected root. `**` consumes any number of segments, so this
+// walks the pattern rather than slicing it to a fixed depth.
 function couldContain(pattern: string, directory: string): boolean {
   const segments = pattern.split("/");
-  const depth = directory.split("/").length;
-  const head = segments.slice(0, depth).join("/");
-  return globToRegExp(head).test(directory) && (depth < segments.length || head !== pattern);
+  const parts = directory.split("/");
+  const walk = (index: number, part: number): boolean => {
+    if (part === parts.length) return index < segments.length;
+    if (index === segments.length) return false;
+    if (segments[index] === "**") {
+      // A globstar can absorb any remaining directory segments, and a trailing
+      // one keeps matching content deeper than the directory itself.
+      for (let skip = part; skip <= parts.length; skip += 1) {
+        if (walk(index + 1, skip)) return true;
+      }
+      return true;
+    }
+    if (!globToRegExp(segments[index]!).test(parts[part]!)) return false;
+    return walk(index + 1, part + 1);
+  };
+  return walk(0, 0);
 }
 
 function report(config: ConfidentialConfig, repoRoot: string): ConfidentialReport {
@@ -325,6 +370,12 @@ function report(config: ConfidentialConfig, repoRoot: string): ConfidentialRepor
   }
   if (localAttributeOverride(repo)) {
     errors.push("attribute policy comes from an untracked source: info/attributes");
+  }
+  const stagedConfig = tracked.find(
+    (entry) => portablePathIdentity(entry.path) === portablePathIdentity(CONFIG_FILE),
+  );
+  if (stagedConfig && stagedPolicyMismatch(repo, config, stagedConfig.oid)) {
+    errors.push(`${CONFIG_FILE} declares a different confidential policy than the one checked`);
   }
 
   // A pattern that covers nothing is the failure mode that makes a green run
@@ -368,7 +419,7 @@ function report(config: ConfidentialConfig, repoRoot: string): ConfidentialRepor
   for (const entry of protectedEntries) {
     if (unmerged.includes(entry.path)) continue; // Reported with the unmerged paths.
     const header = headers.get(entry.oid);
-    if (POLICY_BASENAMES.has(basename(entry.path))) {
+    if (POLICY_BASENAMES.has(portablePathIdentity(basename(entry.path)))) {
       errors.push(`protected path must not cover Git or workspace policy: ${entry.path}`);
     } else if (!entry.mode.startsWith("100")) {
       errors.push(`protected path is not a regular file: ${entry.path}`);
