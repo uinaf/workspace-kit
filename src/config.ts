@@ -442,27 +442,42 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
     if (roots.some((root) => root.startsWith("#") || root.startsWith("!"))) {
       fail('confidential.roots must not start with "#" or "!"');
     }
+    const controlIdentities = new Set(
+      [".git", ".git-crypt", ".githooks"].map(portablePathIdentity),
+    );
     if (
       roots.some((root) =>
-        [".git", ".git-crypt", ".githooks"]
-          .map(portablePathIdentity)
-          .includes(portablePathIdentity(root.split("/")[0]!)),
+        root.split("/").some((component) => controlIdentities.has(portablePathIdentity(component))),
       )
     ) {
       fail("confidential.roots must not contain Git or hook control directories");
     }
-    const identities = roots.map(portablePathIdentity);
-    for (let index = 0; index < identities.length; index += 1) {
-      for (let previous = 0; previous < index; previous += 1) {
-        const current = identities[index]!;
-        const ancestor = identities[previous]!;
-        if (
-          current === ancestor ||
-          current.startsWith(`${ancestor}/`) ||
-          ancestor.startsWith(`${current}/`)
-        ) {
-          fail(`confidential.roots[${index}] overlaps confidential.roots[${previous}]`);
+    const identities = roots
+      .map((root, index) => ({
+        components: portablePathIdentity(root).split("/"),
+        identity: portablePathIdentity(root),
+        index,
+      }))
+      .sort((left, right) => {
+        const length = Math.min(left.components.length, right.components.length);
+        for (let index = 0; index < length; index += 1) {
+          const leftComponent = left.components[index]!;
+          const rightComponent = right.components[index]!;
+          if (leftComponent < rightComponent) return -1;
+          if (leftComponent > rightComponent) return 1;
         }
+        return left.components.length - right.components.length;
+      });
+    for (let index = 1; index < identities.length; index += 1) {
+      const ancestor = identities[index - 1]!;
+      const current = identities[index]!;
+      if (
+        current.identity === ancestor.identity ||
+        current.identity.startsWith(`${ancestor.identity}/`)
+      ) {
+        const later = Math.max(current.index, ancestor.index);
+        const earlier = Math.min(current.index, ancestor.index);
+        fail(`confidential.roots[${later}] overlaps confidential.roots[${earlier}]`);
       }
     }
     out.confidential = { provider: "git-crypt", roots };

@@ -540,15 +540,16 @@ export function confidentialCheck(
     };
   }
 
-  const roots = uniquePortablePaths([
+  const rootCandidates = [
     ...(current.confidential?.roots ?? []),
     ...(proposed?.roots ?? []),
     ...(committed?.roots ?? []),
-  ]);
+  ];
+  const roots = uniquePortablePaths(rootCandidates);
   if (roots.length === 0) return { enabled: false, errors: [] };
 
   let entries: IndexEntry[];
-  const ancestors = ancestorPaths(roots);
+  const ancestors = ancestorPaths(rootCandidates);
   const ancestorAttributes = ancestors.map((path) => `${path}/.gitattributes`);
   try {
     entries = indexEntries(repoRoot, [

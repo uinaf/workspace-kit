@@ -181,7 +181,7 @@ Consumers own shared machine-global skill selection and installation.
 
 ```json
 {
-  "minVersion": "0.1.0",
+  "minVersion": "0.12.0",
   "required": ["AGENTS.md", "CLAUDE.md"],
   "forbidden": [".env"],
   "links": [{ "path": "CLAUDE.md", "target": "AGENTS.md" }],

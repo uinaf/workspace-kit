@@ -133,7 +133,7 @@ test("confidential config requires its supporting version and literal directory 
     () =>
       parseWorkspaceConfig({
         minVersion: CONFIDENTIAL_MIN_VERSION,
-        confidential: { provider: "git-crypt", roots: [".GITHOOKS/pre-commit"] },
+        confidential: { provider: "git-crypt", roots: ["private/.GITHOOKS/pre-commit"] },
       }),
     /must not contain Git or hook control directories/,
   );
@@ -144,6 +144,14 @@ test("confidential config requires its supporting version and literal directory 
         confidential: { provider: "git-crypt", roots: ["#private"] },
       }),
     /must not start with "#" or "!"/,
+  );
+  assert.throws(
+    () =>
+      parseWorkspaceConfig({
+        minVersion: CONFIDENTIAL_MIN_VERSION,
+        confidential: { provider: "git-crypt", roots: ["a", "a-b", "a/c"] },
+      }),
+    /confidential\.roots\[2\] overlaps confidential\.roots\[0\]/,
   );
 });
 
@@ -472,6 +480,62 @@ test("confidential check deduplicates portable root aliases across config states
     git(dir, "add", "workspace.json", ".gitattributes");
 
     assert.deepEqual(check(dir), { enabled: true, errors: [] });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("confidential check retains portable aliases for ancestor validation", () => {
+  const dir = fixture();
+  try {
+    git(dir, "commit", "-qm", "baseline");
+    rmSync(join(dir, "private"), { recursive: true, force: true });
+    writeFileSync(
+      join(dir, "workspace.json"),
+      `${JSON.stringify(
+        {
+          minVersion: CONFIDENTIAL_MIN_VERSION,
+          confidential: { provider: "git-crypt", roots: ["Vendor/Module/private"] },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    writeFileSync(
+      join(dir, ".gitattributes"),
+      "Vendor/Module/private/** filter=git-crypt diff=git-crypt\n",
+    );
+    git(dir, "add", "-A");
+    git(
+      dir,
+      "update-index",
+      "--add",
+      "--cacheinfo",
+      `160000,${git(dir, "rev-parse", "HEAD")},Vendor/Module`,
+    );
+    git(dir, "commit", "-qm", "uppercase nested root");
+
+    writeFileSync(
+      join(dir, "workspace.json"),
+      `${JSON.stringify(
+        {
+          minVersion: CONFIDENTIAL_MIN_VERSION,
+          confidential: { provider: "git-crypt", roots: ["vendor/module/private"] },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    writeFileSync(
+      join(dir, ".gitattributes"),
+      "vendor/module/private/** filter=git-crypt diff=git-crypt\n",
+    );
+    git(dir, "add", "workspace.json", ".gitattributes");
+
+    assert.match(
+      check(dir).errors.join("\n"),
+      /"Vendor\/Module": confidential roots cannot traverse tracked entries/,
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
