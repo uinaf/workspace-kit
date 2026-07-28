@@ -164,6 +164,23 @@ Consumers own shared machine-global skill selection and installation.
   blocked; configured directory roots and their descendants are protected
   with platform-independent path semantics. Passing means "eligible for human
   review", never approval.
+- **Confidential content** — when a `confidential` section exists,
+  `confidential check` verifies that content the workspace declares
+  confidential is recorded in Git as provider ciphertext. `git-crypt` is the
+  only supported provider. Git is the oracle for path policy: attributes are
+  resolved from the index with `git check-attr --cached`, so `[attr]` macros,
+  negation, per-directory `.gitattributes`, and `core.ignorecase` all behave as
+  Git behaves. Declared patterns are matched ignoring case and Unicode spelling,
+  so a path that differs from a declared pattern only in spelling is still
+  treated as protected. The check fails when a protected index entry is not
+  git-crypt ciphertext, when a declared pattern is outside the provider's
+  policy, when a declared pattern matches nothing, when git-crypt covers a path
+  the workspace never declared, when a protected entry is a symlink, submodule,
+  or unmerged, when a declared pattern would encrypt Git or workspace policy
+  files, and when git-crypt key material is tracked anywhere in the index.
+  Key-material findings verify the provider's key header, so prose that merely
+  names it is not flagged. The check reads only object headers; it never reports
+  file content, never decrypts, and never changes state.
 - **Documentation links** — when enabled, `docs links` validates relative
   destinations in tracked Markdown inline links, images, and reference
   definitions. It supports angle-bracket destinations, balanced parentheses,
@@ -213,6 +230,11 @@ Consumers own shared machine-global skill selection and installation.
   "handoff": { "paths": ["AGENTS.md"], "prefixes": ["memory/"] },
   "docsLinks": { "enabled": false, "exclude": [] },
   "skills": {},
+  "confidential": {
+    // opt-in; absent disables the check entirely
+    "provider": "git-crypt",
+    "paths": ["memory/private/**"],
+  },
 }
 ```
 
@@ -261,6 +283,12 @@ operation and exits 1 when any are present; a clean generated catalog exits 0.
 and runs `wiki backfill --check` when `wiki` exists. It does not run `wiki
 stale`, which is a separate history-based operation.
 
+`confidential check` prints one error per line and exits 1, or prints
+`confidential ok (<provider>, <n> protected paths)` and exits 0. Findings name
+paths only: no file content, byte counts, or excerpts ever reach stdout, stderr,
+or the JSON reports. `doctor` includes it whenever the `confidential` section
+exists.
+
 `registry validate` exits 1 for malformed entries, ownership-policy failures,
 or unsafe local checkout state and prints `registry ok` on success. It reads
 Git metadata only; it never clones, fetches, pulls, or changes a checkout.
@@ -278,8 +306,54 @@ runs for recurring coverage. The consumer may add the workflow path to
 workflow as part of its structure.
 
 Local workspace validation stays focused on deterministic structure, wiki,
-registry, documentation, and skill contracts. Host configuration audits and
-repository-history security scans remain independently operated surfaces.
+registry, documentation, skill, and confidential-content contracts. Host
+configuration audits and repository-history security scans remain independently
+operated surfaces.
+
+### Confidential content: threat model
+
+Secret scanning detects credentials that were committed by accident.
+`confidential` addresses the different problem of content a workspace stores in
+Git _on purpose_ and does not want readable in the remote. The two are separate
+surfaces and neither replaces the other.
+
+The guarantee is deliberately narrow: **the selected file contents are
+unreadable in the Git remote and in clones without a decryption identity, and no
+commit created through the gate carries those paths as plaintext.** Everything
+else is out of scope.
+
+workspace-kit owns documentation and validation only. It implements no
+cryptography, manages no keys, installs nothing, and scaffolds nothing. It never
+unlocks, decrypts, encrypts, or otherwise changes state — the provider,
+recipients, identities, distribution, and recovery are consumer-owned. A green
+check is evidence that the declared contract has not drifted; it is not proof of
+confidentiality.
+
+Explicit non-goals:
+
+- The kit cannot confirm that ciphertext decrypts, or that it names the intended
+  recipients. Without a key, only the provider's framing is verifiable.
+- It inspects the index — which equals `HEAD` in a clean checkout — and never
+  audits older commits. Plaintext already in history stays in history; removing
+  it requires a history rewrite and a rotation of anything it exposed, and both
+  are outside this contract.
+- `git merge`, `cherry-pick`, `rebase`, `revert`, `am`, and `--no-verify` do not
+  run `pre-commit`. A local hook is convenience; `verify` in CI is the
+  authority, and a workflow that merges without squashing must check the whole
+  proposed range, not only its tip.
+- Filenames, directory shape, file sizes, commit messages, and change timing
+  stay visible unless the provider hides them; git-crypt does not.
+- Access cannot be revoked from history. Anyone who has cloned and unlocked
+  keeps that content permanently, so a recipient change is not a revocation.
+- Nothing here protects content from an already-authorized agent or process
+  after unlock, or from leakage through prompts, logs, editor caches, temporary
+  files, backups, or screenshots.
+- Encrypted Git storage is the wrong home for live credentials. Keep those in a
+  secret manager and commit only sanitized references.
+
+Declared protected paths must stay outside the roots that content checks scan
+(`wiki.root`, `dailyLogs.root`, `dailyLogs.contexts`): in a locked clone those
+files are ciphertext, and a Markdown-shaped check has nothing to read.
 
 ## Profiles (`init`)
 

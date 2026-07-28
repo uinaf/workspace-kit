@@ -22,6 +22,7 @@ import {
   peerErrors,
   workspaceErrors,
 } from "./checks/contract.ts";
+import { confidentialReport, confidentialSummary } from "./checks/confidential.ts";
 import { docsLinkErrors } from "./checks/docsLinks.ts";
 import { limitWarnings } from "./checks/limits.ts";
 import { projectRegistryErrors } from "./checks/registry.ts";
@@ -58,6 +59,7 @@ commands:
   contract handoff <path...>  screen proposed handoff paths
   links check | fix        verify or recreate configured alias symlinks
   docs links               check relative links in tracked markdown
+  confidential check       verify declared confidential paths stay encrypted
   registry validate        validate project-registry policy and local checkouts
   registry clone | status | pull  operate configured project checkouts
   registry path <category/name> [--mode <mode>]  resolve a configured checkout
@@ -267,6 +269,18 @@ function doctorReport(config: WorkspaceConfig): DoctorReport {
     } else {
       stdout("skills ok");
       checks.skills = "ok";
+    }
+  }
+
+  if (config.confidential) {
+    const result = confidentialReport(config.confidential);
+    if (result.errors.length > 0) {
+      stderr(result.errors);
+      bad.push("confidential check failed (exit 1)");
+      checks.confidential = "fail";
+    } else {
+      stdout(confidentialSummary(config.confidential, result));
+      checks.confidential = "ok";
     }
   }
 
@@ -580,6 +594,20 @@ function main(): void {
       process.exit(1);
     }
     console.log("docs-links ok");
+    process.exit(0);
+  }
+
+  if (command === "confidential") {
+    const [mode, ...args] = rest;
+    if (mode !== "check" || args.length > 0) usageExit();
+    const config = loadConfigOrFail();
+    const confidential = requireSection(config.confidential, "confidential");
+    const result = confidentialReport(confidential);
+    if (result.errors.length > 0) {
+      console.error(result.errors.join("\n"));
+      process.exit(1);
+    }
+    console.log(confidentialSummary(confidential, result));
     process.exit(0);
   }
 

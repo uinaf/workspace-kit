@@ -33,6 +33,7 @@ export type ContractConfig = { file: string };
 export type HandoffConfig = { paths: string[]; prefixes: string[] };
 export type DocsLinksConfig = { enabled: boolean; exclude: string[] };
 export type SkillsConfig = { manifest: "skills/skills.json" };
+export type ConfidentialConfig = { provider: "git-crypt"; paths: string[] };
 
 export type WorkspaceConfig = {
   minVersion?: string;
@@ -47,6 +48,7 @@ export type WorkspaceConfig = {
   handoff?: HandoffConfig;
   docsLinks?: DocsLinksConfig;
   skills?: SkillsConfig;
+  confidential?: ConfidentialConfig;
 };
 
 export const CONFIG_FILE = "workspace.json";
@@ -147,6 +149,7 @@ const CONFIG_SHAPE: ConfigShape = {
   handoff: { paths: true, prefixes: true },
   docsLinks: { enabled: true, exclude: true },
   skills: {},
+  confidential: { provider: true, paths: true },
 };
 
 function collectUnknownKeys(value: unknown, shape: ConfigShape, path: string, out: string[]): void {
@@ -417,6 +420,26 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
   if ("skills" in value) {
     if (!isRecord(value.skills)) fail("skills must be an object");
     out.skills = { manifest: "skills/skills.json" };
+  }
+
+  if ("confidential" in value) {
+    if (!isRecord(value.confidential)) fail("confidential must be an object");
+    const provider = text(value.confidential.provider, "confidential.provider");
+    if (provider !== "git-crypt") fail("confidential.provider must be git-crypt");
+    const declared = nonEmptyUniqueStringList(value.confidential.paths, "confidential.paths");
+    // A trailing separator would normalize away silently, and a directory
+    // pattern means something different to the provider than its contents do.
+    if (declared.some((path) => /[/\\]$/.test(path))) {
+      fail("confidential.paths must not end in a path separator (use a trailing /** instead)");
+    }
+    const paths = declared.map((path, index) =>
+      normalizeWorkspacePath(path, `confidential.paths[${index}]`),
+    );
+    const identities = paths.map(portablePathIdentity);
+    if (new Set(identities).size !== identities.length) {
+      fail("confidential.paths must not contain duplicates ignoring case");
+    }
+    out.confidential = { provider, paths };
   }
 
   return out;
