@@ -468,7 +468,9 @@ function report(config: ConfidentialConfig, repoRoot: string): ConfidentialRepor
   // A gitlink above a protected route keeps the content in another repository's
   // history, where this contract does not reach.
   for (const entry of tracked) {
-    if (entry.mode !== "160000") continue;
+    // A gitlink the patterns match directly is reported once, as a protected
+    // path that is not a regular file.
+    if (entry.mode !== "160000" || protectedPaths.has(entry.path)) continue;
     const identity = portablePathIdentity(entry.path);
     if (patterns.some((pattern) => couldContain(pattern.identity, identity))) {
       errors.push(`protected content is inside a tracked submodule: ${entry.path}`);
