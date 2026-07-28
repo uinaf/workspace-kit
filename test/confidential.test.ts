@@ -8,6 +8,7 @@ import {
   readFileSync,
   rmSync,
   symlinkSync,
+  truncateSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -531,6 +532,7 @@ test("confidential check retains portable aliases for ancestor validation", () =
       "vendor/module/private/** filter=git-crypt diff=git-crypt\n",
     );
     git(dir, "add", "workspace.json", ".gitattributes");
+    git(dir, "commit", "-qm", "lowercase root spelling");
 
     assert.match(
       check(dir).errors.join("\n"),
@@ -748,6 +750,36 @@ test("confidential behavior stays default-off when Git discovery fails", () => {
     writeFileSync(join(dir, "workspace.json"), `${JSON.stringify(config(false), null, 2)}\n`);
 
     assert.deepEqual(check(dir), { enabled: false, errors: [] });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("confidential behavior fails closed on malformed non-empty Git markers", () => {
+  const dir = mkdtempSync(join(tmpdir(), "workspace-confidential-malformed-git-"));
+  try {
+    writeFileSync(join(dir, ".git"), "not a gitdir pointer\n");
+    writeFileSync(join(dir, "workspace.json"), `${JSON.stringify(config(false), null, 2)}\n`);
+
+    const result = check(dir);
+    assert.equal(result.enabled, true);
+    assert.match(result.errors.join("\n"), /Git repository|gitfile|not a git repository/i);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("confidential behavior bounds Git marker reads", () => {
+  const dir = mkdtempSync(join(tmpdir(), "workspace-confidential-large-git-"));
+  try {
+    const dotGit = join(dir, ".git");
+    writeFileSync(dotGit, "");
+    truncateSync(dotGit, 64 * 1024 + 1);
+    writeFileSync(join(dir, "workspace.json"), `${JSON.stringify(config(false), null, 2)}\n`);
+
+    const result = check(dir);
+    assert.equal(result.enabled, true);
+    assert.match(result.errors.join("\n"), /Git repository|gitfile|not a git repository/i);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

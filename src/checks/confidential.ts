@@ -1,10 +1,12 @@
 import { spawnSync } from "node:child_process";
 import {
+  closeSync,
   copyFileSync,
   mkdirSync,
   mkdtempSync,
-  readFileSync,
-  readdirSync,
+  openSync,
+  opendirSync,
+  readSync,
   rmSync,
   statSync,
 } from "node:fs";
@@ -20,6 +22,7 @@ import { gitEnvironmentForRepository } from "../lib/gitProcess.ts";
 
 const GIT_CRYPT_HEADER = Buffer.from([0x00, 0x47, 0x49, 0x54, 0x43, 0x52, 0x59, 0x50, 0x54, 0x00]);
 const GIT_CRYPT_MINIMUM_BLOB_SIZE = 22;
+const MAX_GIT_POINTER_BYTES = 64 * 1024;
 const MAX_GIT_METADATA_BYTES = 64 * 1024 * 1024;
 const CONTROL_FILES = new Set(
   [".gitattributes", ".gitignore", ".gitmodules", "workspace.json"].map(portablePathIdentity),
@@ -304,6 +307,20 @@ function trackedAncestorErrors(repoRoot: string, ancestors: readonly string[]): 
         );
       }
     }
+    if (!tracked) {
+      const aliases = indexEntries(repoRoot, [
+        `:(icase,literal)${path}`,
+        `:(exclude,icase,glob)${path}/**`,
+      ]);
+      const identity = portablePathIdentity(path);
+      const alias = aliases.find((entry) => portablePathIdentity(entry.path) === identity);
+      if (alias) {
+        errors.push(
+          `${displayPath(alias.path)}: confidential roots cannot traverse tracked entries`,
+        );
+        continue;
+      }
+    }
     if (tracked) {
       errors.push(`${displayPath(path)}: confidential roots cannot traverse tracked entries`);
     }
@@ -326,17 +343,29 @@ function gitRepositoryMetadataState(repoRoot: string): "absent" | "present" | "u
       : "unreadable";
   }
   if (metadata.isDirectory()) {
+    let directory: ReturnType<typeof opendirSync> | undefined;
     try {
-      return readdirSync(dotGit).length === 0 ? "absent" : "present";
+      directory = opendirSync(dotGit);
+      return directory.readSync() === null ? "absent" : "present";
     } catch {
       return "unreadable";
+    } finally {
+      directory?.closeSync();
     }
   }
   if (!metadata.isFile()) return "absent";
+  let descriptor: number | undefined;
   try {
-    return /^gitdir: (.+)$/m.test(readFileSync(dotGit, "utf8")) ? "present" : "absent";
+    descriptor = openSync(dotGit, "r");
+    const buffer = Buffer.alloc(MAX_GIT_POINTER_BYTES + 1);
+    const bytesRead = readSync(descriptor, buffer, 0, buffer.length, 0);
+    if (bytesRead === 0) return "absent";
+    if (bytesRead > MAX_GIT_POINTER_BYTES) return "unreadable";
+    return /^gitdir: (.+)$/m.test(buffer.toString("utf8", 0, bytesRead)) ? "present" : "unreadable";
   } catch {
     return "unreadable";
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
   }
 }
 
