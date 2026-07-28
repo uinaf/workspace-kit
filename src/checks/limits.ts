@@ -6,15 +6,36 @@ import type { LimitRule } from "../config.ts";
 import { readWorkspaceText, workspaceLstat } from "../lib/workspaceFs.ts";
 
 // Tiny glob: * matches within a path segment, ? matches one character,
-// ** crosses segments. Enough for "memory/????-??-??.md" style rules.
+// ** crosses segments — including zero segments, so `a/**/b` covers `a/b`
+// and a leading `**/` covers root-level files. Enough for
+// "memory/????-??-??.md" style rules.
 export function globToRegExp(pattern: string): RegExp {
+  // A run of consecutive globstar segments is one zero-or-more-segments
+  // wildcard: `**/**/x` declares the same paths as `**/x`. The run must be
+  // segment-anchored — a `**/` that does not follow a slash or the pattern
+  // start is not a globstar segment and must not join the collapse.
+  const collapsed = pattern.replace(/(^|\/)(?:\*\*\/){2,}/g, "$1**/");
   let out = "";
-  for (let i = 0; i < pattern.length; i += 1) {
-    const char = pattern[i]!;
-    if (char === "*") {
-      if (pattern[i + 1] === "*") {
-        out += ".*";
-        i += 1;
+  for (let i = 0; i < collapsed.length; i += 1) {
+    const char = collapsed[i]!;
+    if (
+      char === "/" &&
+      collapsed[i + 1] === "*" &&
+      collapsed[i + 2] === "*" &&
+      collapsed[i + 3] === "/"
+    ) {
+      out += "(?:/[\\s\\S]+)?/";
+      i += 3;
+    } else if (char === "*") {
+      if (collapsed[i + 1] === "*") {
+        if (i === 0 && collapsed[i + 2] === "/") {
+          out += "(?:[\\s\\S]+/)?";
+          i += 2;
+        } else {
+          // Git paths may contain newlines; ** must not stop at them.
+          out += "[\\s\\S]*";
+          i += 1;
+        }
       } else {
         out += "[^/]*";
       }

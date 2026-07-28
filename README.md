@@ -50,9 +50,10 @@ npm exec -- workspace-kit skills sync               # materialize workspace skil
 `verify` is the canonical local and CI gate. It validates the config, runs the
 configured `doctor` checks, validates a configured project registry, and checks
 that configured wiki catalogs are current. `doctor` covers structure,
-wiki-lint, ownership-contract, documentation-link, workspace-skill, and
-soft-limit checks. Git-history-based wiki staleness remains an explicit
-operation. Candidate paths are screened with `contract handoff <paths...>` for
+wiki-lint, ownership-contract, documentation-link, workspace-skill,
+encrypted-content, and soft-limit checks. Git-history-based wiki staleness
+remains an explicit operation. Candidate paths are screened with
+`contract handoff <paths...>` for
 human review eligibility. Absent config sections disable their checks, unknown
 files are always tolerated, and all validation runs offline with zero runtime
 dependencies.
@@ -103,6 +104,8 @@ commands remain deterministic, credential-free workspace checks.
 - [Workspace convention, bootstrap, and check contracts](docs/convention.md) —
   workspace structure, skill ownership, scaffold follow-through, and exactly
   what each check enforces
+- [Encrypted content](docs/confidentiality.md) — the opt-in encrypted-content
+  contract: threat model, provider comparison, and check semantics
 - [Parity oracle](parity/README.md) — the executable spec the checks are
   held to, byte-for-byte
 - [Release workflow](docs/releasing.md) — automatic, tokenless publishing

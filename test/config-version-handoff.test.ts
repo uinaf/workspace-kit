@@ -66,6 +66,43 @@ test("config enables the conventional workspace skill manifest", () => {
   assert.throws(() => parseWorkspaceConfig({ skills: true }), /skills must be an object/);
 });
 
+test("config parses the opt-in confidential section strictly", () => {
+  const parsed = parseWorkspaceConfig({
+    confidential: { provider: "git-crypt", paths: ["./memory//private/**", "notes\\secret.md"] },
+  });
+  assert.deepEqual(parsed.confidential, {
+    provider: "git-crypt",
+    paths: ["memory/private/**", "notes/secret.md"],
+  });
+
+  assert.throws(
+    () => parseWorkspaceConfig({ confidential: { provider: "gpg", paths: ["a/**"] } }),
+    /confidential\.provider must be one of git-crypt, sops, age/,
+  );
+  assert.throws(
+    () => parseWorkspaceConfig({ confidential: { provider: "age", paths: [] } }),
+    /confidential\.paths must be a non-empty array of non-empty strings/,
+  );
+  assert.throws(
+    () =>
+      parseWorkspaceConfig({
+        confidential: { provider: "age", paths: ["./memory/private/**", "memory\\private\\**"] },
+      }),
+    /confidential\.paths must not contain duplicate aliases/,
+  );
+  assert.throws(
+    () => parseWorkspaceConfig({ confidential: { provider: "sops", paths: ["../outside/**"] } }),
+    /confidential\.paths\[0\] must stay inside the workspace/,
+  );
+  assert.throws(
+    () => parseWorkspaceConfig({ confidential: { provider: "sops", paths: ["C:\\keys/**"] } }),
+    /confidential\.paths\[0\] must stay inside the workspace/,
+  );
+  assert.deepEqual(unknownConfigKeys({ confidential: { provder: "age" } }), [
+    "confidential.provder",
+  ]);
+});
+
 test("revision staleness is opt-in and must be boolean", () => {
   const parsed = parseWorkspaceConfig({ wiki: { root: "memory/wiki" } });
   assert.equal(parsed.wiki?.revisionStaleness, false);

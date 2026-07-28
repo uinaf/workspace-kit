@@ -33,6 +33,10 @@ export type ContractConfig = { file: string };
 export type HandoffConfig = { paths: string[]; prefixes: string[] };
 export type DocsLinksConfig = { enabled: boolean; exclude: string[] };
 export type SkillsConfig = { manifest: "skills/skills.json" };
+export type ConfidentialProvider = "git-crypt" | "sops" | "age";
+export type ConfidentialConfig = { provider: ConfidentialProvider; paths: string[] };
+
+export const CONFIDENTIAL_PROVIDERS: readonly ConfidentialProvider[] = ["git-crypt", "sops", "age"];
 
 export type WorkspaceConfig = {
   minVersion?: string;
@@ -47,6 +51,7 @@ export type WorkspaceConfig = {
   handoff?: HandoffConfig;
   docsLinks?: DocsLinksConfig;
   skills?: SkillsConfig;
+  confidential?: ConfidentialConfig;
 };
 
 export const CONFIG_FILE = "workspace.json";
@@ -147,6 +152,7 @@ const CONFIG_SHAPE: ConfigShape = {
   handoff: { paths: true, prefixes: true },
   docsLinks: { enabled: true, exclude: true },
   skills: {},
+  confidential: { provider: true, paths: true },
 };
 
 function collectUnknownKeys(value: unknown, shape: ConfigShape, path: string, out: string[]): void {
@@ -417,6 +423,24 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
   if ("skills" in value) {
     if (!isRecord(value.skills)) fail("skills must be an object");
     out.skills = { manifest: "skills/skills.json" };
+  }
+
+  if ("confidential" in value) {
+    if (!isRecord(value.confidential)) fail("confidential must be an object");
+    const provider = text(value.confidential.provider, "confidential.provider");
+    if (!(CONFIDENTIAL_PROVIDERS as readonly string[]).includes(provider)) {
+      fail(`confidential.provider must be one of ${CONFIDENTIAL_PROVIDERS.join(", ")}`);
+    }
+    const paths = nonEmptyUniqueStringList(value.confidential.paths, "confidential.paths").map(
+      (path, index) => normalizeWorkspacePath(path, `confidential.paths[${index}]`),
+    );
+    const seen = new Set<string>();
+    for (const path of paths) {
+      const identity = portablePathIdentity(path);
+      if (seen.has(identity)) fail("confidential.paths must not contain duplicate aliases");
+      seen.add(identity);
+    }
+    out.confidential = { provider: provider as ConfidentialProvider, paths };
   }
 
   return out;

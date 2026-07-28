@@ -169,6 +169,20 @@ Consumers own shared machine-global skill selection and installation.
   fragment-only destinations are ignored. Checked Markdown filenames must use
   portable `/` separators; literal backslashes are reported as non-portable.
   Targets must be tracked, so a gitignored-but-present file does not pass.
+- **Encrypted content** — the opt-in `confidential` section declares paths
+  that must stay confidential in Git (versioned private notes, not live
+  credentials). `confidential check` fails closed when a protected blob is
+  staged as plaintext, when git-crypt paths lack `filter=git-crypt` coverage,
+  when protected entries are not regular files, or when provider key material
+  is tracked. The staged `workspace.json` supplies the effective section, so
+  the gate always evaluates the prospective commit's own declaration;
+  declared paths must not cover the config file itself. The gate reports
+  git-crypt lock state without changing it and never decrypts, never manages
+  keys, and stays offline. Providers, recipients, identities, history
+  rewrites, and recovery are consumer-owned. See
+  [confidentiality.md](confidentiality.md) for the threat model, non-goals,
+  and provider comparison. `doctor` and `verify` include the gate whenever
+  the prospective commit declares it.
 
 ## Configuration reference (`workspace.json`)
 
@@ -211,6 +225,7 @@ Consumers own shared machine-global skill selection and installation.
   "handoff": { "paths": ["AGENTS.md"], "prefixes": ["memory/"] },
   "docsLinks": { "enabled": false, "exclude": [] },
   "skills": {},
+  "confidential": { "provider": "git-crypt", "paths": ["memory/private/**"] },
 }
 ```
 
@@ -234,6 +249,21 @@ generated catalogs land under the configured `wiki.root`.
 path. Each `mustContain` pair requires exactly one entry with that repository
 and mode. `maxEntries` counts entries across every top-level registry category;
 zero defines an intentionally empty registry.
+
+`confidential.provider` is one of `git-crypt`, `sops`, `age`. `confidential.paths`
+holds glob patterns (`*` within a path segment, `**` across segments, `?` one
+character) matched against index entries case-insensitively and
+Unicode-normalized, so alias spellings cannot dodge a declared rule. Detection
+is marker-based per provider: `\0GITCRYPT\0` blobs for git-crypt, an
+`age-encryption.org/v1` header with a recipient stanza (or age PEM armor) for
+age, and a parsed whole-file `{"data":"ENC[…]","sops":{…"mac":"ENC[…]"}}`
+envelope with no other top-level keys for sops. For git-crypt, filter
+coverage is resolved from the index (`git check-attr --cached`), so the
+evaluated policy is exactly what the prospective commit carries; git-crypt
+filter rules in local-only sources (`.git/info/attributes`,
+`core.attributesFile`, or the per-user global git attributes file) fail the
+check, including local applications of attribute macros that expand to one.
+Named-key spellings (`filter=git-crypt-<key>`) count as coverage.
 
 ## Output contract
 

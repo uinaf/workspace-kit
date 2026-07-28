@@ -93,6 +93,27 @@ test("glob matcher handles segment wildcards and date shapes", () => {
   assert.ok(!globToRegExp("MEMORY.md").test("SUBMEMORY.md"));
 });
 
+test("glob matcher treats ** as zero or more full segments", () => {
+  // Standard globstar semantics: slash-delimited ** crosses any depth,
+  // including zero — `a/**/b` covers `a/b` and a leading `**/` covers root.
+  assert.ok(globToRegExp("**/*.md").test("root.md"));
+  assert.ok(globToRegExp("memory/**/notes.md").test("memory/notes.md"));
+  assert.ok(globToRegExp("memory/**/notes.md").test("memory/a/b/notes.md"));
+  assert.ok(globToRegExp("memory/**").test("memory/x.md"));
+  assert.ok(!globToRegExp("memory/**").test("memory"));
+  assert.ok(globToRegExp("**").test("anything/at/all"));
+  // Consecutive globstars collapse into one zero-or-more-segments wildcard.
+  assert.ok(globToRegExp("**/**/secret.md").test("secret.md"));
+  assert.ok(globToRegExp("**/**/secret.md").test("a/b/secret.md"));
+  assert.ok(globToRegExp("a/**/**/b").test("a/b"));
+  // The collapse is segment-anchored: a `**/` run only joins when its first
+  // `**` starts the pattern or follows a slash. `prefix**/**/file` keeps its
+  // in-segment `**` and matches exactly what the uncollapsed pattern always
+  // matched.
+  assert.ok(globToRegExp("prefix**/**/file").test("prefix/x/file"));
+  assert.ok(globToRegExp("prefix**/**/file").test("prefix/file"));
+});
+
 test("limits: warnings for oversized tracked files, silence under the limit", () => {
   const dir = mkdtempSync(join(tmpdir(), "limits-"));
   execSync("git init -q", { cwd: dir });

@@ -10,6 +10,7 @@ import {
   parseWorkspaceConfig,
   readRawConfig,
   unknownConfigKeys,
+  type ConfidentialConfig,
   type WorkspaceConfig,
 } from "./config.ts";
 import { structureErrors } from "./checks/structure.ts";
@@ -22,6 +23,7 @@ import {
   peerErrors,
   workspaceErrors,
 } from "./checks/contract.ts";
+import { confidentialReport } from "./checks/confidential.ts";
 import { docsLinkErrors } from "./checks/docsLinks.ts";
 import { limitWarnings } from "./checks/limits.ts";
 import { projectRegistryErrors } from "./checks/registry.ts";
@@ -63,6 +65,7 @@ commands:
   registry path <category/name> [--mode <mode>]  resolve a configured checkout
   hooks install            configure this checkout's tracked Git hooks
   skills check | sync      verify or install configured workspace-local skills
+  confidential check       validate the encrypted-content contract
   config validate          validate ${CONFIG_FILE} itself
   init [--profile personal|runtime|work] [--dir <path>]  scaffold a workspace
   --version                print the kit version
@@ -245,8 +248,31 @@ function doctorReport(config: WorkspaceConfig): DoctorReport {
     }
   }
 
+  const confidentialWarnings: string[] = [];
+  try {
+    const report = confidentialReport(".", config.confidential);
+    confidentialWarnings.push(...report.warnings);
+    if (report.active) {
+      if (report.errors.length > 0) {
+        stderr(report.errors);
+        bad.push("confidential check failed (exit 1)");
+        checks.confidential = "fail";
+      } else {
+        stdout(`confidential ok (${report.state})`);
+        checks.confidential = "ok";
+      }
+    }
+  } catch (error) {
+    stderr([error instanceof Error ? error.message : String(error)]);
+    bad.push("confidential check failed (exit 1)");
+    checks.confidential = "fail";
+  }
+
   // Soft limits are warnings by design: printed, counted, never fatal.
-  const warnings = config.limits ? limitWarnings(config.limits) : [];
+  const warnings = [
+    ...(config.limits ? limitWarnings(config.limits) : []),
+    ...confidentialWarnings,
+  ];
 
   return { bad, checks, detail, immediateErrors, output, warnings };
 }
@@ -632,6 +658,42 @@ function main(): void {
     }
     console.log("skills synced");
     process.exit(0);
+  }
+
+  if (command === "confidential") {
+    const [mode, ...args] = rest;
+    if (mode !== "check" || args.length > 0) usageExit();
+    // The staged declaration governs the prospective commit (see
+    // confidentialReport), so the worktree config loads optionally: it is
+    // only the adoption fallback for an untracked workspace.json, and a
+    // missing or unstaged-broken worktree copy must not mask a valid staged
+    // one.
+    let worktreeSection: ConfidentialConfig | undefined;
+    let worktreeConfigError: string | undefined;
+    try {
+      worktreeSection = parseWorkspaceConfig(readRawConfig()).confidential;
+    } catch (error) {
+      worktreeConfigError = error instanceof Error ? error.message : String(error);
+    }
+    try {
+      const report = confidentialReport(".", worktreeSection);
+      if (report.warnings.length > 0) console.error(report.warnings.join("\n"));
+      if (!report.active && !report.staged) {
+        // Nothing declared the contract and no section drop is in flight:
+        // an unstaged adoption edit does not count, so an explicitly
+        // invoked gate must never report success without having checked.
+        if (worktreeConfigError) failWith(worktreeConfigError);
+        failWith(`${CONFIG_FILE} has no confidential section`);
+      }
+      if (report.errors.length > 0) {
+        console.error(report.errors.join("\n"));
+        process.exit(1);
+      }
+      console.log(`confidential ok (${report.state})`);
+      process.exit(0);
+    } catch (error) {
+      failWith(error instanceof Error ? error.message : String(error));
+    }
   }
 
   if (command === "limits") {

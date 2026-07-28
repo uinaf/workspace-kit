@@ -45,7 +45,9 @@ function golden(file: string): string {
   return readFileSync(join(goldenDir, file), "utf8");
 }
 
-test("kit CLI reproduces every legacy golden", () => {
+// Replays every legacy golden through spawned CLI runs; under full-suite
+// parallel load this needs well beyond the default 5s.
+test("kit CLI reproduces every legacy golden", { timeout: 60_000 }, () => {
   const mismatches: string[] = [];
 
   const compare = (label: string, actual: string, expected: string) => {
