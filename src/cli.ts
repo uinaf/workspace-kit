@@ -22,7 +22,11 @@ import {
   peerErrors,
   workspaceErrors,
 } from "./checks/contract.ts";
-import { confidentialReport, confidentialSummary } from "./checks/confidential.ts";
+import {
+  confidentialReport,
+  confidentialSummary,
+  indexedConfidentialPolicy,
+} from "./checks/confidential.ts";
 import { docsLinkErrors } from "./checks/docsLinks.ts";
 import { limitWarnings } from "./checks/limits.ts";
 import { projectRegistryErrors } from "./checks/registry.ts";
@@ -272,14 +276,18 @@ function doctorReport(config: WorkspaceConfig): DoctorReport {
     }
   }
 
-  if (config.confidential) {
-    const result = confidentialReport(config.confidential);
+  // Activation follows the index as well as the working tree: dropping the
+  // section from an unstaged edit must not switch the gate off for a commit
+  // whose own configuration still declares a policy.
+  const confidential = config.confidential ?? indexedConfidentialPolicy();
+  if (confidential) {
+    const result = confidentialReport(confidential);
     if (result.errors.length > 0) {
       stderr(result.errors);
       bad.push("confidential check failed (exit 1)");
       checks.confidential = "fail";
     } else {
-      stdout(confidentialSummary(config.confidential, result));
+      stdout(confidentialSummary(confidential, result));
       checks.confidential = "ok";
     }
   }
@@ -601,7 +609,10 @@ function main(): void {
     const [mode, ...args] = rest;
     if (mode !== "check" || args.length > 0) usageExit();
     const config = loadConfigOrFail();
-    const confidential = requireSection(config.confidential, "confidential");
+    const confidential = requireSection(
+      config.confidential ?? indexedConfidentialPolicy(),
+      "confidential",
+    );
     const result = confidentialReport(confidential);
     if (result.errors.length > 0) {
       console.error(result.errors.join("\n"));

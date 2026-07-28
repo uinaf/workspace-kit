@@ -179,7 +179,9 @@ Consumers own shared machine-global skill selection and installation.
   or unmerged, when a declared pattern would encrypt Git or workspace policy
   files, when the indexed `workspace.json` declares a different confidential
   policy than the one being checked, and when git-crypt key material is tracked
-  anywhere in the index.
+  anywhere in the index. The policy the commit carries is binding, so the check
+  also runs when only the indexed `workspace.json` declares one — retiring the
+  section takes a staged edit, not an unstaged one.
   Key-material findings verify the provider's key header, so prose that merely
   names it is not flagged. The check reads only object headers; it never reports
   file content, never decrypts, and never changes state.

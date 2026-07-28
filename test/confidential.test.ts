@@ -410,20 +410,39 @@ test("doctor and verify include the check only when the section exists", () => {
   );
   assert.equal(failed.stderr, "");
 
+  // Dropping the section in the working tree alone does not switch the gate
+  // off: the commit's own configuration still declares the policy.
   writeFileSync(join(dir, "workspace.json"), JSON.stringify({ required: ["workspace.json"] }));
+  const unstaged = kit(dir, "doctor", "--json");
+  assert.equal(unstaged.status, 1, unstaged.stdout);
+  assert.equal(JSON.parse(unstaged.stdout).checks.confidential, "fail");
+
+  // Staging the removal retires it, and the check disappears from the report.
+  git(dir, "add", "-A");
   const without = kit(dir, "doctor", "--json");
   assert.equal(without.status, 0, without.stderr);
   assert.ok(!("confidential" in JSON.parse(without.stdout).checks));
 });
 
 test("an absent section makes the explicit command a configuration error", () => {
-  const dir = workspace();
+  const dir = mkdtempSync(join(tmpdir(), "confidential-unset-"));
+  git(dir, "init", "-q");
   writeFileSync(join(dir, "workspace.json"), JSON.stringify({}));
+  git(dir, "add", "-A");
   const result = kit(dir, "confidential", "check");
   assert.equal(result.status, 1);
   assert.match(result.stderr, /workspace\.json has no confidential section/);
   assert.equal(kit(dir, "confidential").status, 2);
   assert.equal(kit(dir, "confidential", "check", "--json").status, 2);
+});
+
+test("full git-crypt framing is required, not just the magic", () => {
+  const dir = workspace();
+  // The magic followed by a short secret is not something git-crypt can emit,
+  // and the secret would still be readable in the remote.
+  put(dir, "memory/private/short.md", Buffer.from("\0GITCRYPT\0oops", "latin1"));
+  git(dir, "add", "-A");
+  assert.deepEqual(errors(dir), ["protected path is staged as plaintext: memory/private/short.md"]);
 });
 
 test("config parsing rejects unsupported providers and unusable path lists", () => {

@@ -25,7 +25,11 @@ import { globToRegExp } from "./limits.ts";
 // and `\0GITCRYPTKEY` ahead of a key file. Byte 9 separates the two forms.
 const FILE_MAGIC = Buffer.from("\0GITCRYPT\0", "latin1");
 const KEY_MAGIC = Buffer.from("\0GITCRYPTKEY", "latin1");
-const HEADER_BYTES = KEY_MAGIC.length;
+// The magic alone is not ciphertext: anything shorter than the framing cannot
+// have been produced by the provider, so a short secret behind a copied magic
+// must not read as encrypted.
+const FRAMING_BYTES = FILE_MAGIC.length + 12;
+const HEADER_BYTES = Math.max(FRAMING_BYTES, KEY_MAGIC.length);
 // `cat-file --batch` buffers whole objects, so group requests under a byte
 // budget instead of reading the entire protected set in one pass.
 const BATCH_BUDGET = 8 * 1024 * 1024;
@@ -180,22 +184,40 @@ function localAttributeOverride({ commonDir }: Repository): boolean {
     .some((line) => line.trim().length > 0 && !line.trimStart().startsWith("#"));
 }
 
-// The commit carries its own policy, so the declaration being enforced must be
-// the declaration being committed. An unstaged edit that narrows `paths` would
-// otherwise let a partial commit pass against a policy the commit does not have.
-function stagedPolicyMismatch(repo: Repository, config: ConfidentialConfig, oid: string): boolean {
+function stagedPolicy(repo: Repository, oid: string): ConfidentialConfig | undefined {
   const result = gitText(repo.root, repo.env, ["cat-file", "blob", oid]);
-  if (!result.completed || result.status !== 0) return true;
+  if (!result.completed || result.status !== 0) return undefined;
   try {
-    const staged = parseWorkspaceConfig(JSON.parse(result.stdout)).confidential;
-    return (
-      staged === undefined ||
-      staged.provider !== config.provider ||
-      staged.paths.length !== config.paths.length ||
-      staged.paths.some((path, index) => path !== config.paths[index])
-    );
+    return parseWorkspaceConfig(JSON.parse(result.stdout)).confidential;
   } catch {
-    return true;
+    return undefined;
+  }
+}
+
+function samePolicy(a: ConfidentialConfig, b: ConfidentialConfig): boolean {
+  return (
+    a.provider === b.provider &&
+    a.paths.length === b.paths.length &&
+    a.paths.every((path, index) => path === b.paths[index])
+  );
+}
+
+function stagedConfigEntry(tracked: readonly IndexEntry[]): IndexEntry | undefined {
+  const wanted = portablePathIdentity(CONFIG_FILE);
+  return tracked.find((entry) => portablePathIdentity(entry.path) === wanted);
+}
+
+// The commit carries its own policy, so a workspace whose working-tree config
+// has dropped the section is still bound by the declaration in its index: the
+// alternative lets an unstaged config edit switch the gate off for a partial
+// commit. Absent from both is genuinely disabled.
+export function indexedConfidentialPolicy(repoRoot = "."): ConfidentialConfig | undefined {
+  try {
+    const repo = repository(repoRoot);
+    const entry = stagedConfigEntry(indexEntries(repo).filter((item) => item.stage === "0"));
+    return entry ? stagedPolicy(repo, entry.oid) : undefined;
+  } catch {
+    return undefined; // No repository or no readable index: nothing is staged.
   }
 }
 
@@ -371,11 +393,12 @@ function report(config: ConfidentialConfig, repoRoot: string): ConfidentialRepor
   if (localAttributeOverride(repo)) {
     errors.push("attribute policy comes from an untracked source: info/attributes");
   }
-  const stagedConfig = tracked.find(
-    (entry) => portablePathIdentity(entry.path) === portablePathIdentity(CONFIG_FILE),
-  );
-  if (stagedConfig && stagedPolicyMismatch(repo, config, stagedConfig.oid)) {
-    errors.push(`${CONFIG_FILE} declares a different confidential policy than the one checked`);
+  const stagedConfig = stagedConfigEntry(tracked);
+  if (stagedConfig) {
+    const staged = stagedPolicy(repo, stagedConfig.oid);
+    if (staged === undefined || !samePolicy(staged, config)) {
+      errors.push(`${CONFIG_FILE} declares a different confidential policy than the one checked`);
+    }
   }
 
   // A pattern that covers nothing is the failure mode that makes a green run
@@ -411,8 +434,10 @@ function report(config: ConfidentialConfig, repoRoot: string): ConfidentialRepor
     repo,
     inspected.map((entry) => entry.oid),
   );
-  const isKeyMaterial = (entry: IndexEntry): boolean =>
-    headers.get(entry.oid)?.equals(KEY_MAGIC) === true;
+  const isKeyMaterial = (entry: IndexEntry): boolean => {
+    const header = headers.get(entry.oid);
+    return header !== undefined && header.subarray(0, KEY_MAGIC.length).equals(KEY_MAGIC);
+  };
 
   // One finding per protected path, most specific first: an unverifiable entry
   // must not also be reported as plaintext.
@@ -429,7 +454,10 @@ function report(config: ConfidentialConfig, repoRoot: string): ConfidentialRepor
       errors.push(`protected path is not covered by git-crypt policy: ${entry.path}`);
     } else if (header === undefined) {
       errors.push(`protected path could not be verified: ${entry.path}`);
-    } else if (!header.subarray(0, FILE_MAGIC.length).equals(FILE_MAGIC)) {
+    } else if (
+      header.length < FRAMING_BYTES ||
+      !header.subarray(0, FILE_MAGIC.length).equals(FILE_MAGIC)
+    ) {
       errors.push(`protected path is staged as plaintext: ${entry.path}`);
     }
   }
