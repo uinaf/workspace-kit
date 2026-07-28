@@ -33,6 +33,10 @@ const HEADER_BYTES = Math.max(FRAMING_BYTES, KEY_MAGIC.length);
 // `cat-file --batch` buffers whole objects, so group requests under a byte
 // budget instead of reading the entire protected set in one pass.
 const BATCH_BUDGET = 8 * 1024 * 1024;
+// Listings and attribute output scale with the size of the index, and this check
+// fails closed, so the ceiling has to sit far above any real workspace rather
+// than turn a large one into a blocked commit.
+const TEXT_BUDGET = 512 * 1024 * 1024;
 // An object above this is read on its own with a bounded buffer, so a large
 // protected archive costs a header read rather than its own size in memory.
 const BATCH_OBJECT_LIMIT = 1024 * 1024;
@@ -69,7 +73,7 @@ function gitText(
   const result = spawnSync("git", ["-C", repoRoot, ...args], {
     encoding: "utf8",
     env,
-    maxBuffer: BATCH_BUDGET,
+    maxBuffer: TEXT_BUDGET,
     ...(input === undefined ? {} : { input }),
   });
   return {

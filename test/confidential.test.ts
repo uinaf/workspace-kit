@@ -96,7 +96,7 @@ test("a pre-commit gate blocks `git commit -a` on its temporary index", () => {
   // repository's default index never sees.
   put(dir, "memory/private/notes.md", "plaintext overwrite of an encrypted note\n");
   const hook = join(dir, ".git", "hooks", "pre-commit");
-  writeFileSync(hook, `#!/bin/sh\nexec ${process.execPath} ${cli} confidential check\n`);
+  writeFileSync(hook, `#!/bin/sh\nexec '${process.execPath}' '${cli}' confidential check\n`);
   chmodSync(hook, 0o755);
 
   const result = spawnSync(
