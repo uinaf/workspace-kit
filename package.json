@@ -12,7 +12,8 @@
   },
   "files": [
     "dist",
-    "docs/convention.md"
+    "docs/convention.md",
+    "docs/confidentiality.md"
   ],
   "os": [
     "darwin",

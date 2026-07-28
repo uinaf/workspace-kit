@@ -26,6 +26,7 @@ import { docsLinkErrors } from "./checks/docsLinks.ts";
 import { limitWarnings } from "./checks/limits.ts";
 import { projectRegistryErrors } from "./checks/registry.ts";
 import { projectRegistryEntries } from "./checks/registry.ts";
+import { confidentialCheck } from "./checks/confidential.ts";
 import { initWorkspace } from "./init.ts";
 import { installHooks } from "./hooks.ts";
 import {
@@ -56,6 +57,7 @@ commands:
   contract check           validate this repository's workspace contract
   contract peer <path>     validate both contracts and history separation
   contract handoff <path...>  screen proposed handoff paths
+  confidential check       verify protected Git index blobs and attributes
   links check | fix        verify or recreate configured alias symlinks
   docs links               check relative links in tracked markdown
   registry validate        validate project-registry policy and local checkouts
@@ -162,6 +164,20 @@ function runContractCheck(file: string): number {
   }
 }
 
+function runConfidentialCheck(config: WorkspaceConfig): number {
+  const result = confidentialCheck(".", config);
+  if (!result.enabled) {
+    console.error(`${CONFIG_FILE} has no confidential section`);
+    return 1;
+  }
+  if (result.errors.length > 0) {
+    console.error(result.errors.join("\n"));
+    return 1;
+  }
+  console.log("confidential ok");
+  return 0;
+}
+
 type OutputEvent = {
   stream: "stdout" | "stderr";
   text: string;
@@ -213,6 +229,18 @@ function doctorReport(config: WorkspaceConfig): DoctorReport {
     detail.push(...lines);
     if (lines.length > 0) events.push({ stream: "stderr", text: lines.join("\n") });
   };
+
+  const confidential = confidentialCheck(".", config);
+  if (confidential.enabled) {
+    if (confidential.errors.length > 0) {
+      stderr(confidential.errors);
+      bad.push("confidential check failed (exit 1)");
+      checks.confidential = "fail";
+    } else {
+      stdout("confidential ok");
+      checks.confidential = "ok";
+    }
+  }
 
   if (config.wiki) {
     const result = wikiLintErrors(config.wiki);
@@ -504,6 +532,12 @@ function main(): void {
     }
 
     usageExit();
+  }
+
+  if (command === "confidential") {
+    const [mode, ...args] = rest;
+    if (mode !== "check" || args.length > 0) usageExit();
+    process.exit(runConfidentialCheck(loadConfigOrFail()));
   }
 
   if (command === "links") {

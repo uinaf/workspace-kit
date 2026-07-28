@@ -43,6 +43,7 @@ npm exec -- workspace-kit registry validate         # validate projects.json
 npm exec -- workspace-kit registry status           # inspect registered checkouts
 npm exec -- workspace-kit registry clone            # clone missing managed checkouts
 npm exec -- workspace-kit registry pull             # fast-forward managed checkouts
+npm exec -- workspace-kit confidential check        # verify protected index content
 npm exec -- workspace-kit hooks install              # enable tracked Git hooks
 npm exec -- workspace-kit skills sync               # materialize workspace skills
 ```
@@ -51,7 +52,8 @@ npm exec -- workspace-kit skills sync               # materialize workspace skil
 configured `doctor` checks, validates a configured project registry, and checks
 that configured wiki catalogs are current. `doctor` covers structure,
 wiki-lint, ownership-contract, documentation-link, workspace-skill, and
-soft-limit checks. Git-history-based wiki staleness remains an explicit
+opt-in confidential-index checks plus soft limits. Git-history-based wiki
+staleness remains an explicit
 operation. Candidate paths are screened with `contract handoff <paths...>` for
 human review eligibility. Absent config sections disable their checks, unknown
 files are always tolerated, and all validation runs offline with zero runtime
@@ -98,11 +100,19 @@ workflow. Consumers can list that workflow in `workspace.json.required` when
 its presence is part of their structural contract. Local `workspace-kit`
 commands remain deterministic, credential-free workspace checks.
 
+The optional `confidential` contract verifies that protected Git index entries
+use a staged git-crypt policy and ciphertext envelope without invoking
+git-crypt or managing keys. It is current-index leak protection, not
+cryptographic or historical proof; see
+[Confidential Git content](docs/confidentiality.md).
+
 ## Docs
 
 - [Workspace convention, bootstrap, and check contracts](docs/convention.md) —
   workspace structure, skill ownership, scaffold follow-through, and exactly
   what each check enforces
+- [Confidential Git content](docs/confidentiality.md) — threat model, git-crypt
+  index contract, adoption, and provider ownership
 - [Parity oracle](parity/README.md) — the executable spec the checks are
   held to, byte-for-byte
 - [Release workflow](docs/releasing.md) — automatic, tokenless publishing

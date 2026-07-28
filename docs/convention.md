@@ -171,20 +171,25 @@ Consumers own shared machine-global skill selection and installation.
   fragment-only destinations are ignored. Checked Markdown filenames must use
   portable `/` separators; literal backslashes are reported as non-portable.
   Targets must be tracked, so a gitignored-but-present file does not pass.
+- **Confidential Git content** — `confidential check` validates protected
+  staged/index files against the opt-in git-crypt contract. It never invokes
+  the provider, manages keys, or decrypts content. See
+  [Confidential Git content](confidentiality.md) for the threat model,
+  migration sequence, and exact ownership boundary.
 
 ## Configuration reference (`workspace.json`)
 
-```jsonc
+```json
 {
-  "minVersion": "0.1.0", // kit refuses to run if older
-  "required": ["AGENTS.md", "CLAUDE.md"], // files that must exist
-  "forbidden": [".env"], // files that must not exist
+  "minVersion": "0.1.0",
+  "required": ["AGENTS.md", "CLAUDE.md"],
+  "forbidden": [".env"],
   "links": [{ "path": "CLAUDE.md", "target": "AGENTS.md" }],
   "registry": {
     "file": "projects.json",
     "entry": {
       "required": ["name", "repo", "path", "owns", "mode"],
-      "optional": ["branch", "catalog"],
+      "optional": ["branch", "catalog"]
     },
     "project": {
       "pathPrefix": "~/projects/",
@@ -193,26 +198,29 @@ Consumers own shared machine-global skill selection and installation.
       "allowedOwners": ["fixture-owner"],
       "mustContain": [{ "repo": "fixture-owner/workspace", "mode": "managed" }],
       "maxEntries": 25,
-      "catalog": { "field": "catalog", "modes": ["managed"] },
-    },
+      "catalog": { "field": "catalog", "modes": ["managed"] }
+    }
   },
   "dailyLogs": { "root": "memory", "contexts": "memory/contexts" },
   "wiki": {
     "root": "memory/wiki",
     "requiredFields": ["title", "type", "status", "updated", "tags", "sources"],
-    "indexCoverage": false, // every page cataloged in index.md
-    "logChronology": false, // log.md dates never decrease (append-only proxy)
-    "revisionStaleness": false, // compare proposed source and page revisions
+    "indexCoverage": false,
+    "logChronology": false,
+    "revisionStaleness": false
   },
   "limits": [
-    // soft limits: warnings, never failures
     { "pattern": "MEMORY.md", "maxLines": 200 },
-    { "pattern": "memory/????-??-??.md", "maxLines": 80 },
+    { "pattern": "memory/????-??-??.md", "maxLines": 80 }
   ],
   "contract": { "file": "workspace.contract.json" },
   "handoff": { "paths": ["AGENTS.md"], "prefixes": ["memory/"] },
   "docsLinks": { "enabled": false, "exclude": [] },
   "skills": {},
+  "confidential": {
+    "provider": "git-crypt",
+    "roots": ["memory/private"]
+  }
 }
 ```
 
@@ -236,6 +244,15 @@ generated catalogs land under the configured `wiki.root`.
 path. Each `mustContain` pair requires exactly one entry with that repository
 and mode. `maxEntries` counts entries across every top-level registry category;
 zero defines an intentionally empty registry.
+
+`confidential.roots` are literal portable directory paths, not globs. They must
+be non-empty and non-overlapping, cannot start with `#` or `!`, and each
+requires an exact staged root `.gitattributes` rule in a final canonical rule
+block that protects every descendant. A tracked file or symbolic link at the
+configured root is invalid, and roots cannot traverse tracked files, links, or
+submodules. Enabling this section requires
+`minVersion >= 0.12.0`, because older kits intentionally ignore unknown config
+keys.
 
 ## Output contract
 
@@ -261,6 +278,16 @@ operation and exits 1 when any are present; a clean generated catalog exits 0.
 and runs `wiki backfill --check` when `wiki` exists. It does not run `wiki
 stale`, which is a separate history-based operation.
 
+When the worktree, staged, or committed config contains `confidential`,
+`doctor` and `verify` run the same check as `confidential check`. The union of
+their roots is validated against stage-0 index entries, cached Git attributes,
+and git-crypt's ciphertext envelope. This makes opt-out a two-commit migration:
+remove the config while retaining policy and ciphertext, then remove or migrate
+the protected content in a later commit. Protected conflicts, non-regular
+entries, missing staged policy, incorrect attributes, plaintext blobs, and Git
+operational failures are fatal. The check never includes blob content in
+output. Protected index or attribute metadata above 64 MiB fails closed.
+
 `registry validate` exits 1 for malformed entries, ownership-policy failures,
 or unsafe local checkout state and prints `registry ok` on success. It reads
 Git metadata only; it never clones, fetches, pulls, or changes a checkout.
@@ -278,7 +305,8 @@ runs for recurring coverage. The consumer may add the workflow path to
 workflow as part of its structure.
 
 Local workspace validation stays focused on deterministic structure, wiki,
-registry, documentation, and skill contracts. Host configuration audits and
+registry, documentation, skill, and opt-in confidential-index contracts. Host
+configuration audits, key management, provider lifecycle, and
 repository-history security scans remain independently operated surfaces.
 
 ## Profiles (`init`)

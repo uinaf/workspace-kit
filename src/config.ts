@@ -33,6 +33,8 @@ export type ContractConfig = { file: string };
 export type HandoffConfig = { paths: string[]; prefixes: string[] };
 export type DocsLinksConfig = { enabled: boolean; exclude: string[] };
 export type SkillsConfig = { manifest: "skills/skills.json" };
+export type ConfidentialConfig = { provider: "git-crypt"; roots: string[] };
+export const CONFIDENTIAL_MIN_VERSION = "0.12.0";
 
 export type WorkspaceConfig = {
   minVersion?: string;
@@ -47,6 +49,7 @@ export type WorkspaceConfig = {
   handoff?: HandoffConfig;
   docsLinks?: DocsLinksConfig;
   skills?: SkillsConfig;
+  confidential?: ConfidentialConfig;
 };
 
 export const CONFIG_FILE = "workspace.json";
@@ -147,6 +150,7 @@ const CONFIG_SHAPE: ConfigShape = {
   handoff: { paths: true, prefixes: true },
   docsLinks: { enabled: true, exclude: true },
   skills: {},
+  confidential: { provider: true, roots: true },
 };
 
 function collectUnknownKeys(value: unknown, shape: ConfigShape, path: string, out: string[]): void {
@@ -417,6 +421,51 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
   if ("skills" in value) {
     if (!isRecord(value.skills)) fail("skills must be an object");
     out.skills = { manifest: "skills/skills.json" };
+  }
+
+  if ("confidential" in value) {
+    if (!isRecord(value.confidential)) fail("confidential must be an object");
+    if (!out.minVersion || compareVersions(out.minVersion, CONFIDENTIAL_MIN_VERSION) < 0) {
+      fail(`confidential requires minVersion >= ${CONFIDENTIAL_MIN_VERSION}`);
+    }
+    if (value.confidential.provider !== "git-crypt") {
+      fail('confidential.provider must be "git-crypt"');
+    }
+    const roots = workspacePathList(value.confidential.roots, "confidential.roots");
+    if (roots.length === 0) fail("confidential.roots must not be empty");
+    if (roots.some((root) => /[*?[\]]/.test(root))) {
+      fail("confidential.roots must contain literal paths, not glob patterns");
+    }
+    if (roots.some((root) => /\s/.test(root))) {
+      fail("confidential.roots must not contain whitespace");
+    }
+    if (roots.some((root) => root.startsWith("#") || root.startsWith("!"))) {
+      fail('confidential.roots must not start with "#" or "!"');
+    }
+    if (
+      roots.some((root) =>
+        [".git", ".git-crypt", ".githooks"]
+          .map(portablePathIdentity)
+          .includes(portablePathIdentity(root.split("/")[0]!)),
+      )
+    ) {
+      fail("confidential.roots must not contain Git or hook control directories");
+    }
+    const identities = roots.map(portablePathIdentity);
+    for (let index = 0; index < identities.length; index += 1) {
+      for (let previous = 0; previous < index; previous += 1) {
+        const current = identities[index]!;
+        const ancestor = identities[previous]!;
+        if (
+          current === ancestor ||
+          current.startsWith(`${ancestor}/`) ||
+          ancestor.startsWith(`${current}/`)
+        ) {
+          fail(`confidential.roots[${index}] overlaps confidential.roots[${previous}]`);
+        }
+      }
+    }
+    out.confidential = { provider: "git-crypt", roots };
   }
 
   return out;

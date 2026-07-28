@@ -35,6 +35,16 @@ function run(command, args, cwd) {
   return result.stdout ?? "";
 }
 
+function versionAtLeast(version, minimum) {
+  const current = version.split(".").map(Number);
+  const required = minimum.split(".").map(Number);
+  for (let index = 0; index < 3; index += 1) {
+    const difference = (current[index] ?? 0) - (required[index] ?? 0);
+    if (difference !== 0) return difference > 0;
+  }
+  return true;
+}
+
 try {
   const archiveDir = join(scratch, "archive");
   const consumerDir = join(scratch, "consumer");
@@ -75,7 +85,14 @@ try {
   assert.equal(packed.version, sourceVersion);
   assert.deepEqual(
     packed.files.map((file) => file.path).sort(),
-    ["LICENSE", "README.md", "dist/cli.mjs", "docs/convention.md", "package.json"].sort(),
+    [
+      "LICENSE",
+      "README.md",
+      "dist/cli.mjs",
+      "docs/confidentiality.md",
+      "docs/convention.md",
+      "package.json",
+    ].sort(),
   );
   const archive = join(archiveDir, packed.filename);
 
@@ -139,6 +156,24 @@ try {
   run("git", ["init", "-q"], fixtureDir);
   run(process.execPath, [installedCli, "hooks", "install"], fixtureDir);
   assert.equal(run("git", ["config", "--get", "core.hooksPath"], fixtureDir).trim(), ".githooks");
+  if (versionAtLeast(sourceVersion, "0.12.0")) {
+    config.confidential = { provider: "git-crypt", roots: ["private"] };
+    writeFileSync(join(fixtureDir, "workspace.json"), `${JSON.stringify(config, null, 2)}\n`);
+    writeFileSync(
+      join(fixtureDir, ".gitattributes"),
+      "private/** filter=git-crypt diff=git-crypt\n",
+    );
+    mkdirSync(join(fixtureDir, "private"));
+    writeFileSync(
+      join(fixtureDir, "private", "fixture.enc"),
+      Buffer.concat([
+        Buffer.from([0x00, 0x47, 0x49, 0x54, 0x43, 0x52, 0x59, 0x50, 0x54, 0x00]),
+        Buffer.alloc(12),
+      ]),
+    );
+    run("git", ["add", "-A"], fixtureDir);
+    run(process.execPath, [installedCli, "confidential", "check"], fixtureDir);
+  }
   config.skills = {};
   writeFileSync(join(fixtureDir, "workspace.json"), `${JSON.stringify(config, null, 2)}\n`);
   mkdirSync(join(fixtureDir, ".agents", "skills", "fixture-skill"), { recursive: true });
