@@ -45,7 +45,10 @@ function golden(file: string): string {
   return readFileSync(join(goldenDir, file), "utf8");
 }
 
-test("kit CLI reproduces every legacy golden", () => {
+// Every scenario spawns the CLI several times, so wall-clock here tracks
+// subprocess scheduling rather than anything this test asserts. The default
+// five-second bound is close enough to that cost to fail on a loaded machine.
+test("kit CLI reproduces every legacy golden", { timeout: 120_000 }, () => {
   const mismatches: string[] = [];
 
   const compare = (label: string, actual: string, expected: string) => {

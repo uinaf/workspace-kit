@@ -475,6 +475,21 @@ test("an untracked or aliased policy file is not a committed policy", () => {
   ]);
 });
 
+test("a rejected index is not read as an absent policy either", () => {
+  const dir = workspace();
+  writeFileSync(join(dir, "workspace.json"), JSON.stringify({ required: [".gitattributes"] }));
+  const foreign = mkdtempSync(join(tmpdir(), "confidential-foreign-index-"));
+  // With no section in the working tree, only the index could answer whether
+  // this commit declares a policy — and this index cannot be trusted to.
+  const result = spawnSync(process.execPath, [cli, "doctor", "--json"], {
+    cwd: dir,
+    encoding: "utf8",
+    env: { ...process.env, GIT_INDEX_FILE: join(foreign, "index") },
+  });
+  assert.equal(result.status, 1, result.stdout);
+  assert.equal(JSON.parse(result.stdout).checks.confidential, "fail");
+});
+
 test("an unreadable staged policy is not read as an absent one", () => {
   const dir = workspace();
   writeFileSync(join(dir, "workspace.json"), "{ this is not json");

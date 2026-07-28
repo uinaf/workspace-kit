@@ -93,6 +93,10 @@ function gitOutput(
 
 type Repository = { root: string; commonDir: string; env: NodeJS.ProcessEnv };
 
+// Distinguished because "there is no repository" is the one failure that proves
+// nothing can be staged; every other failure only proves we could not look.
+const NOT_A_REPOSITORY = "not a Git repository";
+
 // Every path this check handles is repository-root-relative, and Git resolves
 // pathspecs and `check-attr` inputs against its own working directory: running
 // from a subdirectory would silently evaluate the wrong paths. Resolve the top
@@ -113,7 +117,7 @@ function repository(repoRoot: string): Repository {
     repoRoot,
     env,
     ["rev-parse", "--show-toplevel", "--absolute-git-dir", "--git-common-dir"],
-    "could not resolve the repository root",
+    NOT_A_REPOSITORY,
   )
     .split("\n")
     .map((line) => line.trim());
@@ -227,15 +231,27 @@ export type IndexedPolicy = { policy: ConfidentialConfig | undefined; unreadable
 
 export function indexedConfidentialPolicy(repoRoot = "."): IndexedPolicy {
   let repo: Repository;
-  let entry: IndexEntry | undefined;
   try {
     repo = repository(repoRoot);
-    entry = stagedConfigEntry(indexEntries(repo).filter((item) => item.stage === "0"));
-  } catch {
-    return { policy: undefined, unreadable: false }; // No repository or index.
+  } catch (error) {
+    // Only the absence of a repository proves nothing is staged. A rejected
+    // index or any other failure means we could not look, which must not pass
+    // for an absent policy.
+    const absent = error instanceof Error && error.message === NOT_A_REPOSITORY;
+    return { policy: undefined, unreadable: !absent };
   }
-  if (!entry) return { policy: undefined, unreadable: false };
-  const result = gitText(repo.root, repo.env, ["cat-file", "blob", entry.oid]);
+
+  // `:<path>` addresses that exact path in the index relative to the repository
+  // root, and `--batch-check` reports an absent entry as `missing` while still
+  // exiting zero. That keeps "no staged policy" distinguishable from "could not
+  // look" without listing the whole index on every run of every workspace,
+  // including the ones that never adopted this section.
+  const probe = gitText(repo.root, repo.env, ["cat-file", "--batch-check"], `:${CONFIG_FILE}\n`);
+  if (!probe.completed || probe.status !== 0) return { policy: undefined, unreadable: true };
+  const [oid, type] = probe.stdout.trim().split(" ");
+  if (!oid || type !== "blob") return { policy: undefined, unreadable: false };
+
+  const result = gitText(repo.root, repo.env, ["cat-file", "blob", oid]);
   if (!result.completed || result.status !== 0) return { policy: undefined, unreadable: true };
   try {
     return {
@@ -342,6 +358,11 @@ function objectHeaders(repo: Repository, oids: string[]): Map<string, Buffer> {
 // Candidate discovery for tracked git-crypt key material. `git grep` scans the
 // index in one pass; every candidate's header is verified before it is
 // reported, so a document that merely mentions the marker is not flagged.
+//
+// This recognizes the headered key format only. git-crypt still loads pre-0.4
+// keys, which are raw key bytes with no header and are therefore
+// indistinguishable from any other small binary blob offline — the contract
+// documents that constraint rather than pretending to detect them.
 function keyMaterialCandidates({ root, env }: Repository): Set<string> {
   const result = gitText(root, env, [
     "grep",

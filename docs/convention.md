@@ -184,7 +184,9 @@ Consumers own shared machine-global skill selection and installation.
   section takes a staged edit, not an unstaged one — and `workspace.json` itself
   must be tracked at that exact path, with no case alias beside it.
   Key-material findings verify the provider's key header, so prose that merely
-  names it is not flagged. The check reads only object headers; it never reports
+  names it is not flagged; that also bounds them to git-crypt's headered key
+  format, since a pre-0.4 key is raw bytes and cannot be told apart from any
+  other small binary blob offline. The check reads only object headers; it never reports
   file content, never decrypts, and never changes state.
 - **Documentation links** — when enabled, `docs links` validates relative
   destinations in tracked Markdown inline links, images, and reference
