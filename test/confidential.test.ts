@@ -520,6 +520,21 @@ test("a globstar segment covers zero directories, as Git treats it", () => {
   ]);
 });
 
+test("a pattern dense with globstars stays tractable", () => {
+  // Enumerating globstar alternatives would be 2^24 patterns here, so the
+  // default test timeout is the regression guard: matching walks the pattern.
+  const pattern = `${Array.from({ length: 24 }, () => "**").join("/")}/notes/**`;
+  const config: ConfidentialConfig = { provider: "git-crypt", paths: [pattern] };
+  const deep = Array.from({ length: 12 }, (_, index) => `d${index}`).join("/");
+  const dir = mkdtempSync(join(tmpdir(), "confidential-globstars-"));
+  git(dir, "init", "-q");
+  writeFileSync(join(dir, "workspace.json"), JSON.stringify({ confidential: config }));
+  writeFileSync(join(dir, ".gitattributes"), `${pattern} filter=git-crypt\n`);
+  put(dir, `${deep}/notes/a.md`, ciphertext());
+  git(dir, "add", "-A");
+  assert.deepEqual(confidentialReport(config, dir).errors, []);
+});
+
 test("a staged gitlink at the config path is unreadable, not absent", () => {
   const dir = workspace();
   writeFileSync(join(dir, "workspace.json"), JSON.stringify({ required: [".gitattributes"] }));

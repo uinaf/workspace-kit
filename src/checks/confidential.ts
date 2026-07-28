@@ -400,41 +400,48 @@ function keyMaterialCandidates({ root, env }: Repository): Set<string> {
   return new Set(result.stdout.split("\0").filter(Boolean));
 }
 
-// Git treats a `**` path segment as zero or more directories, so `a/**/b` covers
-// `a/b` as well as `a/x/b`. Enumerating the variants where such a segment is
-// absent keeps that semantic here without teaching the shared glob translation a
-// second dialect. A trailing `**` is not omissible: it requires content inside.
-function patternVariants(pattern: string): string[] {
-  const segments = pattern.split("/");
-  let variants: string[][] = [[]];
-  segments.forEach((segment, index) => {
-    variants =
-      segment === "**" && index < segments.length - 1
-        ? variants.flatMap((prefix) => [[...prefix, segment], prefix])
-        : variants.map((prefix) => [...prefix, segment]);
-  });
-  return [...new Set(variants.map((parts) => parts.join("/")).filter(Boolean))];
+// Path matching with Git's globstar semantics, walked segment by segment
+// against a precompiled pattern. A `**` segment consumes zero or more path
+// segments, so `a/**/b` covers `a/b` as well as `a/x/b`; a trailing `**`
+// requires content inside. Enumerating those alternatives instead would grow
+// exponentially with the number of globstars in an owner-authored pattern.
+//
+// `route` asks the related question the submodule guard needs: not "does this
+// path match" but "could a path under this directory still match", which is how
+// a gitlink mounted above protected content is spotted.
+type Pattern = { path: string; segments: string[]; matchers: (RegExp | undefined)[] };
+
+function compilePattern(path: string): Pattern {
+  const segments = portablePathIdentity(path).split("/");
+  return {
+    path,
+    segments,
+    matchers: segments.map((segment) => (segment === "**" ? undefined : globToRegExp(segment))),
+  };
 }
 
-// Whether a directory could sit on a route a pattern matches, i.e. whether
-// `<directory>/…` can still satisfy the pattern. Used to spot a submodule
-// mounted above a protected root. `**` consumes any number of segments, so this
-// walks the pattern rather than slicing it to a fixed depth.
-function couldContain(pattern: string, directory: string): boolean {
-  const segments = pattern.split("/");
-  const parts = directory.split("/");
+function segmentMatch(pattern: Pattern, parts: string[], route: boolean): boolean {
+  const { segments, matchers } = pattern;
+  // Revisiting a position can only reproduce a result already rejected, and any
+  // success returns immediately, so remembering visits keeps this polynomial.
+  const visited = new Set<number>();
   const walk = (index: number, part: number): boolean => {
-    if (part === parts.length) return index < segments.length;
-    if (index === segments.length) return false;
-    if (segments[index] === "**") {
-      // A globstar can absorb any remaining directory segments, and a trailing
-      // one keeps matching content deeper than the directory itself.
+    if (index === segments.length) return !route && part === parts.length;
+    const key = index * (parts.length + 1) + part;
+    if (visited.has(key)) return false;
+    visited.add(key);
+    if (matchers[index] === undefined) {
+      // A trailing globstar covers everything strictly inside; in route mode the
+      // directory is already inside, so deeper content still matches.
+      if (index === segments.length - 1) return route || part < parts.length;
       for (let skip = part; skip <= parts.length; skip += 1) {
         if (walk(index + 1, skip)) return true;
       }
-      return true;
+      return route && part === parts.length;
     }
-    if (!globToRegExp(segments[index]!).test(parts[part]!)) return false;
+    // Pattern segments remain but the path is exhausted: a descendant could match.
+    if (part === parts.length) return route;
+    if (!matchers[index]!.test(parts[part]!)) return false;
     return walk(index + 1, part + 1);
   };
   return walk(0, 0);
@@ -449,16 +456,10 @@ function report(config: ConfidentialConfig, repoRoot: string): ConfidentialRepor
   // differs from a declared pattern only by spelling is treated as protected,
   // so a case-insensitive author and a case-sensitive collaborator cannot
   // disagree about what is covered.
-  const patterns = config.paths.map((path) => {
-    const variants = patternVariants(path).map(portablePathIdentity);
-    return { path, variants, regexes: variants.map((variant) => globToRegExp(variant)) };
-  });
-  const matches = (pattern: (typeof patterns)[number], identity: string): boolean =>
-    pattern.regexes.some((regex) => regex.test(identity));
-  const declares = (path: string): boolean => {
-    const identity = portablePathIdentity(path);
-    return patterns.some((pattern) => matches(pattern, identity));
-  };
+  const patterns = config.paths.map(compilePattern);
+  const matches = (pattern: Pattern, path: string, route = false): boolean =>
+    segmentMatch(pattern, portablePathIdentity(path).split("/"), route);
+  const declares = (path: string): boolean => patterns.some((pattern) => matches(pattern, path));
 
   const tracked = entries.filter((entry) => entry.stage === "0");
   const unmerged = [...new Set(entries.filter((e) => e.stage !== "0").map((e) => e.path))].sort();
@@ -490,9 +491,7 @@ function report(config: ConfidentialConfig, repoRoot: string): ConfidentialRepor
   // A pattern that covers nothing is the failure mode that makes a green run
   // meaningless, so it fails rather than passing quietly.
   for (const pattern of patterns) {
-    const covered = [...protectedPaths, ...unmerged].some((path) =>
-      matches(pattern, portablePathIdentity(path)),
-    );
+    const covered = [...protectedPaths, ...unmerged].some((path) => matches(pattern, path));
     if (!covered) errors.push(`no tracked content matches protected path: ${pattern.path}`);
   }
 
@@ -502,11 +501,7 @@ function report(config: ConfidentialConfig, repoRoot: string): ConfidentialRepor
     // A gitlink the patterns match directly is reported once, as a protected
     // path that is not a regular file.
     if (entry.mode !== "160000" || protectedPaths.has(entry.path)) continue;
-    const identity = portablePathIdentity(entry.path);
-    const reaches = patterns.some((pattern) =>
-      pattern.variants.some((variant) => couldContain(variant, identity)),
-    );
-    if (reaches) {
+    if (patterns.some((pattern) => matches(pattern, entry.path, true))) {
       errors.push(`protected content is inside a tracked submodule: ${entry.path}`);
     }
   }
