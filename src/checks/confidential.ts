@@ -254,6 +254,16 @@ function protectedBy(path: string, roots: readonly string[]): boolean {
   });
 }
 
+function uniquePortablePaths(paths: readonly string[]): string[] {
+  const identities = new Set<string>();
+  return paths.filter((path) => {
+    const identity = portablePathIdentity(path);
+    if (identities.has(identity)) return false;
+    identities.add(identity);
+    return true;
+  });
+}
+
 function isConfiguredRoot(path: string, roots: readonly string[]): boolean {
   const identity = portablePathIdentity(path);
   return roots.some((root) => identity === portablePathIdentity(root));
@@ -495,13 +505,11 @@ export function confidentialCheck(
     };
   }
 
-  const roots = [
-    ...new Set([
-      ...(current.confidential?.roots ?? []),
-      ...(proposed?.roots ?? []),
-      ...(committed?.roots ?? []),
-    ]),
-  ];
+  const roots = uniquePortablePaths([
+    ...(current.confidential?.roots ?? []),
+    ...(proposed?.roots ?? []),
+    ...(committed?.roots ?? []),
+  ]);
   if (roots.length === 0) return { enabled: false, errors: [] };
 
   let entries: IndexEntry[];

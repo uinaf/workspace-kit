@@ -449,6 +449,34 @@ test("confidential check evaluates the union of staged and worktree policy", () 
   }
 });
 
+test("confidential check deduplicates portable root aliases across config states", () => {
+  const dir = fixture();
+  try {
+    writeFileSync(
+      join(dir, "workspace.json"),
+      `${JSON.stringify(
+        {
+          minVersion: CONFIDENTIAL_MIN_VERSION,
+          confidential: { provider: "git-crypt", roots: ["Private"] },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    writeFileSync(join(dir, ".gitattributes"), "Private/** filter=git-crypt diff=git-crypt\n");
+    git(dir, "add", "workspace.json", ".gitattributes");
+    git(dir, "commit", "-qm", "uppercase root spelling");
+
+    writeFileSync(join(dir, "workspace.json"), `${JSON.stringify(config(), null, 2)}\n`);
+    writeFileSync(join(dir, ".gitattributes"), "private/** filter=git-crypt diff=git-crypt\n");
+    git(dir, "add", "workspace.json", ".gitattributes");
+
+    assert.deepEqual(check(dir), { enabled: true, errors: [] });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("confidential check fails closed when staged config is unusable", () => {
   const dir = fixture();
   try {
