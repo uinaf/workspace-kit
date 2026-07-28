@@ -351,9 +351,16 @@ Explicit non-goals:
 - Encrypted Git storage is the wrong home for live credentials. Keep those in a
   secret manager and commit only sanitized references.
 
-Declared protected paths must stay outside the roots that content checks scan
-(`wiki.root`, `dailyLogs.root`, `dailyLogs.contexts`): in a locked clone those
-files are ciphertext, and a Markdown-shaped check has nothing to read.
+Two limits of the mechanism are worth planning around rather than discovering.
+Git attribute resolution is not fully containable: `--cached` and a neutralized
+`core.attributesFile` keep working-tree and global rules out, and a git-crypt
+rule in the repository-local `info/attributes` is reported, but a system-wide
+`gitattributes` file cannot be suppressed by any Git option and is out of scope.
+And place protected paths clear of the trees that content checks scan — in a
+locked clone those files are ciphertext, so a wiki or daily-log check reading
+them as Markdown produces noise. The kit does not reject the overlap, because
+the useful arrangement (`memory/private/**` beside a `memory` daily-log root)
+does not actually collide.
 
 ## Profiles (`init`)
 

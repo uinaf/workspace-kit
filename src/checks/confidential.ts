@@ -10,6 +10,7 @@
 // key the kit cannot confirm the ciphertext decrypts or names the intended
 // recipients, and it inspects the index only, never older commits.
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { resolve, sep } from "node:path";
 import { portablePathIdentity, type ConfidentialConfig } from "../config.ts";
 import { gitEnvironmentForRepository } from "../lib/gitProcess.ts";
@@ -22,13 +23,23 @@ const KEY_MAGIC = Buffer.from("\0GITCRYPTKEY", "latin1");
 const HEADER_BYTES = KEY_MAGIC.length;
 // `cat-file --batch` buffers whole objects, so group requests under a byte
 // budget instead of reading the entire protected set in one pass.
-const BATCH_BUDGET = 32 * 1024 * 1024;
+const BATCH_BUDGET = 8 * 1024 * 1024;
+// An object above this is read on its own with a bounded buffer, so a large
+// protected archive costs a header read rather than its own size in memory.
+const BATCH_OBJECT_LIMIT = 1024 * 1024;
 // Encrypting the files that define policy silently disables that policy.
 const POLICY_BASENAMES = new Set([".gitattributes", ".gitignore", ".gitmodules", "workspace.json"]);
+// `git-crypt init -k <name>` installs a per-key filter, so coverage is the
+// default filter or one of that namespace.
+const PROVIDER_FILTER = /^git-crypt(-[A-Za-z0-9._-]+)?$/;
 
 export type ConfidentialReport = { errors: string[]; protectedPaths: number };
 
 type IndexEntry = { mode: string; oid: string; stage: string; path: string };
+// `completed` separates "git ran and exited" from "git could not be run":
+// spawnSync reports the latter with a null status, and a check that read that
+// as an ordinary exit code would treat a truncated scan as a clean one.
+type GitResult = { completed: boolean; status: number; stdout: string };
 
 function basename(path: string): string {
   return path.split("/").at(-1) ?? path;
@@ -39,41 +50,75 @@ function gitText(
   env: NodeJS.ProcessEnv,
   args: string[],
   input?: string,
-): { status: number; stdout: string } {
+): GitResult {
   const result = spawnSync("git", ["-C", repoRoot, ...args], {
     encoding: "utf8",
     env,
     maxBuffer: BATCH_BUDGET,
     ...(input === undefined ? {} : { input }),
   });
-  return { status: result.status ?? 1, stdout: result.stdout ?? "" };
+  return {
+    completed: result.error === undefined && result.status !== null,
+    status: result.status ?? 1,
+    stdout: result.stdout ?? "",
+  };
 }
 
+function gitOutput(
+  repoRoot: string,
+  env: NodeJS.ProcessEnv,
+  args: string[],
+  failure: string,
+  input?: string,
+): string {
+  const result = gitText(repoRoot, env, args, input);
+  if (!result.completed || result.status !== 0) throw new Error(failure);
+  return result.stdout;
+}
+
+type Repository = { root: string; commonDir: string; env: NodeJS.ProcessEnv };
+
+// Every path this check handles is repository-root-relative, and Git resolves
+// pathspecs and `check-attr` inputs against its own working directory: running
+// from a subdirectory would silently evaluate the wrong paths. Resolve the top
+// level once and run everything there.
+//
 // `git commit -a` and `git commit <path>` hand hooks a temporary index through
 // GIT_INDEX_FILE; reading the repository's default index instead would inspect
 // stale content and pass plaintext that is about to be committed. Honour the
 // inherited index only when it belongs to this repository.
-function indexEnvironment(repoRoot: string): NodeJS.ProcessEnv {
+function repository(repoRoot: string): Repository {
   const env = gitEnvironmentForRepository();
+  const [top = "", gitDir = "", common = ""] = gitOutput(
+    repoRoot,
+    env,
+    ["rev-parse", "--show-toplevel", "--absolute-git-dir", "--git-common-dir"],
+    "could not resolve the repository root",
+  )
+    .split("\n")
+    .map((line) => line.trim());
+  if (!top || !gitDir) throw new Error("could not resolve the repository root");
+  const root = resolve(top);
   const inherited = process.env.GIT_INDEX_FILE;
-  if (!inherited) return env;
-  const gitDir = gitText(repoRoot, env, ["rev-parse", "--absolute-git-dir"]);
-  if (gitDir.status !== 0) throw new Error("could not resolve the Git directory");
-  const root = resolve(gitDir.stdout.trim());
-  const indexFile = resolve(inherited);
-  if (indexFile !== root && !indexFile.startsWith(`${root}${sep}`)) {
-    throw new Error("GIT_INDEX_FILE points outside this repository");
+  if (inherited) {
+    const directory = resolve(gitDir);
+    const indexFile = resolve(inherited);
+    if (indexFile !== directory && !indexFile.startsWith(`${directory}${sep}`)) {
+      throw new Error("GIT_INDEX_FILE points outside this repository");
+    }
+    env.GIT_INDEX_FILE = indexFile;
   }
-  env.GIT_INDEX_FILE = indexFile;
-  return env;
+  return { root, commonDir: resolve(root, common), env };
 }
 
-function indexEntries(repoRoot: string, env: NodeJS.ProcessEnv): IndexEntry[] {
-  // `-- :/` is required: without it a run from a subdirectory lists only that
-  // subtree, and every protected path outside it would go unchecked.
-  const result = gitText(repoRoot, env, ["ls-files", "-s", "-z", "--full-name", "--", ":/"]);
-  if (result.status !== 0) throw new Error("could not read the Git index");
-  return result.stdout
+function indexEntries({ root, env }: Repository): IndexEntry[] {
+  // `-- :/` pins the pathspec to the whole repository rather than a subtree.
+  return gitOutput(
+    root,
+    env,
+    ["ls-files", "-s", "-z", "--full-name", "--", ":/"],
+    "could not read the Git index",
+  )
     .split("\0")
     .filter(Boolean)
     .map((record) => {
@@ -83,42 +128,70 @@ function indexEntries(repoRoot: string, env: NodeJS.ProcessEnv): IndexEntry[] {
     });
 }
 
-function filterAttributes(
-  repoRoot: string,
-  env: NodeJS.ProcessEnv,
-  paths: string[],
-): Map<string, string> {
+function filterAttributes({ root, env }: Repository, paths: string[]): Map<string, string> {
   const out = new Map<string, string>();
   if (paths.length === 0) return out;
-  const result = gitText(
-    repoRoot,
+  // `--cached` reads `.gitattributes` from the index instead of the working
+  // tree, and `core.attributesFile=/dev/null` drops the user's global file: a
+  // rule that is not committed protects nothing in a clone. Git also consults
+  // `$GIT_COMMON_DIR/info/attributes`, which cannot be suppressed and is
+  // reported separately.
+  const stdout = gitOutput(
+    root,
     env,
-    ["check-attr", "--cached", "--stdin", "-z", "filter"],
+    ["-c", "core.attributesFile=/dev/null", "check-attr", "--cached", "--stdin", "-z", "filter"],
+    "could not resolve Git attributes",
     `${paths.join("\0")}\0`,
   );
-  if (result.status !== 0) throw new Error("could not resolve Git attributes");
   // `-z` output is a flat `path NUL attribute NUL value NUL` stream.
-  const fields = result.stdout.split("\0");
+  const fields = stdout.split("\0");
   for (let i = 0; i + 2 < fields.length; i += 3) out.set(fields[i]!, fields[i + 2]!);
   return out;
 }
 
-function objectSizes(
-  repoRoot: string,
-  env: NodeJS.ProcessEnv,
-  oids: string[],
-): Map<string, number> {
+// Git gives the repository-local, uncommitted attributes file the highest
+// precedence and offers no way to ignore it, so a git-crypt rule there is a
+// policy that no clone receives.
+function localAttributeOverride({ commonDir }: Repository): boolean {
+  try {
+    return /(?:^|[\s=])git-crypt(?:-[A-Za-z0-9._-]+)?(?:\s|$)/m.test(
+      readFileSync(resolve(commonDir, "info", "attributes"), "utf8"),
+    );
+  } catch {
+    return false; // No repository-local attributes file, or it is unreadable.
+  }
+}
+
+function objectSizes({ root, env }: Repository, oids: string[]): Map<string, number> {
   const sizes = new Map<string, number>();
   if (oids.length === 0) return sizes;
-  const result = gitText(repoRoot, env, ["cat-file", "--batch-check"], `${oids.join("\n")}\n`);
-  if (result.status !== 0) throw new Error("could not inspect indexed content");
-  for (const line of result.stdout.split("\n")) {
+  const stdout = gitOutput(
+    root,
+    env,
+    ["cat-file", "--batch-check"],
+    "could not inspect indexed content",
+    `${oids.join("\n")}\n`,
+  );
+  for (const line of stdout.split("\n")) {
     const [oid, type, size] = line.split(" ");
     if (!oid || type !== "blob" || size === undefined) continue;
     const bytes = Number.parseInt(size, 10);
     if (Number.isInteger(bytes) && bytes >= 0) sizes.set(oid, bytes);
   }
   return sizes;
+}
+
+// An oversized object is read on its own with a bounded buffer. Only the header
+// is needed, so a truncated read is still conclusive; a read that does not even
+// reach the header leaves the object unverified, which fails closed.
+function oversizedHeader({ root, env }: Repository, oid: string): Buffer | undefined {
+  const result = spawnSync("git", ["-C", root, "cat-file", "blob", oid], {
+    env,
+    maxBuffer: BATCH_OBJECT_LIMIT,
+  });
+  const stdout = result.stdout;
+  if (!stdout || stdout.length < HEADER_BYTES) return undefined;
+  return stdout.subarray(0, HEADER_BYTES);
 }
 
 function parseBatch(stdout: Buffer, headers: Map<string, Buffer>): void {
@@ -142,21 +215,17 @@ function parseBatch(stdout: Buffer, headers: Map<string, Buffer>): void {
 
 // Reads the leading bytes of indexed blobs. Only headers are retained; content
 // never leaves this function and is never reported.
-function objectHeaders(
-  repoRoot: string,
-  env: NodeJS.ProcessEnv,
-  oids: string[],
-): Map<string, Buffer> {
+function objectHeaders(repo: Repository, oids: string[]): Map<string, Buffer> {
   const headers = new Map<string, Buffer>();
   const unique = [...new Set(oids)];
-  const sizes = objectSizes(repoRoot, env, unique);
+  const sizes = objectSizes(repo, unique);
   let batch: string[] = [];
   let bytes = 0;
 
   const flush = (): void => {
     if (batch.length === 0) return;
-    const result = spawnSync("git", ["-C", repoRoot, "cat-file", "--batch"], {
-      env,
+    const result = spawnSync("git", ["-C", repo.root, "cat-file", "--batch"], {
+      env: repo.env,
       input: `${batch.join("\n")}\n`,
       maxBuffer: bytes + 1024,
     });
@@ -168,6 +237,11 @@ function objectHeaders(
   for (const oid of unique) {
     const size = sizes.get(oid);
     if (size === undefined) continue; // Missing or non-blob: reported as unverifiable.
+    if (size > BATCH_OBJECT_LIMIT) {
+      const header = oversizedHeader(repo, oid);
+      if (header) headers.set(oid, header);
+      continue;
+    }
     const cost = size + 64; // Each record adds an oid, a type, a size, and two newlines.
     if (batch.length > 0 && bytes + cost > BATCH_BUDGET) flush();
     batch.push(oid);
@@ -180,8 +254,8 @@ function objectHeaders(
 // Candidate discovery for tracked git-crypt key material. `git grep` scans the
 // index in one pass; every candidate's header is verified before it is
 // reported, so a document that merely mentions the marker is not flagged.
-function keyMaterialCandidates(repoRoot: string, env: NodeJS.ProcessEnv): Set<string> {
-  const result = gitText(repoRoot, env, [
+function keyMaterialCandidates({ root, env }: Repository): Set<string> {
+  const result = gitText(root, env, [
     "grep",
     "--cached",
     "-l",
@@ -193,25 +267,27 @@ function keyMaterialCandidates(repoRoot: string, env: NodeJS.ProcessEnv): Set<st
     "--",
     ":/",
   ]);
-  // Exit 1 means no candidates; anything worse is an inspection failure.
-  if (result.status > 1) throw new Error("could not search indexed content");
+  // Exit 1 is grep's "no candidates"; a scan that did not run to completion
+  // must never be read as a clean one.
+  if (!result.completed || result.status > 1) {
+    throw new Error("could not search indexed content");
+  }
   return new Set(result.stdout.split("\0").filter(Boolean));
 }
 
-// The literal directory prefix a pattern can never escape, used to spot a
-// submodule mounted at or above a protected root.
-function literalPrefix(pattern: string): string {
-  const segments: string[] = [];
-  for (const segment of pattern.split("/")) {
-    if (/[*?]/.test(segment)) break;
-    segments.push(segment);
-  }
-  return segments.join("/");
+// Whether a directory could sit on a route a pattern matches — the pattern
+// truncated to that directory's depth still matching it. Used to spot a
+// submodule mounted at or above a protected root, including under a wildcard.
+function couldContain(pattern: string, directory: string): boolean {
+  const segments = pattern.split("/");
+  const depth = directory.split("/").length;
+  const head = segments.slice(0, depth).join("/");
+  return globToRegExp(head).test(directory) && (depth < segments.length || head !== pattern);
 }
 
 function report(config: ConfidentialConfig, repoRoot: string): ConfidentialReport {
-  const env = indexEnvironment(repoRoot);
-  const entries = indexEntries(repoRoot, env);
+  const repo = repository(repoRoot);
+  const entries = indexEntries(repo);
   const errors: string[] = [];
 
   // Case- and Unicode-folded matching deliberately over-selects: a path that
@@ -220,8 +296,8 @@ function report(config: ConfidentialConfig, repoRoot: string): ConfidentialRepor
   // disagree about what is covered.
   const patterns = config.paths.map((path) => ({
     path,
+    identity: portablePathIdentity(path),
     regex: globToRegExp(portablePathIdentity(path)),
-    prefix: portablePathIdentity(literalPrefix(path)),
   }));
   const declares = (path: string): boolean => {
     const identity = portablePathIdentity(path);
@@ -238,6 +314,9 @@ function report(config: ConfidentialConfig, repoRoot: string): ConfidentialRepor
   if (!tracked.some((entry) => basename(entry.path) === ".gitattributes")) {
     errors.push("git-crypt policy is not committed: no tracked .gitattributes");
   }
+  if (localAttributeOverride(repo)) {
+    errors.push("git-crypt policy comes from an untracked source: info/attributes");
+  }
 
   // A pattern that covers nothing is the failure mode that makes a green run
   // meaningless, so it fails rather than passing quietly.
@@ -248,30 +327,28 @@ function report(config: ConfidentialConfig, repoRoot: string): ConfidentialRepor
     if (!covered) errors.push(`no tracked content matches protected path: ${pattern.path}`);
   }
 
-  // A gitlink at or above a protected root keeps the content in another
-  // repository's history, where this contract does not reach.
+  // A gitlink above a protected route keeps the content in another repository's
+  // history, where this contract does not reach.
   for (const entry of tracked) {
     if (entry.mode !== "160000") continue;
     const identity = portablePathIdentity(entry.path);
-    const covers = patterns.some(
-      (pattern) => pattern.prefix === identity || pattern.prefix.startsWith(`${identity}/`),
-    );
-    if (covers) errors.push(`protected content is inside a tracked submodule: ${entry.path}`);
+    if (patterns.some((pattern) => couldContain(pattern.identity, identity))) {
+      errors.push(`protected content is inside a tracked submodule: ${entry.path}`);
+    }
   }
 
   const attributes = filterAttributes(
-    repoRoot,
-    env,
+    repo,
     tracked.map((entry) => entry.path),
   );
-  const candidates = keyMaterialCandidates(repoRoot, env);
+  const covered = (path: string): boolean => PROVIDER_FILTER.test(attributes.get(path) ?? "");
+  const candidates = keyMaterialCandidates(repo);
   const inspected = [
     ...protectedEntries,
     ...tracked.filter((entry) => candidates.has(entry.path) && !protectedPaths.has(entry.path)),
   ].filter((entry) => entry.mode.startsWith("100"));
   const headers = objectHeaders(
-    repoRoot,
-    env,
+    repo,
     inspected.map((entry) => entry.oid),
   );
   const isKeyMaterial = (entry: IndexEntry): boolean =>
@@ -288,7 +365,7 @@ function report(config: ConfidentialConfig, repoRoot: string): ConfidentialRepor
       errors.push(`protected path is not a regular file: ${entry.path}`);
     } else if (isKeyMaterial(entry)) {
       errors.push(`git-crypt key material is tracked: ${entry.path}`);
-    } else if (attributes.get(entry.path) !== "git-crypt") {
+    } else if (!covered(entry.path)) {
       errors.push(`protected path is not covered by git-crypt policy: ${entry.path}`);
     } else if (header === undefined) {
       errors.push(`protected path could not be verified: ${entry.path}`);
@@ -306,7 +383,7 @@ function report(config: ConfidentialConfig, repoRoot: string): ConfidentialRepor
   // Inverse coverage: content the provider encrypts that the workspace never
   // declared. This is how a spelling variant or a stale pattern surfaces.
   for (const entry of tracked) {
-    if (attributes.get(entry.path) === "git-crypt" && !protectedPaths.has(entry.path)) {
+    if (covered(entry.path) && !protectedPaths.has(entry.path)) {
       errors.push(`git-crypt covers an undeclared path: ${entry.path}`);
     }
   }

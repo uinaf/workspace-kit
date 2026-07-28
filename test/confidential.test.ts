@@ -231,9 +231,65 @@ test("a submodule at a protected root is reported", () => {
 
 test("large protected blobs are verified from their header alone", () => {
   const dir = workspace();
-  put(dir, "memory/private/archive.bin", ciphertext("x".repeat(2_000_000)));
+  // Past the batch limit, so this exercises the bounded single-object read.
+  put(dir, "memory/private/archive.bin", ciphertext("x".repeat(3_000_000)));
+  put(dir, "memory/private/leak.bin", "p".repeat(3_000_000));
   git(dir, "add", "-A");
+  assert.deepEqual(errors(dir), ["protected path is staged as plaintext: memory/private/leak.bin"]);
+});
+
+test("policy from an untracked info/attributes is not accepted as coverage", () => {
+  const dir = workspace();
+  put(dir, ".git/info/attributes", "memory/private/** filter=git-crypt\n");
+  assert.deepEqual(errors(dir), [
+    "git-crypt policy comes from an untracked source: info/attributes",
+  ]);
+});
+
+test("policy from the user's global attributes file is not accepted as coverage", () => {
+  const dir = workspace({ attributes: "unrelated.txt text\n" });
+  const globalAttributes = join(dir, "global-attributes");
+  writeFileSync(globalAttributes, "memory/private/** filter=git-crypt\n");
+  git(dir, "config", "core.attributesFile", globalAttributes);
+  assert.deepEqual(errors(dir), [
+    "protected path is not covered by git-crypt policy: memory/private/notes.md",
+  ]);
+});
+
+test("a named git-crypt key counts as coverage", () => {
+  const dir = workspace({
+    attributes: "memory/private/** filter=git-crypt-personal diff=git-crypt-personal\n",
+  });
   assert.deepEqual(errors(dir), []);
+});
+
+test("a submodule under a wildcard protected route is reported", () => {
+  const dir = mkdtempSync(join(tmpdir(), "confidential-wildcard-"));
+  git(dir, "init", "-q");
+  writeFileSync(join(dir, ".gitattributes"), "teams/*/private/** filter=git-crypt\n");
+  put(dir, "teams/beta/private/notes.md", ciphertext());
+  git(dir, "add", "-A");
+  git(dir, "update-index", "--add", "--cacheinfo", "160000", "1".repeat(40), "teams/acme");
+
+  const config: ConfidentialConfig = { provider: "git-crypt", paths: ["teams/*/private/**"] };
+  assert.deepEqual(confidentialReport(config, dir).errors, [
+    "protected content is inside a tracked submodule: teams/acme",
+  ]);
+});
+
+test("the check runs from a subdirectory without narrowing its scope", () => {
+  const dir = workspace();
+  put(dir, "memory/private/leak.md", "plaintext\n");
+  git(dir, "add", "-A");
+  mkdirSync(join(dir, "docs"), { recursive: true });
+  // Both the check itself and the CLI resolve the top level: git would
+  // otherwise evaluate pathspecs and attributes relative to the subdirectory.
+  assert.deepEqual(confidentialReport(CONFIG, join(dir, "docs")).errors, [
+    "protected path is staged as plaintext: memory/private/leak.md",
+  ]);
+  const result = kit(join(dir, "docs"), "confidential", "check");
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /staged as plaintext: memory\/private\/leak\.md/);
 });
 
 test("an unmerged protected path is unverifiable rather than green", () => {
