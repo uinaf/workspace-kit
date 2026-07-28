@@ -89,6 +89,8 @@ type Repository = { root: string; commonDir: string; env: NodeJS.ProcessEnv };
 // inherited index only when it belongs to this repository.
 function repository(repoRoot: string): Repository {
   const env = gitEnvironmentForRepository();
+  // Attribute rules from outside the repository are not part of any clone.
+  env.GIT_ATTR_NOSYSTEM = "1";
   const [top = "", gitDir = "", common = ""] = gitOutput(
     repoRoot,
     env,
@@ -131,11 +133,11 @@ function indexEntries({ root, env }: Repository): IndexEntry[] {
 function filterAttributes({ root, env }: Repository, paths: string[]): Map<string, string> {
   const out = new Map<string, string>();
   if (paths.length === 0) return out;
-  // `--cached` reads `.gitattributes` from the index instead of the working
-  // tree, and `core.attributesFile=/dev/null` drops the user's global file: a
-  // rule that is not committed protects nothing in a clone. Git also consults
-  // `$GIT_COMMON_DIR/info/attributes`, which cannot be suppressed and is
-  // reported separately.
+  // A rule that is not committed protects nothing in a clone, so every
+  // attribute source outside the index is excluded: `--cached` ignores the
+  // working tree, `core.attributesFile=/dev/null` drops the user's global file,
+  // and GIT_ATTR_NOSYSTEM drops the system-wide one. Git offers no equivalent
+  // for `$GIT_COMMON_DIR/info/attributes`, which is reported separately.
   const stdout = gitOutput(
     root,
     env,
@@ -150,16 +152,20 @@ function filterAttributes({ root, env }: Repository, paths: string[]): Map<strin
 }
 
 // Git gives the repository-local, uncommitted attributes file the highest
-// precedence and offers no way to ignore it, so a git-crypt rule there is a
-// policy that no clone receives.
+// precedence and offers no way to ignore it, so any rule there is policy that no
+// clone receives. Its effect cannot be narrowed by inspection either: a tracked
+// `[attr]` macro lets `info/attributes` grant git-crypt coverage without ever
+// naming the provider. Any effective line is therefore reported.
 function localAttributeOverride({ commonDir }: Repository): boolean {
+  let content: string;
   try {
-    return /(?:^|[\s=])git-crypt(?:-[A-Za-z0-9._-]+)?(?:\s|$)/m.test(
-      readFileSync(resolve(commonDir, "info", "attributes"), "utf8"),
-    );
+    content = readFileSync(resolve(commonDir, "info", "attributes"), "utf8");
   } catch {
     return false; // No repository-local attributes file, or it is unreadable.
   }
+  return content
+    .split("\n")
+    .some((line) => line.trim().length > 0 && !line.trimStart().startsWith("#"));
 }
 
 function objectSizes({ root, env }: Repository, oids: string[]): Map<string, number> {
@@ -242,7 +248,10 @@ function objectHeaders(repo: Repository, oids: string[]): Map<string, Buffer> {
       if (header) headers.set(oid, header);
       continue;
     }
-    const cost = size + 64; // Each record adds an oid, a type, a size, and two newlines.
+    // Each record adds the object id, a type, a decimal size, separators, and
+    // two newlines. Deriving the width from the id keeps SHA-256 repositories,
+    // whose ids are twice as wide, inside the buffer.
+    const cost = size + oid.length + 40;
     if (batch.length > 0 && bytes + cost > BATCH_BUDGET) flush();
     batch.push(oid);
     bytes += cost;
@@ -315,7 +324,7 @@ function report(config: ConfidentialConfig, repoRoot: string): ConfidentialRepor
     errors.push("git-crypt policy is not committed: no tracked .gitattributes");
   }
   if (localAttributeOverride(repo)) {
-    errors.push("git-crypt policy comes from an untracked source: info/attributes");
+    errors.push("attribute policy comes from an untracked source: info/attributes");
   }
 
   // A pattern that covers nothing is the failure mode that makes a green run

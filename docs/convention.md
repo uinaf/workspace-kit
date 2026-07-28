@@ -351,12 +351,14 @@ Explicit non-goals:
 - Encrypted Git storage is the wrong home for live credentials. Keep those in a
   secret manager and commit only sanitized references.
 
-Two limits of the mechanism are worth planning around rather than discovering.
-Git attribute resolution is not fully containable: `--cached` and a neutralized
-`core.attributesFile` keep working-tree and global rules out, and a git-crypt
-rule in the repository-local `info/attributes` is reported, but a system-wide
-`gitattributes` file cannot be suppressed by any Git option and is out of scope.
-And place protected paths clear of the trees that content checks scan — in a
+Two operational notes are worth planning around rather than discovering. Only
+committed policy counts: attributes are resolved from the index, and the
+working-tree, user-global, and system-wide attribute sources are all excluded.
+Git offers no way to ignore the repository-local `.git/info/attributes`, so any
+effective line there fails the check outright — a tracked `[attr]` macro lets
+that file grant coverage without naming the provider, which makes its effect
+impossible to judge by reading it. Move such rules into a tracked
+`.gitattributes`. Second, place protected paths clear of the trees that content checks scan — in a
 locked clone those files are ciphertext, so a wiki or daily-log check reading
 them as Markdown produces noise. The kit does not reject the overlap, because
 the useful arrangement (`memory/private/**` beside a `memory` daily-log root)

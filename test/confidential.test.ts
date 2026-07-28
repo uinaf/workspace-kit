@@ -240,10 +240,21 @@ test("large protected blobs are verified from their header alone", () => {
 
 test("policy from an untracked info/attributes is not accepted as coverage", () => {
   const dir = workspace();
-  put(dir, ".git/info/attributes", "memory/private/** filter=git-crypt\n");
+  // A tracked `[attr]` macro lets this file grant coverage without ever naming
+  // the provider, so any effective line is rejected rather than interpreted.
+  put(
+    dir,
+    ".gitattributes",
+    "[attr]crypt filter=git-crypt diff=git-crypt\nmemory/private/** crypt\n",
+  );
+  put(dir, ".git/info/attributes", "# comment\n\nmemory/other/** crypt\n");
+  git(dir, "add", "-A");
   assert.deepEqual(errors(dir), [
-    "git-crypt policy comes from an untracked source: info/attributes",
+    "attribute policy comes from an untracked source: info/attributes",
   ]);
+
+  put(dir, ".git/info/attributes", "# only comments and blank lines\n\n");
+  assert.deepEqual(errors(dir), []);
 });
 
 test("policy from the user's global attributes file is not accepted as coverage", () => {
