@@ -25,6 +25,9 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          standalone: true
       - uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb # v1.15.0
         with:
           node-version-file: ".node-version"
@@ -57,6 +60,9 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          standalone: true
       # Secret-bearing job: no dependency cache, fresh install via setup-vp.
       # vp must be on PATH here because npm publish's prepack runs the verify
       # gate (vp check/test/pack). Trusted publishing authenticates from the
