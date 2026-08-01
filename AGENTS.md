@@ -42,12 +42,13 @@ consumers own their workspace policy and composition.
 The repo runs on the [Vite+](https://github.com/voidzero-dev/vite-plus)
 toolchain; all tool config lives in `vite.config.ts`.
 
-`vp run verify` runs `vp check` (format, lint, type check), the full test suite
-with aggregate coverage across `src/`, `vp pack`, and an installed-tarball CLI
+`pnpm exec vp run verify` runs `vp check` (format, lint, type check), the full
+test suite with aggregate coverage across `src/`, `vp pack`, and an installed-tarball CLI
 smoke. Executable source-line coverage across in-process and spawned CLI tests
 stays at or above 90%. After `pnpm install`, run
-`vp config --no-agent` to install the pre-commit hook; it runs `vp staged` plus
-the full gate. Fix issues with `vp check --fix`; `parity/legacy/` and
+`pnpm exec vp config --no-agent` to install the pre-commit hook; it runs the
+repository-local `vp staged` plus the full gate. Fix issues with
+`pnpm exec vp check --fix`; `parity/legacy/` and
 `parity/fixtures/` are exempt from lint/format — they are frozen.
 
 ## Releases
