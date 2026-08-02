@@ -1,4 +1,4 @@
-# workspace-kit
+# uinaf/workspace-kit
 
 Config-driven validation and scaffolding for **agent workspaces** — the git
 repositories that give coding/assistant agents a stable operating context.
