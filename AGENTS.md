@@ -23,8 +23,8 @@ consumers own their workspace policy and composition.
   compatibility is outside the release contract. Continue rejecting
   Windows-shaped absolute paths as untrusted portable input.
 - Keep this repository standalone. Do not add package, script, CI, checkout, or
-  validation dependencies on `uinaf/skills` or `uinaf/dotfiles`. Optional
-  documentation links are fine; composition belongs to the consumer.
+  validation dependencies on consumer-specific repositories. Composition
+  belongs to the consumer.
 - The scaffolder writes an owner-editable instruction skeleton and kit-owned
   validation commands. Machine-global state (`~/.claude/`, `~/.codex/`,
   `~/.agents/skills`) remains consumer-owned.

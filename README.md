@@ -86,12 +86,12 @@ frontmatter change is metadata: it does not make dependent pages stale.
 ## Composition model
 
 `workspace-kit` owns portable workspace structure, scaffolding, and validation.
-Consumers compose it with independently installed and released companion tools
-such as `uinaf/skills` and `uinaf/dotfiles`. The optional `skills sync` command
-links authored workspace skills and installs the workspace's declared remote
-skills. It records those copies in `skills/workspace-kit-lock.json` so later
-syncs retire only workspace-kit-managed copies. Machine-global capabilities
-remain consumer-owned.
+Consumers own machine-global setup and compose repository-local tools through
+their workspace policy. The optional `skills sync` command links authored
+workspace skills and installs the workspace's declared remote skills. It
+records those copies in `skills/workspace-kit-lock.json` so later syncs retire
+only workspace-kit-managed copies. Machine-global capabilities remain
+consumer-owned.
 
 Workspace repositories run history-based secret detection in a dedicated CI
 workflow. Consumers can list that workflow in `workspace.json.required` when
