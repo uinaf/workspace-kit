@@ -87,7 +87,7 @@ frontmatter change is metadata: it does not make dependent pages stale.
 
 `workspace-kit` owns portable workspace structure, scaffolding, and validation.
 Consumers compose it with independently installed and released companion tools
-such as `uinaf/agents` and `uinaf/dotfiles`. The optional `skills sync` command
+such as `uinaf/skills` and `uinaf/dotfiles`. The optional `skills sync` command
 links authored workspace skills and installs the workspace's declared remote
 skills. It records those copies in `skills/workspace-kit-lock.json` so later
 syncs retire only workspace-kit-managed copies. Machine-global capabilities
