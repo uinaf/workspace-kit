@@ -3,27 +3,32 @@
 Releases are **fully automatic**: every push to `main` runs verification and
 then semantic-release, which computes the next version from Conventional
 Commits (`fix:` → patch, `feat:` → minor, `BREAKING CHANGE:` → major),
-publishes to npm, and creates the `v*` tag and GitHub release with notes.
-Commits that don't warrant a release (`docs:`, `chore:`, `test:`, …) publish
-nothing.
+publishes to npm, bumps `package.json`, and creates the `v*` tag and GitHub
+release with notes. Commits that don't warrant a release (`docs:`, `chore:`,
+`test:`, …) publish nothing. Release bump commits include `[skip ci]` so they
+do not re-enter verify/release.
 
 Publishing uses **npm Trusted Publishing (OIDC)**: GitHub Actions proves its
 identity to npm per-run and provenance attestations are generated
 automatically. No npm token exists in this repository, its secrets, or any
 maintainer machine.
 
-## Versioning is tag-only
+GitHub Release and version push-back commits are authored by
+`uinaf-releaser[bot]` via a short-lived App installation token minted in the
+`release` Environment (`UINAF_RELEASE_APP_ID` /
+`UINAF_RELEASE_APP_PRIVATE_KEY`). The `protect-main` and
+`protect-release-tags` rulesets still require signed commits/tags for humans,
+and grant an Integration bypass to that App for unsigned bot writeback.
 
-The `main` ruleset requires signed commits, so there are no bot bump-back
-commits: the checked-in `package.json` version is **not authoritative**.
-Full source checkouts use the greater of that placeholder and the latest
-reachable strict `vX.Y.Z` tag; builds bake that effective version into the CLI.
-Shallow clones and source archives fail with a tag-history instruction instead
-of silently stamping the placeholder version.
-Semantic-release derives the next version, stamps `package.json` before the
-prepack gate, and therefore bakes the release version into the published
-tarball. Look up the released version with
-`npm view @uinaf/workspace-kit version` or the latest tag, not package.json.
+## Versioning
+
+`@semantic-release/git` commits the bumped `package.json` back to `main`.
+Full source checkouts still resolve the greater of the checked-in manifest and
+the latest reachable strict `vX.Y.Z` tag (see `src/version.ts`); builds bake
+that effective version into the CLI. Shallow clones and source archives fail
+with a tag-history instruction instead of silently stamping a stale
+placeholder. Look up the released version with
+`npm view @uinaf/workspace-kit version` or the latest tag when in doubt.
 
 ## Configuration record (already done)
 
@@ -31,6 +36,10 @@ tarball. Look up the released version with
   repository `uinaf/workspace-kit`, workflow `release.yml`, environment
   `release`, permission `publish`.
 - GitHub `release` environment restricted to `main` branch runs.
+- `release` Environment holds `UINAF_RELEASE_APP_ID` (variable) and
+  `UINAF_RELEASE_APP_PRIVATE_KEY` (secret) for git/GitHub writeback.
+- Rulesets bypass Integration `uinaf-releaser` (`4474917`) for bot push-back
+  and release tags.
 - `v0.1.0` was the one-time manual bootstrap publish (trusted publishing
   requires an existing package); it carries no provenance. Every CI-published
   version does.
