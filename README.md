@@ -1,3 +1,5 @@
+![](https://uinaf.dev/og/banner/workspace-kit.png)
+
 # uinaf/workspace-kit
 
 Config-driven validation and scaffolding for **agent workspaces** — the git
