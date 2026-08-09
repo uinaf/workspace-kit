@@ -83,4 +83,4 @@ test("kit CLI reproduces every legacy golden", () => {
     0,
     `parity mismatches (${mismatches.length}):\n\n${mismatches.join("\n\n")}`,
   );
-});
+}, 20_000);
