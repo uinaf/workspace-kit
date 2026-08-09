@@ -3,10 +3,10 @@
 Releases are **fully automatic**: every push to `main` runs verification and
 then semantic-release, which computes the next version from Conventional
 Commits (`fix:` → patch, `feat:` → minor, `BREAKING CHANGE:` → major),
-publishes to npm, bumps `package.json`, and creates the `v*` tag and GitHub
-release with notes. Commits that don't warrant a release (`docs:`, `chore:`,
-`test:`, …) publish nothing. Release bump commits include `[skip ci]` so they
-do not re-enter verify/release.
+publishes to npm, creates the `v*` tag and immutable GitHub Release, then syncs
+the released version back to `package.json`. Commits that don't warrant a
+release (`docs:`, `chore:`, `test:`, …) publish nothing. Release version commits
+include `[skip ci]` so they do not re-enter verify/release.
 
 Publishing uses **npm Trusted Publishing (OIDC)**: GitHub Actions proves its
 identity to npm per-run and provenance attestations are generated
@@ -17,12 +17,14 @@ GitHub Release and version push-back commits are authored by
 `uinaf-releaser[bot]` via a short-lived App installation token minted in the
 `release` Environment (`UINAF_RELEASE_APP_ID` /
 `UINAF_RELEASE_APP_PRIVATE_KEY`). The `protect-main` and
-`protect-release-tags` rulesets still require signed commits/tags for humans,
-and grant an Integration bypass to that App for unsigned bot writeback.
+`protect-release-tags` rulesets require verified signatures without a release
+App bypass.
 
 ## Versioning
 
-`@semantic-release/git` commits the bumped `package.json` back to `main`.
+After npm and GitHub publication verify, the workflow stages the released
+`package.json` and commits it through GitHub's API as the authenticated App.
+GitHub signs the resulting commit.
 Full source checkouts still resolve the greater of the checked-in manifest and
 the latest reachable strict `vX.Y.Z` tag (see `src/version.ts`); builds bake
 that effective version into the CLI. Shallow clones and source archives fail
