@@ -16,10 +16,10 @@ maintainer machine.
 
 GitHub Release and version push-back commits are authored by
 `uinaf-releaser[bot]` via a short-lived App installation token minted in the
-`release` Environment (`UINAF_RELEASE_APP_ID` /
+`release` Environment (`UINAF_RELEASE_APP_CLIENT_ID` /
 `UINAF_RELEASE_APP_PRIVATE_KEY`). The `protect-main` and
-`protect-release-tags` rulesets require verified signatures without a release
-App bypass.
+`protect-release-tags` rulesets require verified signatures. The release App
+can create protected release tags but cannot bypass the default-branch rule.
 
 ## Versioning
 
@@ -39,10 +39,10 @@ placeholder. Look up the released version with
   repository `uinaf/workspace-kit`, workflow `release.yml`, environment
   `release`, permission `publish`.
 - GitHub `release` environment restricted to `main` branch runs.
-- `release` Environment holds `UINAF_RELEASE_APP_ID` (variable) and
+- `release` Environment holds `UINAF_RELEASE_APP_CLIENT_ID` (variable) and
   `UINAF_RELEASE_APP_PRIVATE_KEY` (secret) for git/GitHub writeback.
-- Rulesets bypass Integration `uinaf-releaser` (`4474917`) for bot push-back
-  and release tags.
+- The release-tag ruleset allows `uinaf-releaser` to create tags; the
+  default-branch ruleset has no bypass actors.
 - `v0.1.0` was the one-time manual bootstrap publish (trusted publishing
   requires an existing package); it carries no provenance. Every CI-published
   version does.
