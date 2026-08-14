@@ -16,6 +16,7 @@ import {
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { CONSUMER_PACKAGE_MANAGER } from "../src/checks/packageManager.ts";
 import { initWorkspace } from "../src/init.ts";
 import { kitVersion } from "../src/version.ts";
 
@@ -34,19 +35,22 @@ for (const profile of ["personal", "runtime", "work"] as const) {
     const agents = readFileSync(join(dir, "AGENTS.md"), "utf8");
     assert.match(agents, /TODO/);
     assert.match(agents, /## Skill Ownership/);
-    assert.match(agents, /npm run verify/);
+    assert.match(agents, /pnpm verify/);
     const packageJson = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
       scripts: Record<string, string>;
       devDependencies: Record<string, string>;
+      packageManager: string;
     };
     assert.equal(packageJson.devDependencies["@uinaf/workspace-kit"], kitVersion());
     assert.equal(packageJson.scripts.doctor, "workspace-kit doctor");
-    assert.equal(packageJson.scripts.test, "npm run verify");
+    assert.equal(packageJson.scripts.test, "pnpm verify");
     assert.equal(packageJson.scripts.verify, "workspace-kit verify");
+    assert.equal(packageJson.packageManager, CONSUMER_PACKAGE_MANAGER);
     if (profile === "personal" || profile === "runtime") {
       const hook = readFileSync(join(dir, ".githooks", "pre-commit"), "utf8");
-      assert.match(hook, /npm run verify/);
+      assert.match(hook, /pnpm verify/);
       assert.doesNotMatch(hook, /npx/);
+      assert.doesNotMatch(hook, /npm run/);
       assert.equal(packageJson.scripts["registry:check"], "workspace-kit registry validate");
       assert.equal(packageJson.scripts["registry:clone"], "workspace-kit registry clone");
       assert.equal(packageJson.scripts["registry:status"], "workspace-kit registry status");
@@ -125,6 +129,31 @@ test("init stops before scaffolding around an incompatible existing package", ()
 
   assert.throws(
     () => initWorkspace(dir, "personal"),
+    /package.json is not compatible.*existing-workspace adoption steps/,
+  );
+  assert.equal(existsSync(join(dir, "AGENTS.md")), false);
+});
+
+test("init refuses a matching package that is missing the pnpm pin", () => {
+  const dir = scratchDirectory("init-unpinned-");
+  writeFileSync(
+    join(dir, "package.json"),
+    `${JSON.stringify(
+      {
+        scripts: {
+          doctor: "workspace-kit doctor",
+          test: "pnpm verify",
+          verify: "workspace-kit verify",
+        },
+        devDependencies: { "@uinaf/workspace-kit": kitVersion() },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+
+  assert.throws(
+    () => initWorkspace(dir, "work"),
     /package.json is not compatible.*existing-workspace adoption steps/,
   );
   assert.equal(existsSync(join(dir, "AGENTS.md")), false);

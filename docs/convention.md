@@ -101,7 +101,7 @@ Enable workspace skill management with `"skills": {}` in `workspace.json`,
 then run:
 
 ```bash
-npm exec -- workspace-kit skills sync
+pnpm exec workspace-kit skills sync
 ```
 
 Sync links every locally authored skill into `.agents/skills`, ensures the
@@ -124,14 +124,22 @@ Consumers own shared machine-global skill selection and installation.
 
 ## Adopting an existing workspace
 
-1. Install `@uinaf/workspace-kit` as an exact development dependency.
-2. Add a project-local `verify` script for `workspace-kit verify`; add direct
+1. Enable Corepack if needed, then install `@uinaf/workspace-kit` as an
+   exact development dependency with
+   `pnpm add --save-dev --save-exact @uinaf/workspace-kit`.
+2. Pin `"packageManager": "pnpm@11.18.0"` in `package.json` and add a
+   project-local `verify` script for `workspace-kit verify`; add direct
    check shortcuts only when people use them independently.
 3. Describe the workspace's selected sections in `workspace.json`.
 4. Put authored skills in `skills/<name>/`, declare remote workspace skills in
    `skills/skills.json`, and run `skills sync`.
-5. Run the local `verify` script and the repository's CI before deploying
-   the checkout to a runtime.
+5. Run `pnpm verify` and the repository's CI before deploying the checkout
+   to a runtime.
+
+Existing npm-based agent workspaces migrate by enabling Corepack, rewriting
+scripts and docs to `pnpm …`, running `pnpm import` or a fresh `pnpm install`,
+and deleting `package-lock.json`. Leave `packageManager.enforce` off until
+that cutover is done; set it true once the pin and lockfile match.
 
 ## 4. Operations (optional)
 
@@ -171,6 +179,14 @@ Consumers own shared machine-global skill selection and installation.
   fragment-only destinations are ignored. Checked Markdown filenames must use
   portable `/` separators; literal backslashes are reported as non-portable.
   Targets must be tracked, so a gitignored-but-present file does not pass.
+- **Package manager (opt-in)** — convention workspaces use pnpm.
+  `init` writes a Corepack `packageManager` pin, pnpm scripts, and
+  `"packageManager": { "enforce": true }`. Existing configs without the
+  section stay unchecked. When `packageManager.enforce` is true, `doctor`
+  and `verify` require `package.json#packageManager` to be a `pnpm@` pin
+  and reject `package-lock.json` / `yarn.lock`. Set
+  `allowForeignLockfiles` only as a time-boxed escape hatch while a
+  lockfile is being replaced.
 
 ## Configuration reference (`workspace.json`)
 
@@ -213,6 +229,7 @@ Consumers own shared machine-global skill selection and installation.
   "handoff": { "paths": ["AGENTS.md"], "prefixes": ["memory/"] },
   "docsLinks": { "enabled": false, "exclude": [] },
   "skills": {},
+  "packageManager": { "enforce": false, "allowForeignLockfiles": false },
 }
 ```
 
@@ -259,7 +276,8 @@ operation and exits 1 when any are present; a clean generated catalog exits 0.
 `verify` loads and validates `workspace.json` once, runs the configured
 `doctor` checks, includes `registry validate` when `registry.project` exists,
 and runs `wiki backfill --check` when `wiki` exists. It does not run `wiki
-stale`, which is a separate history-based operation.
+stale`, which is a separate history-based operation. The package-manager
+check runs only when `packageManager.enforce` is true.
 
 `registry validate` exits 1 for malformed entries, ownership-policy failures,
 or unsafe local checkout state and prints `registry ok` on success. It reads
@@ -285,8 +303,8 @@ repository-history security scans remain independently operated surfaces.
 
 In an empty directory, `init` scaffolds an owner-editable instruction skeleton with TODO markers, an
 exact local `@uinaf/workspace-kit` development dependency, package scripts,
-and the selected profile's structural files. Run `npm install` once, then use
-`npm run verify`; generated hooks use the same local package and stay offline.
+and the selected profile's structural files. Run `pnpm install` once, then use
+`pnpm verify`; generated hooks use the same local package and stay offline.
 Existing files remain unchanged. A re-run accepts a compatible `package.json`;
 an existing repository follows the adoption steps above, and init stops before
 writing when its package contract is incompatible.

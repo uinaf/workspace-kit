@@ -348,6 +348,7 @@ test("init points workspace owners to the packaged bootstrap convention", () => 
     result.stdout,
     /next: replace the AGENTS\.md TODOs using @uinaf\/workspace-kit\/docs\/convention\.md/,
   );
+  assert.match(result.stdout, /enable the hook with: pnpm hooks:install/);
 });
 
 test("init --dir pointing at an existing file fails cleanly", () => {

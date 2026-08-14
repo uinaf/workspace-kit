@@ -23,6 +23,7 @@ import {
   workspaceErrors,
 } from "./checks/contract.ts";
 import { docsLinkErrors } from "./checks/docsLinks.ts";
+import { packageManagerErrors } from "./checks/packageManager.ts";
 import { limitWarnings } from "./checks/limits.ts";
 import { projectRegistryErrors } from "./checks/registry.ts";
 import { projectRegistryEntries } from "./checks/registry.ts";
@@ -270,6 +271,18 @@ function doctorReport(config: WorkspaceConfig): DoctorReport {
     }
   }
 
+  if (config.packageManager?.enforce) {
+    const errors = packageManagerErrors(config.packageManager);
+    if (errors.length > 0) {
+      stderr(errors);
+      bad.push("package-manager failed (exit 1)");
+      checks.packageManager = "fail";
+    } else {
+      stdout("package-manager ok");
+      checks.packageManager = "ok";
+    }
+  }
+
   // Soft limits are warnings by design: printed, counted, never fatal.
   const warnings = config.limits ? limitWarnings(config.limits) : [];
 
@@ -410,7 +423,7 @@ function main(): void {
     console.log(`workspace scaffolded (${profile} profile)`);
     console.log("next: replace the AGENTS.md TODOs using @uinaf/workspace-kit/docs/convention.md");
     if (result.created.includes(".githooks/pre-commit")) {
-      console.log("enable the hook with: npm run hooks:install");
+      console.log("enable the hook with: pnpm hooks:install");
     }
     process.exit(0);
   }

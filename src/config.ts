@@ -33,6 +33,7 @@ export type ContractConfig = { file: string };
 export type HandoffConfig = { paths: string[]; prefixes: string[] };
 export type DocsLinksConfig = { enabled: boolean; exclude: string[] };
 export type SkillsConfig = { manifest: "skills/skills.json" };
+export type PackageManagerConfig = { enforce: boolean; allowForeignLockfiles: boolean };
 
 export type WorkspaceConfig = {
   minVersion?: string;
@@ -47,6 +48,7 @@ export type WorkspaceConfig = {
   handoff?: HandoffConfig;
   docsLinks?: DocsLinksConfig;
   skills?: SkillsConfig;
+  packageManager?: PackageManagerConfig;
 };
 
 export const CONFIG_FILE = "workspace.json";
@@ -147,6 +149,7 @@ const CONFIG_SHAPE: ConfigShape = {
   handoff: { paths: true, prefixes: true },
   docsLinks: { enabled: true, exclude: true },
   skills: {},
+  packageManager: { enforce: true, allowForeignLockfiles: true },
 };
 
 function collectUnknownKeys(value: unknown, shape: ConfigShape, path: string, out: string[]): void {
@@ -417,6 +420,19 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
   if ("skills" in value) {
     if (!isRecord(value.skills)) fail("skills must be an object");
     out.skills = { manifest: "skills/skills.json" };
+  }
+
+  if ("packageManager" in value) {
+    if (!isRecord(value.packageManager)) fail("packageManager must be an object");
+    for (const flag of ["enforce", "allowForeignLockfiles"]) {
+      if (flag in value.packageManager && typeof value.packageManager[flag] !== "boolean") {
+        fail(`packageManager.${flag} must be a boolean`);
+      }
+    }
+    out.packageManager = {
+      enforce: value.packageManager.enforce === true,
+      allowForeignLockfiles: value.packageManager.allowForeignLockfiles === true,
+    };
   }
 
   return out;

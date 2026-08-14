@@ -1,6 +1,7 @@
 // Workspace scaffolder. Writes owner-editable structural skeletons and
 // kit-owned validation commands. Existing files remain unchanged.
 import { mkdirSync, realpathSync } from "node:fs";
+import { CONSUMER_PACKAGE_MANAGER } from "./checks/packageManager.ts";
 import { kitVersion } from "./version.ts";
 import { wikiBackfill } from "./checks/wikiBackfill.ts";
 import {
@@ -38,7 +39,7 @@ skills are owned. Installed machine-global copies are not workspace source.
 
 ## Validation
 
-Run \`npm run verify\` before committing.
+Run \`pnpm verify\` before committing.
 
 ## Boundaries
 
@@ -49,7 +50,7 @@ TODO: what is private, what may leave this workspace, and how.
 function packageDefinition(profile: Profile) {
   const scripts: Record<string, string> = {
     doctor: "workspace-kit doctor",
-    test: "npm run verify",
+    test: "pnpm verify",
     verify: "workspace-kit verify",
   };
   if (profile === "personal" || profile === "runtime") {
@@ -64,6 +65,7 @@ function packageDefinition(profile: Profile) {
     scripts,
     devDependencies: { "@uinaf/workspace-kit": kitVersion() },
     engines: { node: ">=24.18.0" },
+    packageManager: CONSUMER_PACKAGE_MANAGER,
   };
 }
 
@@ -90,7 +92,15 @@ function assertCompatiblePackage(root: string, profile: Profile): void {
   const scriptsMatch = Object.entries(expected.scripts).every(
     ([name, command]) => scripts[name] === command,
   );
-  if (!scriptsMatch || dependencies["@uinaf/workspace-kit"] !== kitVersion()) {
+  const packageManager =
+    isRecord(existing) && typeof existing.packageManager === "string"
+      ? existing.packageManager
+      : undefined;
+  if (
+    !scriptsMatch ||
+    dependencies["@uinaf/workspace-kit"] !== kitVersion() ||
+    packageManager !== expected.packageManager
+  ) {
     throw new Error(
       `package.json is not compatible with init --profile ${profile}; follow the existing-workspace adoption steps in docs/convention.md`,
     );
@@ -167,6 +177,7 @@ export function initWorkspace(dir: string, profile: Profile): InitResult {
     minVersion: kitVersion(),
     required,
     links,
+    packageManager: { enforce: true },
   };
 
   if (profile === "personal" || profile === "runtime") {
@@ -201,7 +212,7 @@ if ! command -v node >/dev/null 2>&1; then
   echo "pre-commit: node not found; skipping workspace-kit checks" >&2
   exit 0
 fi
-npm run verify
+pnpm verify
 `,
       0o755,
     );

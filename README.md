@@ -12,21 +12,24 @@ Supported execution environments are macOS and Linux.
 ## Install
 
 ```bash
-npm install --save-dev --save-exact @uinaf/workspace-kit
+pnpm add --save-dev --save-exact @uinaf/workspace-kit
 ```
 
 Use the project-local binary so contributors and CI use the version recorded
 by the workspace. Requires Node >= 24.18 plus git on PATH for the
-history-dependent checks.
+history-dependent checks. Convention workspaces use pnpm; enable Corepack
+once so the first command works before `init` writes the `packageManager`
+pin.
 
 For a new workspace, start in an empty directory. The one-shot bootstrap
 records the resolved release as an exact local development dependency; ongoing
 commands then use that local pin:
 
 ```bash
-npx --yes @uinaf/workspace-kit@latest init --profile personal
-npm install
-npm run verify
+corepack enable
+pnpm dlx @uinaf/workspace-kit@latest init --profile personal
+pnpm install
+pnpm verify
 ```
 
 For a repository that already has `package.json`, follow
@@ -38,22 +41,22 @@ one.
 ## Quick usage
 
 ```bash
-npm exec -- workspace-kit verify                    # complete offline gate
-npm exec -- workspace-kit doctor                    # configured core checks
-npm exec -- workspace-kit wiki backfill --check     # detect catalog drift
-npm exec -- workspace-kit registry validate         # validate projects.json
-npm exec -- workspace-kit registry status           # inspect registered checkouts
-npm exec -- workspace-kit registry clone            # clone missing managed checkouts
-npm exec -- workspace-kit registry pull             # fast-forward managed checkouts
-npm exec -- workspace-kit hooks install              # enable tracked Git hooks
-npm exec -- workspace-kit skills sync               # materialize workspace skills
+pnpm exec workspace-kit verify                    # complete offline gate
+pnpm exec workspace-kit doctor                    # configured core checks
+pnpm exec workspace-kit wiki backfill --check     # detect catalog drift
+pnpm exec workspace-kit registry validate         # validate projects.json
+pnpm exec workspace-kit registry status           # inspect registered checkouts
+pnpm exec workspace-kit registry clone            # clone missing managed checkouts
+pnpm exec workspace-kit registry pull             # fast-forward managed checkouts
+pnpm exec workspace-kit hooks install              # enable tracked Git hooks
+pnpm exec workspace-kit skills sync               # materialize workspace skills
 ```
 
 `verify` is the canonical local and CI gate. It validates the config, runs the
 configured `doctor` checks, validates a configured project registry, and checks
 that configured wiki catalogs are current. `doctor` covers structure,
-wiki-lint, ownership-contract, documentation-link, workspace-skill, and
-soft-limit checks. Git-history-based wiki staleness remains an explicit
+wiki-lint, ownership-contract, documentation-link, workspace-skill,
+package-manager, and soft-limit checks. Git-history-based wiki staleness remains an explicit
 operation. Candidate paths are screened with `contract handoff <paths...>` for
 human review eligibility. Absent config sections disable their checks, unknown
 files are always tolerated, and all validation runs offline with zero runtime

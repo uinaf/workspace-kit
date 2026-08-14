@@ -36,6 +36,7 @@ test("config reports nested unknown keys and canonicalizes repository paths", ()
     contract: { file: ".\\workspace.contract.json" },
     handoff: { paths: [], prefixes: ["memory/"], prefxies: [] },
     skills: { typo: true },
+    packageManager: { enforce: false, enforc: true },
   };
 
   assert.deepEqual(unknownConfigKeys(raw), [
@@ -43,6 +44,7 @@ test("config reports nested unknown keys and canonicalizes repository paths", ()
     "wiki.indexCoverge",
     "handoff.prefxies",
     "skills.typo",
+    "packageManager.enforc",
   ]);
 
   const parsed = parseWorkspaceConfig(raw);
