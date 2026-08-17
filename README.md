@@ -114,7 +114,7 @@ commands remain deterministic, credential-free workspace checks.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Vulnerabilities: [SECURITY.md](SECURITY.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md). Vulnerabilities: [SECURITY.md](https://github.com/uinaf/workspace-kit/security/policy).
 
 ## License
 
