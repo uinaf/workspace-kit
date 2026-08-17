@@ -1,8 +1,8 @@
-![](https://uinaf.dev/og/banner/workspace-kit.png)
+![workspace-kit — validates and scaffolds agent workspaces.](https://uinaf.dev/og/banner/workspace-kit.png)
 
 # uinaf/workspace-kit
 
-Config-driven validation and scaffolding for **agent workspaces** — the git
+Config-driven validation and scaffolding for **agent workspaces**: the git
 repositories that give coding/assistant agents a stable operating context.
 This workspace model is distinct from package-manager workspaces and monorepo
 tooling.
@@ -105,12 +105,12 @@ commands remain deterministic, credential-free workspace checks.
 
 ## Docs
 
-- [Workspace convention, bootstrap, and check contracts](docs/convention.md) —
+- [Workspace convention, bootstrap, and check contracts](docs/convention.md):
   workspace structure, skill ownership, scaffold follow-through, and exactly
   what each check enforces
-- [Parity oracle](parity/README.md) — the executable spec the checks are
+- [Parity oracle](parity/README.md): the executable spec the checks are
   held to, byte-for-byte
-- [Release workflow](docs/releasing.md) — automatic, tokenless publishing
+- [Release workflow](docs/releasing.md): automatic, tokenless publishing
 
 ## Contributing
 
