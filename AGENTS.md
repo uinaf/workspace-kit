@@ -11,7 +11,7 @@ consumers own their workspace policy and composition.
 ## Hard rules
 
 - **This repo is public.** Never reference any consumer workspace, person,
-  brand, employer, hostname, or private path — in code, fixtures, docs,
+  brand, employer, hostname, or private path, in code, fixtures, docs,
   comments, commit messages, or issues. All fixtures are synthetic
   (`fixture-owner/fixture-workspace` style).
 - **Zero runtime dependencies. No postinstall scripts or telemetry.**
@@ -34,7 +34,7 @@ consumers own their workspace policy and composition.
   skill selection, global installation, and untracked workspace content.
 - **Parity is law.** The ported validators must reproduce `parity/goldens/`
   byte-for-byte; new behavior ships config-gated and default-off. Never edit
-  a golden by hand — see [parity/README.md](parity/README.md) before
+  a golden by hand; see [parity/README.md](parity/README.md) before
   touching any check.
 
 ## Verify
@@ -49,13 +49,13 @@ stays at or above 90%. After `pnpm install --frozen-lockfile`, run
 `pnpm exec vp config --no-agent` to install the pre-commit hook; it runs the
 repository-local `vp staged` plus the full gate. Fix issues with
 `pnpm exec vp check --fix`; `parity/legacy/` and
-`parity/fixtures/` are exempt from lint/format — they are frozen.
+`parity/fixtures/` are exempt from lint/format; they are frozen.
 
 ## Releases
 
 Conventional Commits drive publishing: every push to `main` with `feat:` or
 `fix:` commits auto-releases to npm (see
-[docs/releasing.md](docs/releasing.md)). Choose prefixes accordingly —
+[docs/releasing.md](docs/releasing.md)). Choose prefixes accordingly;
 `docs:`/`chore:`/`test:` publish nothing.
 
 ## Compatibility
