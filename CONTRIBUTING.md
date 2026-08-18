@@ -33,5 +33,5 @@ never edit a golden by hand.
 Branch from `main`, keep PRs scoped, use Conventional Commits, and fill the
 PR template. CI must be green; `main` requires signed commits.
 
-Releases are automatic on push to main (semantic-release, tokenless) — see
+Releases are automatic on push to main (semantic-release, tokenless); see
 [docs/releasing.md](docs/releasing.md).

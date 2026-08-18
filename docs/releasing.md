@@ -1,13 +1,16 @@
 # Releasing
 
 Releases are **fully automatic**: every push to `main` runs verification and
-then semantic-release, which computes the next version from Conventional
-Commits (`fix:` → patch, `feat:` → minor, `BREAKING CHANGE:` → major),
-commits the released `package.json` through GitHub's signed App commit API,
-then creates the `v*` tag, publishes to npm, and creates the immutable GitHub
-Release. Commits that don't warrant a
-release (`docs:`, `chore:`, `test:`, …) publish nothing. Release version commits
-include `[skip ci]` so they do not re-enter verify/release.
+then semantic-release.
+
+- semantic-release computes the next version from Conventional Commits
+  (`fix:` → patch, `feat:` → minor, `BREAKING CHANGE:` → major), commits the
+  released `package.json` through GitHub's signed App commit API, then creates
+  the `v*` tag, publishes to npm, and creates the immutable GitHub Release.
+- Commits that don't warrant a release (`docs:`, `chore:`, `test:`, …) publish
+  nothing.
+- Release version commits include `[skip ci]` so they do not re-enter
+  verify/release.
 
 Publishing uses **npm Trusted Publishing (OIDC)**: GitHub Actions proves its
 identity to npm per-run and provenance attestations are generated
@@ -23,15 +26,17 @@ can create protected release tags but cannot bypass the default-branch rule.
 
 ## Versioning
 
-During semantic-release prepare, the workflow commits the released
-`package.json` through GitHub's API as the authenticated App. GitHub signs the
-commit, and semantic-release creates the tag from that commit before publishing.
-Full source checkouts still resolve the greater of the checked-in manifest and
-the latest reachable strict `vX.Y.Z` tag (see `src/version.ts`); builds bake
-that effective version into the CLI. Shallow clones and source archives fail
-with a tag-history instruction instead of silently stamping a stale
-placeholder. Look up the released version with
-`npm view @uinaf/workspace-kit version` or the latest tag when in doubt.
+- During semantic-release prepare, the workflow commits the released
+  `package.json` through GitHub's API as the authenticated App. GitHub signs
+  the commit, and semantic-release creates the tag from that commit before
+  publishing.
+- Full source checkouts still resolve the greater of the checked-in manifest
+  and the latest reachable strict `vX.Y.Z` tag (see `src/version.ts`); builds
+  bake that effective version into the CLI.
+- Shallow clones and source archives fail with a tag-history instruction
+  instead of silently stamping a stale placeholder.
+- Look up the released version with `npm view @uinaf/workspace-kit version` or
+  the latest tag when in doubt.
 
 ## Configuration record (already done)
 

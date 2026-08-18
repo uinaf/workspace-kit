@@ -52,35 +52,40 @@ pnpm exec workspace-kit hooks install              # enable tracked Git hooks
 pnpm exec workspace-kit skills sync               # materialize workspace skills
 ```
 
-`verify` is the canonical local and CI gate. It validates the config, runs the
-configured `doctor` checks, validates a configured project registry, and checks
-that configured wiki catalogs are current. `doctor` covers structure,
-wiki-lint, ownership-contract, documentation-link, workspace-skill,
-package-manager, and soft-limit checks. Git-history-based wiki staleness remains an explicit
-operation. Candidate paths are screened with `contract handoff <paths...>` for
-human review eligibility. Absent config sections disable their checks, unknown
-files are always tolerated, and all validation runs offline with zero runtime
-dependencies.
-`workspace-kit --help` lists all commands.
+- `verify` is the canonical local and CI gate: it validates the config, runs
+  the configured `doctor` checks, validates a configured project registry, and
+  checks that configured wiki catalogs are current.
+- `doctor` covers structure, wiki-lint, ownership-contract,
+  documentation-link, workspace-skill, package-manager, and soft-limit checks.
+- Git-history-based wiki staleness remains an explicit operation.
+- `contract handoff <paths...>` screens candidate paths for human review
+  eligibility.
+- Absent config sections disable their checks, unknown files are always
+  tolerated, and all validation runs offline with zero runtime dependencies.
+- `workspace-kit --help` lists all commands.
 
-`registry validate` is an explicit project-registry gate. It validates the
-entire declared entry shape before inspecting any locally present checkout,
-then checks project paths against the configured home-relative prefix, allowed
-Git origin hosts, repository paths, portable case/Unicode aliases, canonical
-roots, optional catalog pointers, allowed repository owners, required entries,
-and an optional entry limit. The explicit `registry.project` policy enables
-this check; `originHosts` defaults to `["github.com"]`, and missing checkouts
-are allowed. `verify` includes it whenever that policy is present. Personal and
-runtime scaffolds use `verify` in their generated pre-commit hook.
+- `registry validate` is an explicit project-registry gate: it validates the
+  entire declared entry shape before inspecting any locally present checkout,
+  then checks project paths against the configured home-relative prefix,
+  allowed Git origin hosts, repository paths, portable case/Unicode aliases,
+  canonical roots, optional catalog pointers, allowed repository owners,
+  required entries, and an optional entry limit.
+- The explicit `registry.project` policy enables this check; `originHosts`
+  defaults to `["github.com"]`, and missing checkouts are allowed.
+- `verify` includes it whenever that policy is present. Personal and runtime
+  scaffolds use `verify` in their generated pre-commit hook.
 
-The explicit `registry clone`, `registry status`, and `registry pull` commands
-run the same validation first, then operate on the configured lifecycle modes.
-Clone and pull affect only entries whose mode is `managed`; status also shows
-locally present route-only entries. Pull is always fast-forward-only and
-refuses a configured branch mismatch. `registry path <category/name>` resolves
-one validated checkout for consumer-owned composition without teaching the
-package about a particular repository. `hooks install` configures the tracked
-`.githooks` directory for the current checkout.
+- The explicit `registry clone`, `registry status`, and `registry pull`
+  commands run the same validation first, then operate on the configured
+  lifecycle modes.
+- Clone and pull affect only entries whose mode is `managed`; status also
+  shows locally present route-only entries.
+- Pull is always fast-forward-only and refuses a configured branch mismatch.
+- `registry path <category/name>` resolves one validated checkout for
+  consumer-owned composition without teaching the package about a particular
+  repository.
+- `hooks install` configures the tracked `.githooks` directory for the current
+  checkout.
 
 For Git-aware wiki freshness, opt in with `wiki.revisionStaleness`. The check
 then evaluates the current working tree, including staged and unstaged edits,
