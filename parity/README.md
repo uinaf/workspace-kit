@@ -6,17 +6,17 @@ the kit.
 
 ## Layout
 
-- `legacy/` — frozen validator scripts (bun) from the private workspaces that
+- `legacy/`: frozen validator scripts (bun) from the private workspaces that
   originated the convention, at extraction time. Do not edit, except
   for the two fixes recorded in the spec (missing `log.md` crash; hardcoded
-  `bun` sub-spawn) — and those land in `src/`, never here.
-- `fixtures/green-personal/` — one synthetic workspace exercising every green
+  `bun` sub-spawn), and those land in `src/`, never here.
+- `fixtures/green-personal/`: one synthetic workspace exercising every green
   code path. Error scenarios are defined as mutations inside `capture.ts`,
   not as separate trees.
-- `goldens/` — captured legacy outputs: `<scenario>.out` / `.err` / `.exit`,
+- `goldens/`: captured legacy outputs: `<scenario>.out` / `.err` / `.exit`,
   plus `backfill-generated.tree` (generated-file snapshot) and
   `backfill-worktree-status.txt` (idempotency proof).
-- `capture.ts` — rebuilds fixtures as real git repos with pinned
+- `capture.ts`: rebuilds fixtures as real git repos with pinned
   author/committer dates (deterministic commit ids) and regenerates all
   goldens. Requires bun and git locally; CI never runs legacy scripts.
 
@@ -24,8 +24,8 @@ the kit.
 
 Captured text replaces the fixture working directory with `<WORK>`, the
 capture day's date with `<TODAY>` (the legacy backfill stamps the current
-date into generated frontmatter), and — in the `peer-check-shared` scenario
-only — 40-hex commit ids with `<SHA>`. Any parity comparison must apply the
+date into generated frontmatter), and, in the `peer-check-shared` scenario
+only, 40-hex commit ids with `<SHA>`. Any parity comparison must apply the
 same normalization to the new implementation's output.
 
 ## Scenario map
@@ -49,19 +49,19 @@ same normalization to the new implementation's output.
 bun parity/capture.ts
 ```
 
-Run it twice and `git diff` — the output must be identical (determinism is
+Run it twice and `git diff`: the output must be identical (determinism is
 part of the contract). Goldens only change when a legacy script changes, and
 legacy scripts are frozen.
 
 ## Known legacy behaviors that are FIXES in src/, not parity targets
 
 1. `wiki-lint` crashes with a stack trace when `memory/wiki/log.md` is
-   missing — the port reports a clean error (or skips when the wiki section
+   missing; the port reports a clean error (or skips when the wiki section
    is unconfigured). No golden exists for this on purpose.
-2. `doctor` spawns the literal `bun` binary for sub-checks — the port runs
+2. `doctor` spawns the literal `bun` binary for sub-checks; the port runs
    sub-checks in-process. Behavior is identical on the green path.
 3. `doctor`'s `projects.json` parse-failure message embeds the JS engine's
-   JSON error text (JavaScriptCore vs V8 differ) — byte parity is impossible
+   JSON error text (JavaScriptCore vs V8 differ); byte parity is impossible
    there and that message is explicitly excluded from the contract.
 4. Audited filesystem containment is a kit-level security invariant, not a
    legacy parity behavior: backfill canonicalizes its workspace-relative root,
@@ -79,7 +79,7 @@ behavior with no golden:
   a generated file with yesterday's `updated:`, rerun, assert byte-identical.
 - Frontmatter parser quirks (`lib/frontmatter.ts`): inline arrays split on
   commas even inside quotes; single-quote stripping; CRLF files never parse.
-  The port keeps this parser as-is — tests define the kept quirks.
+  The port keeps this parser as-is; tests define the kept quirks.
 - Non-string `updated:` values silently skip validation in both wiki-lint
   and wiki-stale.
 - `wiki-lint` missing-wiki-root exit-1 message; markdown-link `#fragment`
@@ -94,5 +94,5 @@ behavior with no golden:
 - `wiki-stale`: `git log failed` fallback still prints `wiki-stale ok`.
 - Handoff: `--handoff` with zero args exits 2 (usage), not an empty
   eligible list.
-- Backfill `Source.source` (`source:` frontmatter field) is dead code —
+- Backfill `Source.source` (`source:` frontmatter field) is dead code,
   never read by output generation. The port may drop it; do not cargo-cult.
