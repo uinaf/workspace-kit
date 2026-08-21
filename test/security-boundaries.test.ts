@@ -145,17 +145,19 @@ test("workspace writes support existing filenames near the filesystem limit", ()
   assert.equal(readFileSync(join(dir, name), "utf8"), "after\n");
 });
 
-test("workspace writes preserve read-only output protection", () => {
-  if (process.getuid?.() === 0) return;
-  const dir = scaffold();
-  const path = join(dir, "read-only.md");
-  writeFileSync(path, "protected\n");
-  chmodSync(path, 0o444);
+test.skipIf(process.getuid?.() === 0)(
+  "workspace writes preserve read-only output protection",
+  () => {
+    const dir = scaffold();
+    const path = join(dir, "read-only.md");
+    writeFileSync(path, "protected\n");
+    chmodSync(path, 0o444);
 
-  assert.throws(() => writeWorkspaceText(dir, "read-only.md", "replaced\n"), /EACCES|EPERM/);
-  assert.equal(readFileSync(path, "utf8"), "protected\n");
-  assert.equal(statSync(path).mode & 0o777, 0o444);
-});
+    assert.throws(() => writeWorkspaceText(dir, "read-only.md", "replaced\n"), /EACCES|EPERM/);
+    assert.equal(readFileSync(path, "utf8"), "protected\n");
+    assert.equal(statSync(path).mode & 0o777, 0o444);
+  },
+);
 
 test("doctor operational failures preserve the JSON contract", () => {
   const dir = scaffold("personal");
