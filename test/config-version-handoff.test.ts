@@ -68,6 +68,67 @@ test("config enables the conventional workspace skill manifest", () => {
   assert.throws(() => parseWorkspaceConfig({ skills: true }), /skills must be an object/);
 });
 
+test("config models llm-wiki and repository-scoped hindsight memory", () => {
+  const llmWiki = parseWorkspaceConfig({
+    memory: { strategy: "llm-wiki" },
+    dailyLogs: { root: "memory", contexts: "memory/contexts" },
+    wiki: { root: "memory/wiki" },
+  });
+  assert.deepEqual(llmWiki.memory, { strategy: "llm-wiki" });
+
+  const codingAgent = parseWorkspaceConfig({
+    memory: {
+      strategy: "hindsight",
+      integration: "coding-agent",
+      namespace: "fixture-owner/fixture-workspace",
+    },
+  });
+  assert.deepEqual(codingAgent.memory, {
+    strategy: "hindsight",
+    integration: "coding-agent",
+    namespace: "fixture-owner/fixture-workspace",
+  });
+
+  assert.throws(
+    () => parseWorkspaceConfig({ memory: { strategy: "llm-wiki" } }),
+    /requires dailyLogs and wiki/,
+  );
+  assert.throws(
+    () =>
+      parseWorkspaceConfig({
+        memory: {
+          strategy: "hindsight",
+          integration: "openclaw",
+          namespace: "fixture-owner/fixture-workspace",
+        },
+        wiki: { root: "memory/wiki" },
+      }),
+    /cannot be combined with dailyLogs or wiki/,
+  );
+  assert.throws(
+    () =>
+      parseWorkspaceConfig({
+        memory: {
+          strategy: "hindsight",
+          integration: "unknown",
+          namespace: "fixture-owner/fixture-workspace",
+        },
+      }),
+    /integration must be coding-agent or openclaw/,
+  );
+  assert.throws(
+    () =>
+      parseWorkspaceConfig({
+        memory: {
+          strategy: "hindsight",
+          integration: "coding-agent",
+          namespace: "not-a-repository",
+        },
+      }),
+    /namespace must be a Git repository path/,
+  );
+});
+
 test("revision staleness is opt-in and must be boolean", () => {
   const parsed = parseWorkspaceConfig({ wiki: { root: "memory/wiki" } });
   assert.equal(parsed.wiki?.revisionStaleness, false);

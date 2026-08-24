@@ -165,6 +165,57 @@ test("init explains malformed existing package metadata", () => {
   assert.throws(() => initWorkspace(dir, "work"), /package.json is not usable by init/);
 });
 
+test("init scaffolds a Hindsight workspace without llm-wiki artifacts", () => {
+  const dir = scratchDirectory("init-hindsight-");
+  initWorkspace(dir, "personal", {
+    strategy: "hindsight",
+    integration: "coding-agent",
+    namespace: "fixture-owner/fixture-workspace",
+  });
+
+  const config = JSON.parse(readFileSync(join(dir, "workspace.json"), "utf8")) as Record<
+    string,
+    unknown
+  >;
+  assert.deepEqual(config.memory, {
+    strategy: "hindsight",
+    integration: "coding-agent",
+    namespace: "fixture-owner/fixture-workspace",
+  });
+  assert.equal(config.dailyLogs, undefined);
+  assert.equal(config.wiki, undefined);
+  assert.equal(existsSync(join(dir, "memory", "wiki")), false);
+  assert.match(readFileSync(join(dir, "AGENTS.md"), "utf8"), /Search Hindsight knowledge pages/);
+
+  execSync("git init -q", { cwd: dir });
+  const verify = spawnSync(process.execPath, [cli, "verify"], {
+    cwd: dir,
+    encoding: "utf8",
+  });
+  assert.equal(verify.status, 0, verify.stderr);
+});
+
+test("init validates explicit memory selections before writing", () => {
+  const invalidNamespace = scratchDirectory("init-memory-namespace-");
+  assert.throws(
+    () =>
+      initWorkspace(invalidNamespace, "personal", {
+        strategy: "hindsight",
+        integration: "coding-agent",
+        namespace: "invalid",
+      }),
+    /namespace must be a Git repository path/,
+  );
+  assert.equal(existsSync(join(invalidNamespace, "AGENTS.md")), false);
+
+  const workWiki = scratchDirectory("init-work-wiki-");
+  assert.throws(
+    () => initWorkspace(workWiki, "work", { strategy: "llm-wiki" }),
+    /does not scaffold the llm-wiki memory layout/,
+  );
+  assert.equal(existsSync(join(workWiki, "AGENTS.md")), false);
+});
+
 function scratchDirectory(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix));
 }

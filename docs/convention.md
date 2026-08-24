@@ -18,6 +18,24 @@ owner-reviewed.
 
 ## 2. Memory (optional)
 
+A workspace may declare one memory strategy in `workspace.json`:
+
+- **`llm-wiki`** keeps the repository-maintained raw-log and compiled-wiki
+  lifecycle described below. It requires both `dailyLogs` and `wiki`.
+- **`hindsight`** delegates recall and retention to an existing Hindsight
+  integration. `integration` names the client contract (`coding-agent` or
+  `openclaw`), while `namespace` is the canonical `owner/repository` identity
+  used to route that repository's banks. Workspace-kit validates this
+  declaration but never installs a plugin, reads machine-global configuration,
+  checks credentials, or calls Hindsight.
+
+The strategy is an ownership declaration, not an authorization layer. A
+Hindsight client and server remain responsible for bank routing, credentials,
+and runtime health. Existing configurations without `memory` retain their
+current behavior; `dailyLogs` and `wiki` remain the legacy llm-wiki signal.
+
+### LLM wiki
+
 - **Raw layer**: dated daily logs (`memory/YYYY-MM-DD.md`) and per-context
   logs (`memory/contexts/<slug>/*.md`), each starting with an H1.
 - **Compiled layer**: a wiki (`memory/wiki/`) of pages carrying frontmatter
@@ -219,6 +237,7 @@ that cutover is done; set it true once the pin and lockfile match.
     },
   },
   "dailyLogs": { "root": "memory", "contexts": "memory/contexts" },
+  "memory": { "strategy": "llm-wiki" },
   "wiki": {
     "root": "memory/wiki",
     "requiredFields": ["title", "type", "status", "updated", "tags", "sources"],
@@ -238,6 +257,22 @@ that cutover is done; set it true once the pin and lockfile match.
   "packageManager": { "enforce": false, "allowForeignLockfiles": false },
 }
 ```
+
+A repository using the coding-agent Hindsight integration instead declares:
+
+```jsonc
+{
+  "memory": {
+    "strategy": "hindsight",
+    "integration": "coding-agent",
+    "namespace": "fixture-owner/fixture-workspace",
+  },
+}
+```
+
+Do not combine the Hindsight strategy with `dailyLogs` or `wiki`; source
+documents may still live elsewhere in the repository as ordinary authored
+content.
 
 - Strict JSON, no comments in the real file; every section optional.
 - Unknown keys at every supported nesting level are ignored at runtime
@@ -329,6 +364,11 @@ repository-history security scans remain independently operated surfaces.
   catalogs, and a `verify` pre-commit hook.
 - `runtime`: personal + HEARTBEAT.md and IDENTITY.md placeholders for
   always-on runtime identities.
+
+Personal and runtime profiles default to `llm-wiki`. Pass `--memory
+hindsight`, `--integration coding-agent|openclaw`, and `--namespace
+owner/repository` together to scaffold Hindsight instructions without raw-log
+or wiki artifacts. The `work` profile still defaults to no memory strategy.
 
 A fresh scaffold is verify-green immediately. The ownership contract stays
 unconfigured until an origin remote and a peer actually exist.

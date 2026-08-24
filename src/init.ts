@@ -2,6 +2,7 @@
 // kit-owned validation commands. Existing files remain unchanged.
 import { mkdirSync, realpathSync } from "node:fs";
 import { CONSUMER_PACKAGE_MANAGER } from "./checks/packageManager.ts";
+import { parseWorkspaceConfig, type MemoryConfig } from "./config.ts";
 import { kitVersion } from "./version.ts";
 import { wikiBackfill } from "./checks/wikiBackfill.ts";
 import {
@@ -14,7 +15,27 @@ import {
 export type Profile = "personal" | "runtime" | "work";
 export type InitResult = { created: string[]; skipped: string[] };
 
-function agentsSkeleton(): string {
+function memoryInstructions(memory: MemoryConfig | undefined): string {
+  if (memory?.strategy === "hindsight") {
+    const retrieval =
+      memory.integration === "coding-agent"
+        ? "Search Hindsight knowledge pages before re-deriving repository history. Use deeper reflection only when those pages are insufficient."
+        : "Use the OpenClaw Hindsight plugin's bank for the active session context. Do not select another repository or channel bank.";
+    return `## Memory
+
+This repository uses the \`${memory.integration}\` Hindsight integration under
+the \`${memory.namespace}\` namespace. ${retrieval}
+Keep current policy and operational contracts in repository documentation;
+Hindsight owns retained experience and recall.
+`;
+  }
+  return `## Memory
+
+TODO: define how daily evidence is promoted into the repository-maintained wiki.
+`;
+}
+
+function agentsSkeleton(memory: MemoryConfig | undefined): string {
   return `# AGENTS.md
 
 <!-- Owner-authored: workspace-kit scaffolds structure only and never edits
@@ -27,6 +48,8 @@ TODO: what this workspace is, who owns it, and what belongs here.
 ## Session Start
 
 TODO: what an agent should read first, and when.
+
+${memoryInstructions(memory)}
 
 ## Working Agreement
 
@@ -120,7 +143,11 @@ sources: [AGENTS.md]
 ${body}`;
 }
 
-export function initWorkspace(dir: string, profile: Profile): InitResult {
+export function initWorkspace(
+  dir: string,
+  profile: Profile,
+  requestedMemory?: MemoryConfig,
+): InitResult {
   const created: string[] = [];
   const skipped: string[] = [];
   const today = new Date().toISOString().slice(0, 10);
@@ -132,10 +159,22 @@ export function initWorkspace(dir: string, profile: Profile): InitResult {
       `${dir} is not a usable directory: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
+  if (profile === "work" && requestedMemory?.strategy === "llm-wiki") {
+    throw new Error("init --profile work does not scaffold the llm-wiki memory layout");
+  }
+  const validatedRequestedMemory =
+    requestedMemory?.strategy === "hindsight"
+      ? parseWorkspaceConfig({ memory: requestedMemory }).memory
+      : requestedMemory;
   const root = realpathSync(dir);
   assertCompatiblePackage(root, profile);
+  const memory =
+    validatedRequestedMemory ??
+    (profile === "personal" || profile === "runtime"
+      ? ({ strategy: "llm-wiki" } as const)
+      : undefined);
   const seedWikiCatalog =
-    profile !== "work" &&
+    memory?.strategy === "llm-wiki" &&
     !workspaceLstat(root, "workspace.json") &&
     !workspaceLstat(root, "memory/wiki/sources") &&
     !workspaceLstat(root, "memory/wiki/tags");
@@ -166,7 +205,7 @@ export function initWorkspace(dir: string, profile: Profile): InitResult {
     created.push(rel);
   };
 
-  put("AGENTS.md", agentsSkeleton());
+  put("AGENTS.md", agentsSkeleton(memory));
   link("CLAUDE.md", "AGENTS.md");
   put("package.json", packageSkeleton(profile));
   put("docs/README.md", "# Docs\n\nTODO: index the documents that live under docs/.\n");
@@ -179,30 +218,33 @@ export function initWorkspace(dir: string, profile: Profile): InitResult {
     links,
     packageManager: { enforce: true },
   };
+  if (memory) config.memory = memory;
 
   if (profile === "personal" || profile === "runtime") {
     put("README.md", "# Workspace\n\nTODO: one paragraph on what this repository is.\n");
     put(".env.example", "# Names only — never values.\n");
     put("projects.json", "{}\n");
-    put(
-      "memory/wiki/index.md",
-      wikiPage(
-        "Wiki index",
-        "wiki-index",
-        "# Wiki index\n\nTODO: link topic pages as they appear.\n",
-        today,
-      ),
-    );
-    put(
-      "memory/wiki/schema.md",
-      wikiPage(
-        "Wiki schema",
-        "wiki-schema",
-        "# Wiki schema\n\nTODO: describe the frontmatter and page conventions this wiki follows.\n",
-        today,
-      ),
-    );
-    put("memory/wiki/log.md", wikiPage("Wiki log", "wiki-log", "# Wiki log\n", today));
+    if (memory?.strategy === "llm-wiki") {
+      put(
+        "memory/wiki/index.md",
+        wikiPage(
+          "Wiki index",
+          "wiki-index",
+          "# Wiki index\n\nTODO: link topic pages as they appear.\n",
+          today,
+        ),
+      );
+      put(
+        "memory/wiki/schema.md",
+        wikiPage(
+          "Wiki schema",
+          "wiki-schema",
+          "# Wiki schema\n\nTODO: describe the frontmatter and page conventions this wiki follows.\n",
+          today,
+        ),
+      );
+      put("memory/wiki/log.md", wikiPage("Wiki log", "wiki-log", "# Wiki log\n", today));
+    }
     put(
       ".githooks/pre-commit",
       `#!/bin/sh
@@ -217,7 +259,9 @@ pnpm verify
       0o755,
     );
     required.push("README.md", ".env.example", "projects.json");
-    required.push("memory/wiki/index.md", "memory/wiki/schema.md", "memory/wiki/log.md");
+    if (memory?.strategy === "llm-wiki") {
+      required.push("memory/wiki/index.md", "memory/wiki/schema.md", "memory/wiki/log.md");
+    }
     config.registry = {
       file: "projects.json",
       entry: {
@@ -230,8 +274,10 @@ pnpm verify
         catalog: { field: "catalog", modes: ["managed"] },
       },
     };
-    config.dailyLogs = { root: "memory", contexts: "memory/contexts" };
-    config.wiki = { root: "memory/wiki" };
+    if (memory?.strategy === "llm-wiki") {
+      config.dailyLogs = { root: "memory", contexts: "memory/contexts" };
+      config.wiki = { root: "memory/wiki" };
+    }
     config.handoff = {
       paths: [
         "AGENTS.md",
