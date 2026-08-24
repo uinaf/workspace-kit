@@ -28,8 +28,8 @@ can create protected release tags but cannot bypass the default-branch rule.
 
 - During semantic-release prepare, the workflow commits the released
   `package.json` through GitHub's API as the authenticated App. GitHub signs
-  the commit, and semantic-release creates the tag from that commit before
-  publishing.
+  the commit. The ephemeral checkout then switches to that exact commit before
+  semantic-release creates the tag and publishes the package.
 - Full source checkouts still resolve the greater of the checked-in manifest
   and the latest reachable strict `vX.Y.Z` tag (see `src/version.ts`); builds
   bake that effective version into the CLI.
