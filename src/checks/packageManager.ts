@@ -1,7 +1,7 @@
 import type { PackageManagerConfig } from "../config.ts";
 import { readWorkspaceText, workspaceLstat } from "../lib/workspaceFs.ts";
 
-export const CONSUMER_PACKAGE_MANAGER = "pnpm@11.18.0";
+export const CONSUMER_PACKAGE_MANAGER = "pnpm@11.23.0";
 
 const FOREIGN_LOCKFILES = ["package-lock.json", "yarn.lock"] as const;
 

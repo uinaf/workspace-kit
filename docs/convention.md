@@ -150,7 +150,7 @@ Consumers own shared machine-global skill selection and installation.
 1. Enable Corepack if needed, then install `@uinaf/workspace-kit` as an
    exact development dependency with
    `pnpm add --save-dev --save-exact @uinaf/workspace-kit`.
-2. Pin `"packageManager": "pnpm@11.18.0"` in `package.json` and add a
+2. Pin `"packageManager": "pnpm@11.23.0"` in `package.json` and add a
    project-local `verify` script for `workspace-kit verify`; add direct
    check shortcuts only when people use them independently.
 3. Describe the workspace's selected sections in `workspace.json`.
