@@ -28,10 +28,10 @@ can create protected release tags but cannot bypass the default-branch rule.
 
 - During semantic-release prepare, the workflow commits the released
   `package.json` through GitHub's API as the authenticated App. GitHub signs
-  the commit. The ephemeral checkout then fetches remote `main` and switches to
-  that exact commit before semantic-release creates the tag and publishes the
-  package. This fetch is required because the API plugin advances the remote
-  ref without updating the action's working tree.
+  the commit. The ephemeral checkout resolves the current `main` ref through
+  GitHub's API and switches to that exact commit before semantic-release creates
+  the tag and publishes the package. This handoff is required because the API
+  plugin advances the remote ref without updating the action's working tree.
 - Full source checkouts still resolve the greater of the checked-in manifest
   and the latest reachable strict `vX.Y.Z` tag (see `src/version.ts`); builds
   bake that effective version into the CLI.
@@ -68,6 +68,8 @@ can create protected release tags but cannot bypass the default-branch rule.
 
 - The release job runs only after verification and secret scanning pass. PRs
   run the same gates with read-only permissions and no environment access.
+- Verification runs on Blacksmith. The release job runs on GitHub-hosted Linux
+  because npm provenance rejects self-hosted runner attestations.
 - Publish concurrency is non-cancellable (queued, never killed mid-publish).
 - `prepack` runs the full verify gate (which rebuilds a clean `dist/`)
   before any tarball is produced. The gate stages the effective version the

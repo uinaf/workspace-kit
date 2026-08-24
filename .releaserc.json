@@ -15,7 +15,7 @@
     [
       "@semantic-release/exec",
       {
-        "prepareCmd": "git fetch origin main && git switch --detach FETCH_HEAD"
+        "prepareCmd": "git switch --detach \"$(gh api repos/$GITHUB_REPOSITORY/git/ref/heads/main --jq .object.sha)\""
       }
     ],
     [

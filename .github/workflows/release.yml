@@ -47,7 +47,8 @@ jobs:
   release:
     if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
     needs: [verify, secrets]
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    # npm provenance accepts GitHub-hosted runners only.
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: release
     # Never cancel a publish mid-flight; queue instead.
