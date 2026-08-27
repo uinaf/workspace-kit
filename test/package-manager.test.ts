@@ -83,10 +83,10 @@ test("package-manager check requires a pnpm@ pin and rejects foreign lockfiles",
     ['package.json: packageManager must be a pnpm@ pin (got "pnpm@latest")'],
   );
 
-  writeFileSync(join(dir, "package.json"), '{"packageManager":"pnpm@^11.23.0"}\n');
+  writeFileSync(join(dir, "package.json"), '{"packageManager":"pnpm@^12.0.0"}\n');
   assert.deepEqual(
     inDir(dir, () => packageManagerErrors(enforced)),
-    ['package.json: packageManager must be a pnpm@ pin (got "pnpm@^11.23.0")'],
+    ['package.json: packageManager must be a pnpm@ pin (got "pnpm@^12.0.0")'],
   );
 
   writeFileSync(
