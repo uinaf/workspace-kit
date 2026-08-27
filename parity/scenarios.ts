@@ -32,9 +32,8 @@ export function utcToday(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-// Explicit allowlist — never spread process.env: a stray FORCE_COLOR or
-// locale in the invoking shell would poison outputs with ANSI codes or
-// ICU-collated ordering.
+// Never spread process.env. FORCE_COLOR or the invoking shell's locale would
+// poison outputs with ANSI codes or ICU-collated ordering.
 export function makeEnv(): Record<string, string> {
   return {
     PATH: process.env.PATH ?? "",

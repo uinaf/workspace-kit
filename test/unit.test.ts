@@ -1,5 +1,4 @@
-// Port-time unit-test debt from parity/README.md: legacy behaviors that
-// goldens cannot capture, pinned here so the port cannot silently diverge.
+// Legacy contracts that the golden parity suite cannot capture.
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 import { execSync } from "node:child_process";
@@ -35,8 +34,8 @@ function scratch(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix));
 }
 
-test("frontmatter parser quirks are kept as-is", () => {
-  // Inline arrays split on commas even inside quotes — a kept quirk.
+test("frontmatter parser preserves its legacy syntax", () => {
+  // Inline arrays split on commas even inside quotes.
   assert.deepEqual(parseFrontmatter('---\ntags: ["a, b"]\n---\n').tags, ["a", "b"]);
   // Single- and double-quote stripping (one char per side).
   assert.equal(clean("'hello'"), "hello");
@@ -50,7 +49,7 @@ test("frontmatter parser quirks are kept as-is", () => {
   ]);
 });
 
-test("non-string updated silently skips validation (kept quirk)", () => {
+test("non-string updated values skip validation", () => {
   const dir = scratch("wiki-");
   mkdirSync(join(dir, "wiki"), { recursive: true });
   writeFileSync(
@@ -74,7 +73,7 @@ test("missing wiki root is a clean fatal error", () => {
   assert.equal(result.fatal, "missing memory/wiki");
 });
 
-test("missing wiki log is an error, not a crash (recorded fix)", () => {
+test("missing wiki log is an error, not a crash", () => {
   const dir = scratch("nolog-");
   mkdirSync(join(dir, "wiki"), { recursive: true });
   writeFileSync(
@@ -86,14 +85,22 @@ test("missing wiki log is an error, not a crash (recorded fix)", () => {
 });
 
 test("handoff invariants are not configurable", () => {
-  for (const path of ["", "/etc/passwd", "a/../b", ".env", ".ENV", ".env.local", "x/.Env.prod"]) {
+  for (const path of [
+    "",
+    "/etc/passwd",
+    "a/../b",
+    ".env",
+    ".ENV",
+    ".env.local",
+    "x/.Env.prod",
+    "memory/x.md",
+    "MEMORY/x.md",
+    "SOUL.md",
+    "soul.md",
+  ]) {
     assert.equal(isPrivateHandoffPath(path, HANDOFF), true, path);
   }
   assert.equal(isPrivateHandoffPath("scripts/ok.ts", HANDOFF), false);
-  assert.equal(isPrivateHandoffPath("memory/x.md", HANDOFF), true);
-  assert.equal(isPrivateHandoffPath("MEMORY/x.md", HANDOFF), true);
-  assert.equal(isPrivateHandoffPath("SOUL.md", HANDOFF), true);
-  assert.equal(isPrivateHandoffPath("soul.md", HANDOFF), true);
 });
 
 test("loadContract fails fast in field order", () => {

@@ -1,6 +1,6 @@
 // Port of the legacy workspace-contract validator. Message strings and
-// evaluation order are parity-locked to parity/goldens — do not "improve"
-// them without regenerating the oracle.
+// evaluation order are parity-locked to parity/goldens. Regenerate the oracle
+// when changing them.
 import { spawnSync } from "node:child_process";
 import { posix, resolve, win32 } from "node:path";
 import type { HandoffConfig } from "../config.ts";

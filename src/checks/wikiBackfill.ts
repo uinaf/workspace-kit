@@ -103,8 +103,7 @@ function allSources(repoRoot: string, root: string): Source[] {
     "README.md",
     "CONTRIBUTING.md",
   ].filter(
-    // Root convention files are optional: a scaffold without SOUL.md et al.
-    // must not crash the generator (recorded fix vs legacy).
+    // Missing optional root convention files are skipped.
     (p, i, a) =>
       a.indexOf(p) === i &&
       p !== root &&

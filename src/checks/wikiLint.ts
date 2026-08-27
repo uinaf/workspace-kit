@@ -1,7 +1,6 @@
 // Port of the legacy wiki-lint. Messages, ordering, and wikilink resolution
 // (page-relative -> root-relative -> unique-leaf fallback) are parity-locked
-// to parity/goldens. One recorded fix vs legacy: a missing log file is a
-// clean error instead of an uncaught crash.
+// to parity/goldens. A missing log file returns an error instead of throwing.
 import { basename, dirname, join, normalize, posix, relative } from "node:path";
 import { asList, isExternal, parseFrontmatter } from "../lib/frontmatter.ts";
 import {
@@ -17,7 +16,7 @@ function stripFencedCode(text: string): string {
 
 export type WikiLintOptions = {
   root: string;
-  // Legacy defaults; workspaces may add e.g. "created" per the convention.
+  // Default fields; workspaces may add e.g. "created" per the convention.
   requiredFields?: string[];
   // Karpathy llm-wiki rules, opt-in: every non-exempt page must be cataloged
   // in index.md; log entries must be appended in chronological order.
@@ -173,7 +172,6 @@ export function wikiLintErrors(options: string | WikiLintOptions): WikiLintResul
 
   const logPath = join(root, "log.md");
   if (!workspaceLstat(".", logPath)) {
-    // Recorded fix: legacy crashed here with a stack trace.
     bad.push(`missing ${logPath}`);
   } else {
     const logText = readWorkspaceText(".", logPath);

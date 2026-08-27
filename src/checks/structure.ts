@@ -1,7 +1,7 @@
 // Port of the legacy doctor's own checks (required files, alias symlinks,
 // registry shape, daily-log H1). Message strings and ordering are
 // parity-locked to parity/goldens. Required files deliberately use
-// filesystem existence, not git-tracked state — the contract check owns
+// filesystem existence instead of git-tracked state. The contract check owns
 // tracked semantics.
 import { posix } from "node:path";
 import type { DailyLogsConfig, LinkRule, RegistryConfig, WorkspaceConfig } from "../config.ts";

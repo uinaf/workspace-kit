@@ -1,6 +1,5 @@
 // Soft size limits from the workspace convention (e.g. MEMORY.md under 200
-// lines, daily logs under 80). These are WARNINGS by design — "the audit
-// flags them, the human decides" — so they never fail a run.
+// lines, daily logs under 80) emit warnings and never fail a run.
 import { spawnSync } from "node:child_process";
 import type { LimitRule } from "../config.ts";
 import { readWorkspaceText, workspaceLstat } from "../lib/workspaceFs.ts";

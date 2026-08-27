@@ -1,6 +1,6 @@
 // The opt-in llm-wiki enforcement checks: index-as-catalog coverage,
 // append-only log chronology, configurable required frontmatter, and soft
-// size-limit warnings. All default OFF — golden parity proves that.
+// size-limit warnings. They default off to preserve golden parity.
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 import { execSync, spawnSync } from "node:child_process";

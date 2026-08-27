@@ -1,5 +1,4 @@
-// Coverage for the kit-only v1 surfaces plus regressions for the
-// pre-release adversarial-review findings.
+// Integration coverage for CLI surfaces outside the golden parity suite.
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 import { execFileSync, execSync, spawnSync } from "node:child_process";
@@ -51,7 +50,7 @@ function commitAll(dir: string): void {
   });
 }
 
-test("wiki backfill runs green on the kit's own scaffold (P0 regression)", () => {
+test("wiki backfill accepts the kit's own scaffold", () => {
   const dir = scaffold("personal");
   const result = kit(dir, "wiki", "backfill");
   assert.equal(result.status, 0, result.stderr);

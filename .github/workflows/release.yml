@@ -2,7 +2,7 @@ name: Release
 
 # Canonical verify -> release on push to main. Publishing uses npm Trusted
 # Publishing (OIDC): npmjs.com lists this workflow filename (release.yml)
-# and the "release" environment as the package's trusted publisher — see
+# and the "release" environment as the package's trusted publisher. See
 # docs/releasing.md. Version push-back and GitHub Release writes use a
 # short-lived uinaf-releaser installation token. GitHub signs the App-authored
 # version commit before semantic-release creates the tag.
