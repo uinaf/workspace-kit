@@ -28,7 +28,7 @@ jobs:
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           standalone: true
-      - uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb # v1.15.0
+      - uses: voidzero-dev/setup-vp@1b32467adbe183473499fd9d5d372c3ed9641754 # v1.18.0
         with:
           node-version-file: ".node-version"
           cache: true
@@ -71,7 +71,7 @@ jobs:
       # vp must be on PATH here because npm publish's prepack runs the verify
       # gate (vp check/test/pack). Trusted publishing authenticates from the
       # job's OIDC identity; no registry token is ever configured.
-      - uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb # v1.15.0
+      - uses: voidzero-dev/setup-vp@1b32467adbe183473499fd9d5d372c3ed9641754 # v1.18.0
         with:
           node-version-file: ".node-version"
           run-install: |
