@@ -123,6 +123,24 @@ test("docs links names a stageable untracked target instead of calling it broken
   ]);
 });
 
+test("docs links keeps case collisions and embedded repositories on the broken-link message", () => {
+  const dir = repository();
+  put(dir, "README.md", "[case](guide.md)\n[embedded](nested)\n");
+  put(dir, "Guide.md", "# guide\n");
+  track(dir);
+  // On a case-insensitive filesystem this overwrites Guide.md; on a
+  // case-sensitive one it creates a distinct untracked file. Both must stay
+  // broken: staging cannot produce a tree that checks out everywhere.
+  put(dir, "guide.md", "# guide\n");
+  mkdirSync(join(dir, "nested"), { recursive: true });
+  execFileSync("git", ["init", "-q"], { cwd: join(dir, "nested") });
+
+  assert.deepEqual(check(dir), [
+    "README.md: broken link (guide.md)",
+    "README.md: broken link (nested)",
+  ]);
+});
+
 test("docs links skips tracked symlink leaves and reports missing tracked Markdown", () => {
   const dir = repository();
   put(dir, "README.md", "# Readme\n");

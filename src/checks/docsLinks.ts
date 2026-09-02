@@ -283,15 +283,29 @@ function pathPart(href: string): string {
   return href;
 }
 
-// Untracked paths git would accept from `git add`: present, not ignored, and
-// spelled exactly as git sees them (a case-mismatched tracked file is not
-// listed here on case-insensitive filesystems).
-function stageablePaths(): Set<string> {
-  const result = spawnSync("git", ["ls-files", "--others", "--exclude-standard", "-z"], {
-    encoding: "utf8",
-  });
-  if (result.status !== 0) return new Set();
-  return new Set(result.stdout.split("\0").filter(Boolean));
+// Whether `git add <target>` would make the link resolve: the path is
+// untracked and not ignored, is not an embedded repository (git lists those
+// as `dir/` and refuses to add them), and does not collide by case with a
+// tracked path (git would stage it, but the tree could not be checked out on
+// a case-insensitive filesystem). Scoped to one pathspec so the listing stays
+// small regardless of how much untracked content the worktree holds.
+function isStageable(target: string, trackedFolded: Set<string>): boolean {
+  const folded = target.toLowerCase();
+  if (trackedFolded.has(folded)) return false;
+  const prefix = `${folded}/`;
+  for (const file of trackedFolded) {
+    if (file.startsWith(prefix)) return false;
+  }
+  const result = spawnSync(
+    "git",
+    ["ls-files", "--others", "--exclude-standard", "-z", "--", target],
+    { encoding: "utf8" },
+  );
+  if (result.status !== 0) return false;
+  return result.stdout
+    .split("\0")
+    .filter(Boolean)
+    .some((entry) => !entry.endsWith("/"));
 }
 
 export function docsLinkErrors(config: DocsLinksConfig): string[] {
@@ -299,15 +313,7 @@ export function docsLinkErrors(config: DocsLinksConfig): string[] {
   const result = spawnSync("git", ["ls-files", "-z"], { encoding: "utf8" });
   if (result.status !== 0) return ["could not list tracked files"];
   const tracked = new Set(result.stdout.split("\0").filter(Boolean));
-  const stageable = stageablePaths();
-  const isStageable = (target: string): boolean => {
-    if (stageable.has(target)) return true;
-    const prefix = `${target}/`;
-    for (const file of stageable) {
-      if (file.startsWith(prefix)) return true;
-    }
-    return false;
-  };
+  const trackedFolded = new Set([...tracked].map((file) => file.toLowerCase()));
   const isTracked = (target: string): boolean => {
     if (target === ".") return tracked.size > 0;
     if (tracked.has(target)) return true;
@@ -364,7 +370,7 @@ export function docsLinkErrors(config: DocsLinksConfig): string[] {
         // The rule is deliberate: a present-but-untracked target would break
         // for everyone else. Say so only when staging would actually work.
         bad.push(
-          isStageable(target)
+          isStageable(target, trackedFolded)
             ? `${file}: untracked link target (${raw}); stage it so the link resolves for others`
             : `${file}: broken link (${raw})`,
         );
