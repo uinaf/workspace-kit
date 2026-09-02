@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "vite-plus/test";
@@ -116,8 +116,8 @@ test("docs links names a stageable untracked target instead of calling it broken
   put(dir, "build/out.js", "// ignored\n");
 
   assert.deepEqual(check(dir), [
-    "README.md: untracked link target (scripts/new.ts); stage it so the link resolves for others",
-    "README.md: untracked link target (generated); stage it so the link resolves for others",
+    "README.md: untracked link target (scripts/new.ts); the link resolves only once it is tracked",
+    "README.md: untracked link target (generated); the link resolves only once it is tracked",
     "README.md: broken link (build/out.js)",
     "README.md: broken link (scripts/gone.ts)",
   ]);
@@ -141,24 +141,36 @@ test("docs links keeps case collisions and embedded repositories on the broken-l
   ]);
 });
 
-test("docs links rejects targets git would refuse or a portable tree cannot hold", () => {
+test("docs links keeps targets no commit could make portable on the broken-link message", () => {
   const dir = repository();
-  put(
-    dir,
-    "README.md",
-    ["[nul](file%00.md)", "[gitdir](docs/.Git/x.md)", "[deep embedded](generated)", ""].join("\n"),
-  );
+  put(dir, "README.md", "[nul](file%00.md)\n[gitdir](docs/.Git/x.md)\n[empty](emptydir)\n");
   track(dir);
   put(dir, "docs/.Git/x.md", "# alias of the git directory\n");
-  put(dir, "generated/a.md", "# fine on its own\n");
-  mkdirSync(join(dir, "generated", "nested"), { recursive: true });
-  execFileSync("git", ["init", "-q"], { cwd: join(dir, "generated", "nested") });
+  mkdirSync(join(dir, "emptydir"), { recursive: true });
 
   assert.deepEqual(check(dir), [
     "README.md: broken link (file%00.md)",
     "README.md: broken link (docs/.Git/x.md)",
-    "README.md: broken link (generated)",
+    "README.md: broken link (emptydir)",
   ]);
+});
+
+test("docs links does not run git's check-in pipeline while validating", () => {
+  const dir = repository();
+  put(dir, "README.md", "[new](notes/new.md)\n");
+  put(dir, ".gitattributes", "*.md filter=marker\n");
+  track(dir);
+  execFileSync(
+    "git",
+    ["config", "filter.marker.clean", `sh -c 'touch "${join(dir, "FILTER_RAN")}"; cat'`],
+    { cwd: dir },
+  );
+  put(dir, "notes/new.md", "# untracked\n");
+
+  assert.deepEqual(check(dir), [
+    "README.md: untracked link target (notes/new.md); the link resolves only once it is tracked",
+  ]);
+  assert.equal(existsSync(join(dir, "FILTER_RAN")), false);
 });
 
 test("docs links rejects an untracked target below a tracked path that aliases it", () => {
@@ -184,7 +196,7 @@ test("docs links treats link targets as literal paths, not git patterns", () => 
 
   assert.deepEqual(check(dir), [
     "README.md: broken link (missing%2A.md)",
-    "README.md: untracked link target (assets); stage it so the link resolves for others",
+    "README.md: untracked link target (assets); the link resolves only once it is tracked",
   ]);
 });
 

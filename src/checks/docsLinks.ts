@@ -283,14 +283,16 @@ function pathPart(href: string): string {
   return href;
 }
 
-// Whether `git add <target>` would make the link resolve for everyone. Git
-// itself is the authority on addability (`add --dry-run` refuses ignored
-// paths, missing paths, and embedded repositories at any depth without
-// touching the index). Two cases git accepts but a portable tree cannot
-// hold are rejected first: components aliasing the `.git` directory, and
-// collisions with tracked paths under the portable identity in either
-// direction (a tracked file `Guide` blocks `guide/sub/x.md` and vice versa).
-function isStageable(target: string, trackedIdentities: Set<string>): boolean {
+// Whether the target is an untracked, non-ignored path git knows about, so
+// the diagnostic can say "untracked" instead of "broken". This deliberately
+// does not claim `git add` will succeed: deciding that would mean running
+// git's check-in pipeline (clean filters can execute commands), listing
+// every descendant of a directory, and reasoning about index validity. The
+// listing is filter-free, literal, and collapses directories to one entry so
+// output stays bounded. Portable-identity collisions with tracked paths and
+// `.git` aliases are still reported as broken, since no commit could make
+// those links resolve on a case-insensitive filesystem.
+function isUntrackedTarget(target: string, trackedIdentities: Set<string>): boolean {
   if (target.includes("\0")) return false;
   const identity = portablePathIdentity(target);
   const components = identity.split("/");
@@ -303,10 +305,37 @@ function isStageable(target: string, trackedIdentities: Set<string>): boolean {
     if (tracked.startsWith(prefix)) return false;
   }
   try {
-    const result = spawnSync("git", ["--literal-pathspecs", "add", "--dry-run", "--", target], {
-      encoding: "utf8",
-    });
-    return result.status === 0;
+    const result = spawnSync(
+      "git",
+      [
+        "--literal-pathspecs",
+        "ls-files",
+        "--others",
+        "--exclude-standard",
+        "--directory",
+        "--no-empty-directory",
+        "-z",
+        "--",
+        target,
+      ],
+      { encoding: "utf8" },
+    );
+    if (result.status !== 0) return false;
+    const entries = result.stdout.split("\0").filter(Boolean);
+    // A directory entry is an embedded repository when it carries its own
+    // .git; git lists it as untracked but will never add it.
+    return (
+      entries.length > 0 &&
+      entries.every((entry) => !entry.endsWith("/") || !isEmbeddedRepository(entry))
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isEmbeddedRepository(directory: string): boolean {
+  try {
+    return workspaceLstat(".", `${directory}.git`, "embedded repository marker") !== undefined;
   } catch {
     return false;
   }
@@ -372,10 +401,10 @@ export function docsLinkErrors(config: DocsLinksConfig): string[] {
         bad.push(`${file}: broken link (${raw})`);
       } else if (!isTracked(target)) {
         // The rule is deliberate: a present-but-untracked target would break
-        // for everyone else. Say so only when staging would actually work.
+        // for everyone else. Name the cause; do not promise a remedy.
         bad.push(
-          isStageable(target, trackedIdentities)
-            ? `${file}: untracked link target (${raw}); stage it so the link resolves for others`
+          isUntrackedTarget(target, trackedIdentities)
+            ? `${file}: untracked link target (${raw}); the link resolves only once it is tracked`
             : `${file}: broken link (${raw})`,
         );
       }
