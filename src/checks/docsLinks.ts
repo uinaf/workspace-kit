@@ -4,7 +4,7 @@
 // backtick/tilde fenced blocks.
 import { spawnSync } from "node:child_process";
 import { posix } from "node:path";
-import type { DocsLinksConfig } from "../config.ts";
+import { portablePathIdentity, type DocsLinksConfig } from "../config.ts";
 import { readWorkspaceText, workspaceLstat } from "../lib/workspaceFs.ts";
 
 type Destination = { offset: number; raw: string };
@@ -283,29 +283,47 @@ function pathPart(href: string): string {
   return href;
 }
 
-// Whether `git add <target>` would make the link resolve: the path is
-// untracked and not ignored, is not an embedded repository (git lists those
-// as `dir/` and refuses to add them), and does not collide by case with a
-// tracked path (git would stage it, but the tree could not be checked out on
-// a case-insensitive filesystem). Scoped to one pathspec so the listing stays
-// small regardless of how much untracked content the worktree holds.
-function isStageable(target: string, trackedFolded: Set<string>): boolean {
-  const folded = target.toLowerCase();
-  if (trackedFolded.has(folded)) return false;
-  const prefix = `${folded}/`;
-  for (const file of trackedFolded) {
-    if (file.startsWith(prefix)) return false;
+// Whether `git add <target>` would make the link resolve for everyone: the
+// path is untracked and not ignored, is not an embedded repository (git will
+// not add one), and does not collide with a tracked path under the portable
+// identity (git would stage it, but the tree could not be checked out on a
+// case-insensitive filesystem). The target is a literal pathspec, and
+// directories collapse to a single `dir/` entry so output stays bounded.
+function isStageable(target: string, trackedIdentities: Set<string>): boolean {
+  const identity = portablePathIdentity(target);
+  if (trackedIdentities.has(identity)) return false;
+  const prefix = `${identity}/`;
+  for (const tracked of trackedIdentities) {
+    if (tracked.startsWith(prefix)) return false;
   }
   const result = spawnSync(
     "git",
-    ["ls-files", "--others", "--exclude-standard", "-z", "--", target],
+    [
+      "--literal-pathspecs",
+      "ls-files",
+      "--others",
+      "--exclude-standard",
+      "--directory",
+      "--no-empty-directory",
+      "-z",
+      "--",
+      target,
+    ],
     { encoding: "utf8" },
   );
   if (result.status !== 0) return false;
-  return result.stdout
-    .split("\0")
-    .filter(Boolean)
-    .some((entry) => !entry.endsWith("/"));
+  const entries = result.stdout.split("\0").filter(Boolean);
+  if (entries.length === 0) return false;
+  // A directory entry is stageable unless it is an embedded repository.
+  return entries.every((entry) => !entry.endsWith("/") || !isEmbeddedRepository(entry));
+}
+
+function isEmbeddedRepository(directory: string): boolean {
+  try {
+    return workspaceLstat(".", `${directory}.git`, "embedded repository marker") !== undefined;
+  } catch {
+    return false;
+  }
 }
 
 export function docsLinkErrors(config: DocsLinksConfig): string[] {
@@ -313,7 +331,7 @@ export function docsLinkErrors(config: DocsLinksConfig): string[] {
   const result = spawnSync("git", ["ls-files", "-z"], { encoding: "utf8" });
   if (result.status !== 0) return ["could not list tracked files"];
   const tracked = new Set(result.stdout.split("\0").filter(Boolean));
-  const trackedFolded = new Set([...tracked].map((file) => file.toLowerCase()));
+  const trackedIdentities = new Set([...tracked].map(portablePathIdentity));
   const isTracked = (target: string): boolean => {
     if (target === ".") return tracked.size > 0;
     if (tracked.has(target)) return true;
@@ -370,7 +388,7 @@ export function docsLinkErrors(config: DocsLinksConfig): string[] {
         // The rule is deliberate: a present-but-untracked target would break
         // for everyone else. Say so only when staging would actually work.
         bad.push(
-          isStageable(target, trackedFolded)
+          isStageable(target, trackedIdentities)
             ? `${file}: untracked link target (${raw}); stage it so the link resolves for others`
             : `${file}: broken link (${raw})`,
         );

@@ -141,6 +141,19 @@ test("docs links keeps case collisions and embedded repositories on the broken-l
   ]);
 });
 
+test("docs links treats link targets as literal paths, not git patterns", () => {
+  const dir = repository();
+  put(dir, "README.md", "[glob](missing%2A.md)\n[dir](assets)\n");
+  track(dir);
+  put(dir, "missing1.md", "# not the link target\n");
+  put(dir, "assets/a.png", "png");
+
+  assert.deepEqual(check(dir), [
+    "README.md: broken link (missing%2A.md)",
+    "README.md: untracked link target (assets); stage it so the link resolves for others",
+  ]);
+});
+
 test("docs links skips tracked symlink leaves and reports missing tracked Markdown", () => {
   const dir = repository();
   put(dir, "README.md", "# Readme\n");
