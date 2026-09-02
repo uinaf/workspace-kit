@@ -141,6 +141,40 @@ test("docs links keeps case collisions and embedded repositories on the broken-l
   ]);
 });
 
+test("docs links rejects targets git would refuse or a portable tree cannot hold", () => {
+  const dir = repository();
+  put(
+    dir,
+    "README.md",
+    ["[nul](file%00.md)", "[gitdir](docs/.Git/x.md)", "[deep embedded](generated)", ""].join("\n"),
+  );
+  track(dir);
+  put(dir, "docs/.Git/x.md", "# alias of the git directory\n");
+  put(dir, "generated/a.md", "# fine on its own\n");
+  mkdirSync(join(dir, "generated", "nested"), { recursive: true });
+  execFileSync("git", ["init", "-q"], { cwd: join(dir, "generated", "nested") });
+
+  assert.deepEqual(check(dir), [
+    "README.md: broken link (file%00.md)",
+    "README.md: broken link (docs/.Git/x.md)",
+    "README.md: broken link (generated)",
+  ]);
+});
+
+test("docs links rejects an untracked target below a tracked path that aliases it", () => {
+  const dir = repository();
+  put(dir, "README.md", "[ancestor](guide/sub/file.md)\n");
+  put(dir, "Guide", "# tracked file\n");
+  track(dir);
+  // Keep `Guide` in the index but clear the working copy so the colliding
+  // directory can exist on a case-insensitive filesystem too; on Linux both
+  // would coexist and git would stage the file.
+  rmSync(join(dir, "Guide"));
+  put(dir, "guide/sub/file.md", "# collides with tracked Guide\n");
+
+  assert.deepEqual(check(dir), ["README.md: broken link (guide/sub/file.md)"]);
+});
+
 test("docs links treats link targets as literal paths, not git patterns", () => {
   const dir = repository();
   put(dir, "README.md", "[glob](missing%2A.md)\n[dir](assets)\n");

@@ -283,44 +283,30 @@ function pathPart(href: string): string {
   return href;
 }
 
-// Whether `git add <target>` would make the link resolve for everyone: the
-// path is untracked and not ignored, is not an embedded repository (git will
-// not add one), and does not collide with a tracked path under the portable
-// identity (git would stage it, but the tree could not be checked out on a
-// case-insensitive filesystem). The target is a literal pathspec, and
-// directories collapse to a single `dir/` entry so output stays bounded.
+// Whether `git add <target>` would make the link resolve for everyone. Git
+// itself is the authority on addability (`add --dry-run` refuses ignored
+// paths, missing paths, and embedded repositories at any depth without
+// touching the index). Two cases git accepts but a portable tree cannot
+// hold are rejected first: components aliasing the `.git` directory, and
+// collisions with tracked paths under the portable identity in either
+// direction (a tracked file `Guide` blocks `guide/sub/x.md` and vice versa).
 function isStageable(target: string, trackedIdentities: Set<string>): boolean {
+  if (target.includes("\0")) return false;
   const identity = portablePathIdentity(target);
-  if (trackedIdentities.has(identity)) return false;
+  const components = identity.split("/");
+  if (components.some((component) => component === ".GIT")) return false;
+  for (let depth = 1; depth <= components.length; depth += 1) {
+    if (trackedIdentities.has(components.slice(0, depth).join("/"))) return false;
+  }
   const prefix = `${identity}/`;
   for (const tracked of trackedIdentities) {
     if (tracked.startsWith(prefix)) return false;
   }
-  const result = spawnSync(
-    "git",
-    [
-      "--literal-pathspecs",
-      "ls-files",
-      "--others",
-      "--exclude-standard",
-      "--directory",
-      "--no-empty-directory",
-      "-z",
-      "--",
-      target,
-    ],
-    { encoding: "utf8" },
-  );
-  if (result.status !== 0) return false;
-  const entries = result.stdout.split("\0").filter(Boolean);
-  if (entries.length === 0) return false;
-  // A directory entry is stageable unless it is an embedded repository.
-  return entries.every((entry) => !entry.endsWith("/") || !isEmbeddedRepository(entry));
-}
-
-function isEmbeddedRepository(directory: string): boolean {
   try {
-    return workspaceLstat(".", `${directory}.git`, "embedded repository marker") !== undefined;
+    const result = spawnSync("git", ["--literal-pathspecs", "add", "--dry-run", "--", target], {
+      encoding: "utf8",
+    });
+    return result.status === 0;
   } catch {
     return false;
   }
