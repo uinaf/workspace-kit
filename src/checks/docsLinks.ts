@@ -283,12 +283,15 @@ function pathPart(href: string): string {
   return href;
 }
 
-function existsInWorkspace(target: string): boolean {
-  try {
-    return workspaceLstat(".", target, "link target") !== undefined;
-  } catch {
-    return false;
-  }
+// Untracked paths git would accept from `git add`: present, not ignored, and
+// spelled exactly as git sees them (a case-mismatched tracked file is not
+// listed here on case-insensitive filesystems).
+function stageablePaths(): Set<string> {
+  const result = spawnSync("git", ["ls-files", "--others", "--exclude-standard", "-z"], {
+    encoding: "utf8",
+  });
+  if (result.status !== 0) return new Set();
+  return new Set(result.stdout.split("\0").filter(Boolean));
 }
 
 export function docsLinkErrors(config: DocsLinksConfig): string[] {
@@ -296,6 +299,15 @@ export function docsLinkErrors(config: DocsLinksConfig): string[] {
   const result = spawnSync("git", ["ls-files", "-z"], { encoding: "utf8" });
   if (result.status !== 0) return ["could not list tracked files"];
   const tracked = new Set(result.stdout.split("\0").filter(Boolean));
+  const stageable = stageablePaths();
+  const isStageable = (target: string): boolean => {
+    if (stageable.has(target)) return true;
+    const prefix = `${target}/`;
+    for (const file of stageable) {
+      if (file.startsWith(prefix)) return true;
+    }
+    return false;
+  };
   const isTracked = (target: string): boolean => {
     if (target === ".") return tracked.size > 0;
     if (tracked.has(target)) return true;
@@ -350,9 +362,9 @@ export function docsLinkErrors(config: DocsLinksConfig): string[] {
         bad.push(`${file}: broken link (${raw})`);
       } else if (!isTracked(target)) {
         // The rule is deliberate: a present-but-untracked target would break
-        // for everyone else. Say so instead of calling it missing.
+        // for everyone else. Say so only when staging would actually work.
         bad.push(
-          existsInWorkspace(target)
+          isStageable(target)
             ? `${file}: untracked link target (${raw}); stage it so the link resolves for others`
             : `${file}: broken link (${raw})`,
         );

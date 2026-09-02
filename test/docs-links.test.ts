@@ -96,14 +96,29 @@ test("docs links reports broken inline, image, reference, and malformed destinat
   ]);
 });
 
-test("docs links names a present-but-untracked target instead of calling it broken", () => {
+test("docs links names a stageable untracked target instead of calling it broken", () => {
   const dir = repository();
-  put(dir, "README.md", "[new script](scripts/new.ts)\n[gone](scripts/gone.ts)\n");
+  put(
+    dir,
+    "README.md",
+    [
+      "[new script](scripts/new.ts)",
+      "[new dir](generated)",
+      "[ignored](build/out.js)",
+      "[gone](scripts/gone.ts)",
+      "",
+    ].join("\n"),
+  );
+  put(dir, ".gitignore", "build/\n");
   track(dir);
   put(dir, "scripts/new.ts", "export {};\n");
+  put(dir, "generated/index.md", "# generated\n");
+  put(dir, "build/out.js", "// ignored\n");
 
   assert.deepEqual(check(dir), [
     "README.md: untracked link target (scripts/new.ts); stage it so the link resolves for others",
+    "README.md: untracked link target (generated); stage it so the link resolves for others",
+    "README.md: broken link (build/out.js)",
     "README.md: broken link (scripts/gone.ts)",
   ]);
 });
