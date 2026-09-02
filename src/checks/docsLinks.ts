@@ -283,6 +283,14 @@ function pathPart(href: string): string {
   return href;
 }
 
+function existsInWorkspace(target: string): boolean {
+  try {
+    return workspaceLstat(".", target, "link target") !== undefined;
+  } catch {
+    return false;
+  }
+}
+
 export function docsLinkErrors(config: DocsLinksConfig): string[] {
   const bad: string[] = [];
   const result = spawnSync("git", ["ls-files", "-z"], { encoding: "utf8" });
@@ -338,8 +346,16 @@ export function docsLinkErrors(config: DocsLinksConfig): string[] {
       }
       if (href.startsWith("/")) continue;
       const target = posix.normalize(posix.join(posix.dirname(file), href)).replace(/\/+$/, "");
-      if (target === ".." || target.startsWith("../") || !isTracked(target)) {
+      if (target === ".." || target.startsWith("../")) {
         bad.push(`${file}: broken link (${raw})`);
+      } else if (!isTracked(target)) {
+        // The rule is deliberate: a present-but-untracked target would break
+        // for everyone else. Say so instead of calling it missing.
+        bad.push(
+          existsInWorkspace(target)
+            ? `${file}: untracked link target (${raw}); stage it so the link resolves for others`
+            : `${file}: broken link (${raw})`,
+        );
       }
     }
   }

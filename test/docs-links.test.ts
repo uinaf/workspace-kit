@@ -96,6 +96,18 @@ test("docs links reports broken inline, image, reference, and malformed destinat
   ]);
 });
 
+test("docs links names a present-but-untracked target instead of calling it broken", () => {
+  const dir = repository();
+  put(dir, "README.md", "[new script](scripts/new.ts)\n[gone](scripts/gone.ts)\n");
+  track(dir);
+  put(dir, "scripts/new.ts", "export {};\n");
+
+  assert.deepEqual(check(dir), [
+    "README.md: untracked link target (scripts/new.ts); stage it so the link resolves for others",
+    "README.md: broken link (scripts/gone.ts)",
+  ]);
+});
+
 test("docs links skips tracked symlink leaves and reports missing tracked Markdown", () => {
   const dir = repository();
   put(dir, "README.md", "# Readme\n");
