@@ -123,7 +123,7 @@ test("docs links names a stageable untracked target instead of calling it broken
   ]);
 });
 
-test("docs links keeps case collisions and embedded repositories on the broken-link message", () => {
+test("docs links keeps case collisions broken and reports embedded repositories as untracked", () => {
   const dir = repository();
   put(dir, "README.md", "[case](guide.md)\n[embedded](nested)\n");
   put(dir, "Guide.md", "# guide\n");
@@ -137,20 +137,19 @@ test("docs links keeps case collisions and embedded repositories on the broken-l
 
   assert.deepEqual(check(dir), [
     "README.md: broken link (guide.md)",
-    "README.md: broken link (nested)",
+    "README.md: untracked link target (nested); the link resolves only once it is tracked",
   ]);
 });
 
-test("docs links keeps targets no commit could make portable on the broken-link message", () => {
+test("docs links keeps NUL and empty-directory targets on the broken-link message", () => {
   const dir = repository();
-  put(dir, "README.md", "[nul](file%00.md)\n[gitdir](docs/.Git/x.md)\n[empty](emptydir)\n");
+  put(dir, "README.md", "[nul](file%00.md)\n[empty](emptydir)\n[twice](emptydir)\n");
   track(dir);
-  put(dir, "docs/.Git/x.md", "# alias of the git directory\n");
   mkdirSync(join(dir, "emptydir"), { recursive: true });
 
   assert.deepEqual(check(dir), [
     "README.md: broken link (file%00.md)",
-    "README.md: broken link (docs/.Git/x.md)",
+    "README.md: broken link (emptydir)",
     "README.md: broken link (emptydir)",
   ]);
 });

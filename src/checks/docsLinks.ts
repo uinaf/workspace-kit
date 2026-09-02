@@ -283,20 +283,20 @@ function pathPart(href: string): string {
   return href;
 }
 
-// Whether the target is an untracked, non-ignored path git knows about, so
-// the diagnostic can say "untracked" instead of "broken". This deliberately
-// does not claim `git add` will succeed: deciding that would mean running
-// git's check-in pipeline (clean filters can execute commands), listing
-// every descendant of a directory, and reasoning about index validity. The
-// listing is filter-free, literal, and collapses directories to one entry so
-// output stays bounded. Portable-identity collisions with tracked paths and
-// `.git` aliases are still reported as broken, since no commit could make
-// those links resolve on a case-insensitive filesystem.
+// Whether git itself lists the target as an untracked, non-ignored path, so
+// the diagnostic can say "untracked" instead of "broken". This is a
+// classification, not a promise that `git add` will succeed: deciding that
+// would mean entering git's check-in pipeline (clean filters execute
+// commands) and re-deriving its path validity rules. The listing is
+// filter-free, literal, and collapses directories to one entry so output is
+// bounded. Portable-identity collisions with tracked paths stay broken: the
+// link is spelled differently from the file git tracks, and no commit of the
+// untracked spelling could check out next to it on a case-insensitive
+// filesystem.
 function isUntrackedTarget(target: string, trackedIdentities: Set<string>): boolean {
   if (target.includes("\0")) return false;
   const identity = portablePathIdentity(target);
   const components = identity.split("/");
-  if (components.some((component) => component === ".GIT")) return false;
   for (let depth = 1; depth <= components.length; depth += 1) {
     if (trackedIdentities.has(components.slice(0, depth).join("/"))) return false;
   }
@@ -320,22 +320,7 @@ function isUntrackedTarget(target: string, trackedIdentities: Set<string>): bool
       ],
       { encoding: "utf8" },
     );
-    if (result.status !== 0) return false;
-    const entries = result.stdout.split("\0").filter(Boolean);
-    // A directory entry is an embedded repository when it carries its own
-    // .git; git lists it as untracked but will never add it.
-    return (
-      entries.length > 0 &&
-      entries.every((entry) => !entry.endsWith("/") || !isEmbeddedRepository(entry))
-    );
-  } catch {
-    return false;
-  }
-}
-
-function isEmbeddedRepository(directory: string): boolean {
-  try {
-    return workspaceLstat(".", `${directory}.git`, "embedded repository marker") !== undefined;
+    return result.status === 0 && result.stdout.split("\0").some(Boolean);
   } catch {
     return false;
   }
@@ -347,6 +332,16 @@ export function docsLinkErrors(config: DocsLinksConfig): string[] {
   if (result.status !== 0) return ["could not list tracked files"];
   const tracked = new Set(result.stdout.split("\0").filter(Boolean));
   const trackedIdentities = new Set([...tracked].map(portablePathIdentity));
+  // One git process per distinct target, not per link occurrence.
+  const untrackedByTarget = new Map<string, boolean>();
+  const isUntracked = (target: string): boolean => {
+    let known = untrackedByTarget.get(target);
+    if (known === undefined) {
+      known = isUntrackedTarget(target, trackedIdentities);
+      untrackedByTarget.set(target, known);
+    }
+    return known;
+  };
   const isTracked = (target: string): boolean => {
     if (target === ".") return tracked.size > 0;
     if (tracked.has(target)) return true;
@@ -403,7 +398,7 @@ export function docsLinkErrors(config: DocsLinksConfig): string[] {
         // The rule is deliberate: a present-but-untracked target would break
         // for everyone else. Name the cause; do not promise a remedy.
         bad.push(
-          isUntrackedTarget(target, trackedIdentities)
+          isUntracked(target)
             ? `${file}: untracked link target (${raw}); the link resolves only once it is tracked`
             : `${file}: broken link (${raw})`,
         );
