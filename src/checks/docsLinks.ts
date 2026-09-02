@@ -4,7 +4,7 @@
 // backtick/tilde fenced blocks.
 import { spawnSync } from "node:child_process";
 import { posix } from "node:path";
-import type { DocsLinksConfig } from "../config.ts";
+import { portablePathIdentity, type DocsLinksConfig } from "../config.ts";
 import { readWorkspaceText, workspaceLstat } from "../lib/workspaceFs.ts";
 
 type Destination = { offset: number; raw: string };
@@ -283,11 +283,65 @@ function pathPart(href: string): string {
   return href;
 }
 
+// Whether git itself lists the target as an untracked, non-ignored path, so
+// the diagnostic can say "untracked" instead of "broken". This is a
+// classification, not a promise that `git add` will succeed: deciding that
+// would mean entering git's check-in pipeline (clean filters execute
+// commands) and re-deriving its path validity rules. The listing is
+// filter-free, literal, and collapses directories to one entry so output is
+// bounded. Portable-identity collisions with tracked paths stay broken: the
+// link is spelled differently from the file git tracks, and no commit of the
+// untracked spelling could check out next to it on a case-insensitive
+// filesystem.
+function isUntrackedTarget(target: string, trackedIdentities: Set<string>): boolean {
+  if (target.includes("\0")) return false;
+  const identity = portablePathIdentity(target);
+  const components = identity.split("/");
+  for (let depth = 1; depth <= components.length; depth += 1) {
+    if (trackedIdentities.has(components.slice(0, depth).join("/"))) return false;
+  }
+  const prefix = `${identity}/`;
+  for (const tracked of trackedIdentities) {
+    if (tracked.startsWith(prefix)) return false;
+  }
+  try {
+    const result = spawnSync(
+      "git",
+      [
+        "--literal-pathspecs",
+        "ls-files",
+        "--others",
+        "--exclude-standard",
+        "--directory",
+        "--no-empty-directory",
+        "-z",
+        "--",
+        target,
+      ],
+      { encoding: "utf8" },
+    );
+    return result.status === 0 && result.stdout.split("\0").some(Boolean);
+  } catch {
+    return false;
+  }
+}
+
 export function docsLinkErrors(config: DocsLinksConfig): string[] {
   const bad: string[] = [];
   const result = spawnSync("git", ["ls-files", "-z"], { encoding: "utf8" });
   if (result.status !== 0) return ["could not list tracked files"];
   const tracked = new Set(result.stdout.split("\0").filter(Boolean));
+  const trackedIdentities = new Set([...tracked].map(portablePathIdentity));
+  // One git process per distinct target, not per link occurrence.
+  const untrackedByTarget = new Map<string, boolean>();
+  const isUntracked = (target: string): boolean => {
+    let known = untrackedByTarget.get(target);
+    if (known === undefined) {
+      known = isUntrackedTarget(target, trackedIdentities);
+      untrackedByTarget.set(target, known);
+    }
+    return known;
+  };
   const isTracked = (target: string): boolean => {
     if (target === ".") return tracked.size > 0;
     if (tracked.has(target)) return true;
@@ -338,8 +392,16 @@ export function docsLinkErrors(config: DocsLinksConfig): string[] {
       }
       if (href.startsWith("/")) continue;
       const target = posix.normalize(posix.join(posix.dirname(file), href)).replace(/\/+$/, "");
-      if (target === ".." || target.startsWith("../") || !isTracked(target)) {
+      if (target === ".." || target.startsWith("../")) {
         bad.push(`${file}: broken link (${raw})`);
+      } else if (!isTracked(target)) {
+        // The rule is deliberate: a present-but-untracked target would break
+        // for everyone else. Name the cause; do not promise a remedy.
+        bad.push(
+          isUntracked(target)
+            ? `${file}: untracked link target (${raw}); the link resolves only once it is tracked`
+            : `${file}: broken link (${raw})`,
+        );
       }
     }
   }

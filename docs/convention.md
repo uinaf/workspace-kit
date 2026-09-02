@@ -202,7 +202,9 @@ that cutover is done; set it true once the pin and lockfile match.
   optional titles, and Markdown escapes; code spans/fences and external or
   fragment-only destinations are ignored. Checked Markdown filenames must use
   portable `/` separators; literal backslashes are reported as non-portable.
-  Targets must be tracked, so a gitignored-but-present file does not pass.
+  Targets must be tracked, so a gitignored-but-present file does not pass;
+  a present-but-untracked target is reported as untracked rather than
+  broken. The check never runs Git's check-in pipeline to decide that.
 - **Package manager (opt-in)**: convention workspaces use pnpm.
   `init` writes a Corepack `packageManager` pin, pnpm scripts, and
   `"packageManager": { "enforce": true }`. Existing configs without the

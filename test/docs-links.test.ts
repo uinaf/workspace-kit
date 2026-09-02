@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "vite-plus/test";
@@ -93,6 +93,109 @@ test("docs links reports broken inline, image, reference, and malformed destinat
     "README.md: broken link (missing image.png)",
     "README.md: broken link (absent.md)",
     "README.md: broken link (%zz)",
+  ]);
+});
+
+test("docs links names a stageable untracked target instead of calling it broken", () => {
+  const dir = repository();
+  put(
+    dir,
+    "README.md",
+    [
+      "[new script](scripts/new.ts)",
+      "[new dir](generated)",
+      "[ignored](build/out.js)",
+      "[gone](scripts/gone.ts)",
+      "",
+    ].join("\n"),
+  );
+  put(dir, ".gitignore", "build/\n");
+  track(dir);
+  put(dir, "scripts/new.ts", "export {};\n");
+  put(dir, "generated/index.md", "# generated\n");
+  put(dir, "build/out.js", "// ignored\n");
+
+  assert.deepEqual(check(dir), [
+    "README.md: untracked link target (scripts/new.ts); the link resolves only once it is tracked",
+    "README.md: untracked link target (generated); the link resolves only once it is tracked",
+    "README.md: broken link (build/out.js)",
+    "README.md: broken link (scripts/gone.ts)",
+  ]);
+});
+
+test("docs links keeps case collisions broken and reports embedded repositories as untracked", () => {
+  const dir = repository();
+  put(dir, "README.md", "[case](guide.md)\n[embedded](nested)\n");
+  put(dir, "Guide.md", "# guide\n");
+  track(dir);
+  // On a case-insensitive filesystem this overwrites Guide.md; on a
+  // case-sensitive one it creates a distinct untracked file. Both must stay
+  // broken: staging cannot produce a tree that checks out everywhere.
+  put(dir, "guide.md", "# guide\n");
+  mkdirSync(join(dir, "nested"), { recursive: true });
+  execFileSync("git", ["init", "-q"], { cwd: join(dir, "nested") });
+
+  assert.deepEqual(check(dir), [
+    "README.md: broken link (guide.md)",
+    "README.md: untracked link target (nested); the link resolves only once it is tracked",
+  ]);
+});
+
+test("docs links keeps NUL and empty-directory targets on the broken-link message", () => {
+  const dir = repository();
+  put(dir, "README.md", "[nul](file%00.md)\n[empty](emptydir)\n[twice](emptydir)\n");
+  track(dir);
+  mkdirSync(join(dir, "emptydir"), { recursive: true });
+
+  assert.deepEqual(check(dir), [
+    "README.md: broken link (file%00.md)",
+    "README.md: broken link (emptydir)",
+    "README.md: broken link (emptydir)",
+  ]);
+});
+
+test("docs links does not run git's check-in pipeline while validating", () => {
+  const dir = repository();
+  put(dir, "README.md", "[new](notes/new.md)\n");
+  put(dir, ".gitattributes", "*.md filter=marker\n");
+  track(dir);
+  execFileSync(
+    "git",
+    ["config", "filter.marker.clean", `sh -c 'touch "${join(dir, "FILTER_RAN")}"; cat'`],
+    { cwd: dir },
+  );
+  put(dir, "notes/new.md", "# untracked\n");
+
+  assert.deepEqual(check(dir), [
+    "README.md: untracked link target (notes/new.md); the link resolves only once it is tracked",
+  ]);
+  assert.equal(existsSync(join(dir, "FILTER_RAN")), false);
+});
+
+test("docs links rejects an untracked target below a tracked path that aliases it", () => {
+  const dir = repository();
+  put(dir, "README.md", "[ancestor](guide/sub/file.md)\n");
+  put(dir, "Guide", "# tracked file\n");
+  track(dir);
+  // Keep `Guide` in the index but clear the working copy so the colliding
+  // directory can exist on a case-insensitive filesystem too; on Linux both
+  // would coexist and git would stage the file.
+  rmSync(join(dir, "Guide"));
+  put(dir, "guide/sub/file.md", "# collides with tracked Guide\n");
+
+  assert.deepEqual(check(dir), ["README.md: broken link (guide/sub/file.md)"]);
+});
+
+test("docs links treats link targets as literal paths, not git patterns", () => {
+  const dir = repository();
+  put(dir, "README.md", "[glob](missing%2A.md)\n[dir](assets)\n");
+  track(dir);
+  put(dir, "missing1.md", "# not the link target\n");
+  put(dir, "assets/a.png", "png");
+
+  assert.deepEqual(check(dir), [
+    "README.md: broken link (missing%2A.md)",
+    "README.md: untracked link target (assets); the link resolves only once it is tracked",
   ]);
 });
 
