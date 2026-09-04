@@ -365,6 +365,22 @@ test("source version requires full tag history and prefers a newer stamped packa
     ]);
     git(checkout, ["-c", "tag.gpgSign=false", "tag", "v0.3.0"]);
     assert.equal(resolveKitVersion(checkout), "0.3.0");
+    const foreign = join(cloneParent, "foreign");
+    git(cloneParent, ["clone", "-q", checkout, foreign]);
+    git(foreign, ["-c", "tag.gpgSign=false", "tag", "v9.9.9"]);
+    const resolver = new URL("../src/version.ts", import.meta.url).href;
+    const isolated = spawnSync(
+      process.execPath,
+      [
+        "--input-type=module",
+        "-e",
+        `import { resolveKitVersion } from ${JSON.stringify(resolver)}; console.log(resolveKitVersion(process.argv[1]));`,
+        checkout,
+      ],
+      { encoding: "utf8", env: { ...process.env, GIT_DIR: join(foreign, ".git") } },
+    );
+    assert.equal(isolated.status, 0, isolated.stderr);
+    assert.equal(isolated.stdout.trim(), "0.3.0");
 
     writeFileSync(join(checkout, "marker.txt"), "after release\n");
     git(checkout, ["add", "marker.txt"]);
@@ -400,18 +416,16 @@ test("source version requires full tag history and prefers a newer stamped packa
   }
 });
 
-test("forbidden rejects runtime-owned paths", () => {
-  assert.throws(
-    () => parseWorkspaceConfig({ minVersion: "0.13.4", forbidden: ["memory"] }),
-    /an agent runtime owns/,
-  );
-});
-
-test("forbidden rejects paths nested under a runtime-owned root", () => {
-  for (const path of ["memory/dreaming", "DREAMS.md", ".openclaw-repair"]) {
-    assert.throws(
-      () => parseWorkspaceConfig({ minVersion: "0.13.4", forbidden: [path] }),
-      /an agent runtime owns/,
+test("forbidden paths remain consumer policy regardless of memory integration", () => {
+  const forbidden = ["memory", "memory/dreaming", "DREAMS.md", ".openclaw-repair"];
+  assert.deepEqual(parseWorkspaceConfig({ forbidden }).forbidden, forbidden);
+  for (const integration of ["coding-agent", "openclaw"]) {
+    assert.deepEqual(
+      parseWorkspaceConfig({
+        forbidden,
+        memory: { strategy: "hindsight", integration, namespace: "fixture-owner/workspace" },
+      }).forbidden,
+      forbidden,
     );
   }
 });

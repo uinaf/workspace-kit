@@ -415,6 +415,22 @@ export function syncWorkspaceSkills(
       }
     }
 
+    for (const { name } of skills.remote) {
+      const runtimePath = `.agents/skills/${name}`;
+      const stat = workspaceLstat(repoRoot, runtimePath, "remote runtime skill");
+      if (!stat) continue;
+      if (stat.isSymbolicLink() || !stat.isDirectory()) {
+        return [`${runtimePath} is not a managed copied directory`];
+      }
+      const source = managed.get(name);
+      const dependencyEntry = dependencyLock?.skills[name];
+      if (!source || !isRecord(dependencyEntry) || dependencyEntry.source !== source) {
+        return [
+          `${runtimePath} exists without matching workspace-kit and dependency ownership; preserve or move it before syncing`,
+        ];
+      }
+    }
+
     ensureWorkspaceDirectory(repoRoot, ".agents/skills");
     if (!claude) createWorkspaceLink(repoRoot, ".claude/skills", "../.agents/skills");
   } catch (error) {

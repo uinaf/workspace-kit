@@ -34,17 +34,11 @@ Hindsight client and server remain responsible for bank routing, credentials,
 and runtime health. Existing configurations without `memory` retain their
 current behavior; `dailyLogs` and `wiki` remain the legacy llm-wiki signal.
 
-The strategy describes who owns _repository-authored_ memory. It says nothing
-about an agent runtime that writes into the checkout on its own schedule.
-Hindsight and a runtime's local memory are complementary, not alternatives:
-Hindsight retains cross-session experience, while a runtime such as OpenClaw
-consolidates its own local state. Declaring `hindsight` therefore does not mean
-`memory/` must be absent, and a workspace must not add such a path to
-`forbidden` — the kit rejects that rule, because it converts scheduled runtime
-output into a gate failure. Ignore the path in `.gitignore` instead.
-
-The kit currently treats `memory/` and `DREAMS.md`, OpenClaw's dream diary, as
-runtime-owned, along with `.openclaw-repair/` and anything nested under them.
+Consumers decide which paths their runtime owns and which paths must be absent.
+The memory strategy alone does not establish runtime ownership. Configure
+`forbidden` for paths that this workspace must reject. For a workspace whose
+runtime writes local memory, allow those paths and ignore generated output in
+`.gitignore` when appropriate.
 
 ### LLM wiki
 
@@ -138,6 +132,11 @@ then run:
 pnpm exec workspace-kit skills sync
 ```
 
+- Before changing files, sync validates declared destinations and stops at the
+  first conflict. Replacing an
+  existing remote copy requires matching source records in both ownership locks.
+  Unmanaged directories, symlinks, and mismatched provenance stop sync for
+  explicit owner handling.
 - Sync links every locally authored skill into `.agents/skills`, ensures the
   Claude discovery link, then delegates each remote entry to a pinned `skills`
   CLI with telemetry disabled, project scope, and copy mode.
@@ -371,6 +370,10 @@ repository-history security scans remain independently operated surfaces.
 - Existing files remain unchanged. A re-run accepts a compatible
   `package.json`; an existing repository follows the adoption steps above, and
   init stops before writing when its package contract is incompatible.
+- A re-run follows the existing memory configuration, including legacy
+  `dailyLogs`/`wiki` sections. Conflicting explicit memory options fail before
+  scaffolding, as does an unreadable existing config. Changing memory strategy
+  is an owner-managed migration.
 
 - `work`: AGENTS.md + CLAUDE.md symlink + package.json + docs/README.md + workspace.json.
 - `personal`: work + README, `.env.example`, project-registry stub and
