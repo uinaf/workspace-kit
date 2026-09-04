@@ -168,11 +168,29 @@ export function initWorkspace(
       : requestedMemory;
   const root = realpathSync(dir);
   assertCompatiblePackage(root, profile);
-  const memory =
-    validatedRequestedMemory ??
-    (profile === "personal" || profile === "runtime"
+  const existingConfig = workspaceLstat(root, "workspace.json")
+    ? parseWorkspaceConfig(JSON.parse(readWorkspaceText(root, "workspace.json")))
+    : undefined;
+  const existingMemory =
+    existingConfig?.memory ??
+    (existingConfig?.dailyLogs || existingConfig?.wiki
       ? ({ strategy: "llm-wiki" } as const)
       : undefined);
+  if (
+    existingConfig &&
+    validatedRequestedMemory &&
+    JSON.stringify(validatedRequestedMemory) !== JSON.stringify(existingMemory)
+  ) {
+    throw new Error(
+      "requested memory configuration conflicts with workspace.json; update the existing workspace explicitly",
+    );
+  }
+  const memory = existingConfig
+    ? existingMemory
+    : (validatedRequestedMemory ??
+      (profile === "personal" || profile === "runtime"
+        ? ({ strategy: "llm-wiki" } as const)
+        : undefined));
   const seedWikiCatalog =
     memory?.strategy === "llm-wiki" &&
     !workspaceLstat(root, "workspace.json") &&

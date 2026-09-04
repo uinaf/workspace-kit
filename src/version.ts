@@ -3,6 +3,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
+import { gitEnvironmentForRepository } from "./lib/gitProcess.ts";
+
 declare const __WORKSPACE_KIT_VERSION__: string | undefined;
 
 const STABLE_VERSION = /^\d+\.\d+\.\d+$/;
@@ -40,6 +42,7 @@ function reachableTagVersions(packageRoot: string): string[] {
   const shallow = spawnSync("git", ["rev-parse", "--is-shallow-repository"], {
     cwd: packageRoot,
     encoding: "utf8",
+    env: gitEnvironmentForRepository(),
   });
   if (shallow.status !== 0) {
     throw new Error("could not inspect Git history while determining workspace-kit version");
@@ -52,6 +55,7 @@ function reachableTagVersions(packageRoot: string): string[] {
   const result = spawnSync("git", ["tag", "--merged", "HEAD", "--list", "v*"], {
     cwd: packageRoot,
     encoding: "utf8",
+    env: gitEnvironmentForRepository(),
   });
   if (result.status !== 0) {
     throw new Error("could not read Git tags while determining workspace-kit version");

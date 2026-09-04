@@ -334,8 +334,12 @@ test("init refuses to write through pre-existing dangling symlinks", () => {
   const elsewhere = mkdtempSync(join(tmpdir(), "elsewhere-"));
   const plantedTarget = join(elsewhere, "planted.json");
   symlinkSync(plantedTarget, join(victim, "workspace.json"));
-  const result = initWorkspace(victim, "work");
-  assert.ok(result.skipped.includes("workspace.json"));
+  assert.throws(
+    () => initWorkspace(victim, "work"),
+    /workspace.json: symbolic-link file is not allowed/,
+  );
+  assert.ok(lstatSync(join(victim, "workspace.json")).isSymbolicLink());
+  assert.equal(existsSync(join(victim, "AGENTS.md")), false);
   assert.ok(!existsSync(plantedTarget), "must not create files at the symlink target");
 });
 

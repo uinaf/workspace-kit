@@ -547,3 +547,95 @@ test("skills check and doctor expose the offline contract", () => {
     errors: [],
   });
 });
+
+test("remote installation preflights all destinations before any mutation", () => {
+  for (const ownership of ["none", "dependency-only", "manager-only", "mismatch"]) {
+    const root = scratch();
+    const remote = { name: "remote-skill", source: "fixture/remote" };
+    const retired = { name: "retired-skill", source: "fixture/retired" };
+    writeManifest(root, [remote]);
+    writeDiscovery(root);
+    writeSkill(root, ".agents/skills", remote.name);
+    writeSkill(root, ".agents/skills", retired.name);
+    const note = join(root, ".agents/skills", remote.name, "owner-note.txt");
+    writeFileSync(note, "keep owner content");
+    writeLock(root, [
+      retired,
+      ...(ownership === "dependency-only"
+        ? [remote]
+        : ownership === "mismatch"
+          ? [{ ...remote, source: "fixture/replacement" }]
+          : []),
+    ]);
+    writeManagedLock(root, [
+      retired,
+      ...(ownership === "manager-only" || ownership === "mismatch" ? [remote] : []),
+    ]);
+    const lockBefore = readFileSync(join(root, "skills/workspace-kit-lock.json"));
+    let calls = 0;
+    const errors = syncWorkspaceSkills(root, config, () => {
+      calls++;
+      return { status: 0 };
+    });
+    assert.match(errors[0] ?? "", /without matching.*ownership/);
+    assert.equal(calls, 0);
+    assert.equal(readFileSync(note, "utf8"), "keep owner content");
+    assert.ok(workspaceLstatForTest(root, ".agents/skills/retired-skill"));
+    assert.deepEqual(readFileSync(join(root, "skills/workspace-kit-lock.json")), lockBefore);
+  }
+});
+
+test("remote installation rejects occupied files and symlinks even with matching locks", () => {
+  for (const shape of ["file", "symlink"]) {
+    const root = scratch();
+    const remote = { name: "remote-skill", source: "fixture/remote" };
+    writeManifest(root, [remote]);
+    writeDiscovery(root);
+    writeLock(root, [remote]);
+    writeManagedLock(root, [remote]);
+    const path = join(root, ".agents/skills/remote-skill");
+    if (shape === "file") writeFileSync(path, "keep");
+    else symlinkSync("../../skills/remote-skill", path);
+    let called = false;
+    assert.match(
+      syncWorkspaceSkills(root, config, () => {
+        called = true;
+        return { status: 0 };
+      })[0] ?? "",
+      /not a managed copied directory/,
+    );
+    assert.equal(called, false);
+    if (shape === "file") assert.equal(readFileSync(path, "utf8"), "keep");
+    else assert.equal(readlinkSync(path), "../../skills/remote-skill");
+  }
+});
+
+test("remote installation updates proven managed copies including declared source changes", () => {
+  for (const source of ["fixture/original", "fixture/replacement"]) {
+    const root = scratch();
+    const original = { name: "remote-skill", source: "fixture/original" };
+    const requested = { ...original, source };
+    writeManifest(root, [requested]);
+    writeDiscovery(root);
+    writeSkill(root, ".agents/skills", original.name);
+    writeLock(root, [original]);
+    writeManagedLock(root, [original]);
+    let calls = 0;
+    assert.deepEqual(
+      syncWorkspaceSkills(root, config, (_command, args) => {
+        calls++;
+        assert.equal(args[3], source);
+        writeLock(root, [requested]);
+        return { status: 0 };
+      }),
+      [],
+    );
+    assert.equal(calls, 1);
+    assert.equal(
+      JSON.parse(readFileSync(join(root, "skills/workspace-kit-lock.json"), "utf8")).skills[
+        original.name
+      ],
+      source,
+    );
+  }
+});
