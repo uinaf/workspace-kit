@@ -82,9 +82,10 @@ function stringList(value: unknown, field: string): string[] {
  * rejects the rule rather than letting the two systems disagree.
  *
  * OpenClaw's memory-core dreaming job owns `memory/` and writes its dream diary
- * to `DREAMS.md` in the workspace root.
+ * to `DREAMS.md` in the workspace root. `.openclaw-repair/` holds root-memory
+ * migration state.
  */
-const RUNTIME_OWNED_PATHS = ["memory", "DREAMS.md"];
+const RUNTIME_OWNED_PATHS = ["memory", "DREAMS.md", ".openclaw-repair"];
 
 function runtimeOwnedPath(path: string): string | undefined {
   return RUNTIME_OWNED_PATHS.find((owned) => path === owned || path.startsWith(`${owned}/`));

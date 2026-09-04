@@ -408,7 +408,7 @@ test("forbidden rejects runtime-owned paths", () => {
 });
 
 test("forbidden rejects paths nested under a runtime-owned root", () => {
-  for (const path of ["memory/dreaming", "DREAMS.md"]) {
+  for (const path of ["memory/dreaming", "DREAMS.md", ".openclaw-repair"]) {
     assert.throws(
       () => parseWorkspaceConfig({ minVersion: "0.13.4", forbidden: [path] }),
       /an agent runtime owns/,

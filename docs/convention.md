@@ -44,7 +44,7 @@ consolidates its own local state. Declaring `hindsight` therefore does not mean
 output into a gate failure. Ignore the path in `.gitignore` instead.
 
 The kit currently treats `memory/` and `DREAMS.md`, OpenClaw's dream diary, as
-runtime-owned, along with anything nested under them.
+runtime-owned, along with `.openclaw-repair/` and anything nested under them.
 
 ### LLM wiki
 
