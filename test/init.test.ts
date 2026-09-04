@@ -255,8 +255,10 @@ test("init preserves legacy or disabled memory and refuses malformed existing co
   delete config.memory;
   writeFileSync(join(legacy, "workspace.json"), JSON.stringify(config));
   assert.equal(initWorkspace(legacy, "personal").created.length, 0);
-  assert.deepEqual(config.dailyLogs, { root: "memory", contexts: "memory/contexts" });
-  assert.deepEqual(config.wiki, { root: "memory/wiki" });
+  const saved = JSON.parse(readFileSync(join(legacy, "workspace.json"), "utf8"));
+  assert.deepEqual(saved, config);
+  assert.deepEqual(saved.dailyLogs, { root: "memory", contexts: "memory/contexts" });
+  assert.deepEqual(saved.wiki, { root: "memory/wiki" });
   assert.equal(initWorkspace(legacy, "personal", { strategy: "llm-wiki" }).created.length, 0);
   assert.throws(
     () =>
