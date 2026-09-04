@@ -403,6 +403,15 @@ test("source version requires full tag history and prefers a newer stamped packa
 test("forbidden rejects runtime-owned paths", () => {
   assert.throws(
     () => parseWorkspaceConfig({ minVersion: "0.13.4", forbidden: ["memory"] }),
-    /an agent runtime owns that path/,
+    /an agent runtime owns/,
   );
+});
+
+test("forbidden rejects paths nested under a runtime-owned root", () => {
+  for (const path of ["memory/dreaming", "DREAMS.md"]) {
+    assert.throws(
+      () => parseWorkspaceConfig({ minVersion: "0.13.4", forbidden: [path] }),
+      /an agent runtime owns/,
+    );
+  }
 });

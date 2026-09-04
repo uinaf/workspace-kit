@@ -81,9 +81,14 @@ function stringList(value: unknown, field: string): string[] {
  * forbids one turns scheduled runtime output into a gate failure, so the kit
  * rejects the rule rather than letting the two systems disagree.
  *
- * OpenClaw's memory-core dreaming job owns `memory/`.
+ * OpenClaw's memory-core dreaming job owns `memory/` and writes its dream diary
+ * to `DREAMS.md` in the workspace root.
  */
-const RUNTIME_OWNED_PATHS = new Set(["memory"]);
+const RUNTIME_OWNED_PATHS = ["memory", "DREAMS.md"];
+
+function runtimeOwnedPath(path: string): string | undefined {
+  return RUNTIME_OWNED_PATHS.find((owned) => path === owned || path.startsWith(`${owned}/`));
+}
 
 function workspacePathList(value: unknown, field: string): string[] {
   return stringList(value, field).map((path, index) =>
@@ -213,9 +218,10 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
   if ("forbidden" in value) {
     const forbidden = workspacePathList(value.forbidden, "forbidden");
     for (const path of forbidden) {
-      if (RUNTIME_OWNED_PATHS.has(path)) {
+      const owned = runtimeOwnedPath(path);
+      if (owned) {
         fail(
-          `forbidden must not list ${path}: an agent runtime owns that path and ` +
+          `forbidden must not list ${path}: an agent runtime owns ${owned} and ` +
             "writes to it on a schedule. Ignore it in .gitignore instead of " +
             "failing the workspace gate on runtime output.",
         );

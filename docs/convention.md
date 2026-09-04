@@ -43,6 +43,9 @@ consolidates its own local state. Declaring `hindsight` therefore does not mean
 `forbidden` — the kit rejects that rule, because it converts scheduled runtime
 output into a gate failure. Ignore the path in `.gitignore` instead.
 
+The kit currently treats `memory/` and `DREAMS.md`, OpenClaw's dream diary, as
+runtime-owned, along with anything nested under them.
+
 ### LLM wiki
 
 - **Raw layer**: dated daily logs (`memory/YYYY-MM-DD.md`) and per-context
