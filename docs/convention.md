@@ -34,6 +34,15 @@ Hindsight client and server remain responsible for bank routing, credentials,
 and runtime health. Existing configurations without `memory` retain their
 current behavior; `dailyLogs` and `wiki` remain the legacy llm-wiki signal.
 
+The strategy describes who owns _repository-authored_ memory. It says nothing
+about an agent runtime that writes into the checkout on its own schedule.
+Hindsight and a runtime's local memory are complementary, not alternatives:
+Hindsight retains cross-session experience, while a runtime such as OpenClaw
+consolidates its own local state. Declaring `hindsight` therefore does not mean
+`memory/` must be absent, and a workspace must not add such a path to
+`forbidden` — the kit rejects that rule, because it converts scheduled runtime
+output into a gate failure. Ignore the path in `.gitignore` instead.
+
 ### LLM wiki
 
 - **Raw layer**: dated daily logs (`memory/YYYY-MM-DD.md`) and per-context

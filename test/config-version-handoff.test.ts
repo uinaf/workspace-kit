@@ -399,3 +399,10 @@ test("source version requires full tag history and prefers a newer stamped packa
     rmSync(cloneParent, { recursive: true, force: true });
   }
 });
+
+test("forbidden rejects runtime-owned paths", () => {
+  assert.throws(
+    () => parseWorkspaceConfig({ minVersion: "0.13.4", forbidden: ["memory"] }),
+    /an agent runtime owns that path/,
+  );
+});

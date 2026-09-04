@@ -76,6 +76,15 @@ function stringList(value: unknown, field: string): string[] {
   return value as string[];
 }
 
+/**
+ * Paths an agent runtime writes into a consumer workspace. A consumer that
+ * forbids one turns scheduled runtime output into a gate failure, so the kit
+ * rejects the rule rather than letting the two systems disagree.
+ *
+ * OpenClaw's memory-core dreaming job owns `memory/`.
+ */
+const RUNTIME_OWNED_PATHS = new Set(["memory"]);
+
 function workspacePathList(value: unknown, field: string): string[] {
   return stringList(value, field).map((path, index) =>
     normalizeWorkspacePath(path, `${field}[${index}]`),
@@ -201,7 +210,19 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
     out.minVersion = minVersion;
   }
   if ("required" in value) out.required = workspacePathList(value.required, "required");
-  if ("forbidden" in value) out.forbidden = workspacePathList(value.forbidden, "forbidden");
+  if ("forbidden" in value) {
+    const forbidden = workspacePathList(value.forbidden, "forbidden");
+    for (const path of forbidden) {
+      if (RUNTIME_OWNED_PATHS.has(path)) {
+        fail(
+          `forbidden must not list ${path}: an agent runtime owns that path and ` +
+            "writes to it on a schedule. Ignore it in .gitignore instead of " +
+            "failing the workspace gate on runtime output.",
+        );
+      }
+    }
+    out.forbidden = forbidden;
+  }
 
   if ("links" in value) {
     if (!Array.isArray(value.links)) fail("links must be an array");
