@@ -19,6 +19,27 @@ import { gitEnvironmentForRepository } from "../src/lib/gitProcess.ts";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = join(root, "src", "cli.ts");
 
+for (const missing of ["directory", "file"]) {
+  test(`hooks install reports a missing hook ${missing} without changing config`, () => {
+    const fixture = mkdtempSync(join(tmpdir(), "workspace-hooks-"));
+    try {
+      if (missing === "file") mkdirSync(join(fixture, ".githooks"));
+      git(fixture, "init", "-q");
+      git(fixture, "config", "core.hooksPath", "existing-hooks");
+      const configBefore = git(fixture, "config", "--local", "--list");
+      const install = spawnSync(process.execPath, [cli, "hooks", "install"], {
+        cwd: fixture,
+        encoding: "utf8",
+      });
+      assert.equal(install.status, 1, install.stderr);
+      assert.match(install.stderr, /\.githooks\/pre-commit is missing/);
+      assert.equal(git(fixture, "config", "--local", "--list"), configBefore);
+    } finally {
+      rmSync(fixture, { recursive: true, force: true });
+    }
+  });
+}
+
 for (const link of ["parent", "hook"]) {
   for (const existingHooksPath of [undefined, "existing-hooks"]) {
     test(`hooks install rejects a symlinked ${link} with hooksPath ${existingHooksPath ?? "unset"}`, () => {

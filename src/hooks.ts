@@ -7,7 +7,8 @@ import { workspaceLstat } from "./lib/workspaceFs.ts";
 export function installHooks(repoRoot: string): string {
   const hook = join(repoRoot, ".githooks", "pre-commit");
   const stat = workspaceLstat(repoRoot, ".githooks/pre-commit");
-  if (!stat?.isFile() || stat.isSymbolicLink()) {
+  if (!stat) throw new Error(".githooks/pre-commit is missing");
+  if (!stat.isFile() || stat.isSymbolicLink()) {
     throw new Error(".githooks/pre-commit must be a regular file");
   }
   const descriptor = openSync(hook, constants.O_RDONLY | constants.O_NOFOLLOW);
