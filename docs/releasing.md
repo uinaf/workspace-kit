@@ -68,8 +68,8 @@ can create protected release tags but cannot bypass the default-branch rule.
 
 - The release job runs only after verification and secret scanning pass. PRs
   run the same gates with read-only permissions and no environment access.
-- Verification runs on Blacksmith. The release job runs on GitHub-hosted Linux
-  because npm provenance rejects self-hosted runner attestations.
+- All workflows use standard GitHub-hosted Linux runners. Verification uses
+  Ubuntu 24.04; publishing retains `ubuntu-latest` for npm provenance.
 - Publish concurrency is non-cancellable (queued, never killed mid-publish).
 - `prepack` runs the full verify gate (which rebuilds a clean `dist/`)
   before any tarball is produced. The gate stages the effective version the
