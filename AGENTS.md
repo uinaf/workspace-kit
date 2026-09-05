@@ -20,8 +20,8 @@ consumers own their workspace policy and composition.
   CLI, while `registry clone` and `registry pull` delegate to `gh` and `git`.
   devDependencies are allowed for build/test only.
 - Supported execution environments are macOS and Linux. Windows runtime
-  compatibility is outside the release contract. Continue rejecting
-  Windows-shaped absolute paths as untrusted portable input.
+  compatibility is outside the release contract. Reject Windows-shaped
+  absolute paths as untrusted portable input.
 - Keep this repository standalone. Do not add package, script, CI, checkout, or
   validation dependencies on consumer-specific repositories. Composition
   belongs to the consumer.
