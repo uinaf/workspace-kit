@@ -1,7 +1,9 @@
 name: Scan
 
-# No push trigger: pull requests scan the same tree before merge and the
-# weekly schedule covers history.
+# No push trigger: pull request runs already scan every commit, history
+# included, because the shared baseline checks out with fetch-depth 0. The
+# weekly schedule re-scans an unchanged repository so detector rules published
+# since the last run still find old material.
 on:
   pull_request:
   workflow_call:
@@ -13,10 +15,15 @@ permissions: {}
 
 concurrency:
   group: scan-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # release.yml calls this as a pre-release gate; cancelling a queued
+  # release's scan would fail that pipeline, so only races between
+  # pull request runs are collapsed.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   scan:
     permissions:
       contents: read
+    # Tracks main by design: baseline changes reach every adopter without a
+    # pin bump per repository, and Renovate does not update this reference.
     uses: uinaf/.github/.github/workflows/scan.yml@main
