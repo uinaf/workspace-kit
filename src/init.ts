@@ -21,12 +21,16 @@ function memoryInstructions(memory: MemoryConfig | undefined): string {
       memory.integration === "coding-agent"
         ? "Search Hindsight knowledge pages before re-deriving repository history. Use deeper reflection only when those pages are insufficient."
         : "Use the OpenClaw Hindsight plugin's bank for the active session context. Do not select another repository or channel bank.";
+    const retention =
+      memory.integration === "openclaw"
+        ? "Hindsight complements OpenClaw's native file memory. Continue writing daily logs in `memory/YYYY-MM-DD.md`, curating `MEMORY.md`, and following OpenClaw's normal memory workflow and session privacy boundaries. Commit authored memory files under the workspace's privacy policy; ignore only specific generated runtime artifacts, never ignore all of `memory/`. Hindsight recall and retention do not replace these files or their curation."
+        : "Hindsight owns retained experience and recall.";
     return `## Memory
 
 This repository uses the \`${memory.integration}\` Hindsight integration under
 the \`${memory.namespace}\` namespace. ${retrieval}
-Keep current policy and operational contracts in repository documentation;
-Hindsight owns retained experience and recall.
+Keep current policy and operational contracts in repository documentation.
+${retention}
 `;
   }
   return `## Memory
