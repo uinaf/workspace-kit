@@ -196,6 +196,27 @@ test("init scaffolds a Hindsight workspace without llm-wiki artifacts", () => {
   assert.equal(verify.status, 0, verify.stderr);
 });
 
+test("OpenClaw Hindsight scaffolding preserves native file memory", () => {
+  for (const integration of ["openclaw", "coding-agent"] as const) {
+    const dir = scratchDirectory("init-native-memory-");
+    initWorkspace(dir, "runtime", {
+      strategy: "hindsight",
+      integration,
+      namespace: "fixture-owner/fixture-workspace",
+    });
+    const instructions = readFileSync(join(dir, "AGENTS.md"), "utf8");
+    if (integration === "openclaw") {
+      assert.match(instructions, /Hindsight complements OpenClaw's native file memory/);
+      assert.match(instructions, /daily logs in `memory\/YYYY-MM-DD.md`/);
+      assert.match(instructions, /curating `MEMORY.md`/);
+      assert.match(instructions, /Commit authored memory files/);
+      assert.match(instructions, /never ignore all of `memory\/`/);
+    } else {
+      assert.doesNotMatch(instructions, /OpenClaw|MEMORY\.md|Commit authored memory/);
+    }
+  }
+});
+
 test("init validates explicit memory selections before writing", () => {
   const invalidNamespace = scratchDirectory("init-memory-namespace-");
   assert.throws(

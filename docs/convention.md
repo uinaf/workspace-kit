@@ -36,9 +36,15 @@ current behavior; `dailyLogs` and `wiki` remain the legacy llm-wiki signal.
 
 Consumers decide which paths their runtime owns and which paths must be absent.
 The memory strategy alone does not establish runtime ownership. Configure
-`forbidden` for paths that this workspace must reject. For a workspace whose
-runtime writes local memory, allow those paths and ignore generated output in
-`.gitignore` when appropriate.
+`forbidden` for paths that this workspace must reject.
+
+For an OpenClaw workspace using Hindsight, preserve OpenClaw's normal file
+memory workflow: write daily logs in `memory/YYYY-MM-DD.md`, curate
+`MEMORY.md`, and follow its session privacy boundaries. Hindsight provides
+complementary recall and retention; it does not replace file memory, logging,
+or curation. Commit authored memory files under the workspace's privacy
+policy. Ignore only specific generated runtime artifacts, never all of
+`memory/`. Runtime feature settings remain the runtime owner's responsibility.
 
 ### LLM wiki
 
@@ -283,9 +289,10 @@ A repository using the coding-agent Hindsight integration instead declares:
 }
 ```
 
-Do not combine the Hindsight strategy with `dailyLogs` or `wiki`; source
-documents may still live elsewhere in the repository as ordinary authored
-content.
+Do not combine the Hindsight strategy with `dailyLogs` or `wiki`: these
+sections enable workspace-kit's llm-wiki validators, not OpenClaw's native
+memory workflow. OpenClaw memory files and other source documents remain
+ordinary authored content and may be committed without those sections.
 
 - Strict JSON, no comments in the real file; every section optional.
 - Unknown keys at every supported nesting level are ignored at runtime
