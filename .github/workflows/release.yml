@@ -3,7 +3,8 @@ name: Release
 # Canonical verify -> release on push to main. Publishing uses npm Trusted
 # Publishing (OIDC): npmjs.com lists this workflow filename (release.yml)
 # and the "release" environment as the package's trusted publisher. See
-# docs/releasing.md. Version push-back and GitHub Release writes use a
+# docs/releasing.md. The release job body is the shared
+# uinaf/.github release-npm workflow, which binds the release environment. Version push-back and GitHub Release writes use a
 # short-lived uinaf-ci installation token. GitHub signs the App-authored
 # version commit before semantic-release creates the tag.
 
@@ -47,68 +48,21 @@ jobs:
   release:
     if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
     needs: [verify, scan]
-    # npm provenance accepts GitHub-hosted runners only.
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: release
-    # Never cancel a publish mid-flight; queue instead.
-    concurrency:
-      group: release-${{ github.repository }}-main
-      cancel-in-progress: false
     permissions:
       contents: read
-      id-token: write # OIDC for npm trusted publishing
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-          ref: main
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-        with:
-          standalone: true
-      # Secret-bearing job: no dependency cache, fresh install via setup-vp.
-      # vp must be on PATH here because npm publish's prepack runs the verify
-      # gate (vp check/test/pack). Trusted publishing authenticates from the
-      # job's OIDC identity; no registry token is ever configured.
-      - uses: voidzero-dev/setup-vp@1b32467adbe183473499fd9d5d372c3ed9641754 # v1.18.0
-        with:
-          node-version-file: ".node-version"
-          run-install: |
-            - args: ["--frozen-lockfile"]
-      - name: Create release bot token
-        id: release-bot
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          client-id: ${{ vars.UINAF_CI_APP_CLIENT_ID }}
-          private-key: ${{ secrets.UINAF_CI_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-          repositories: ${{ github.event.repository.name }}
-          permission-contents: write
-      - name: Authorize release writes
-        env:
-          GH_TOKEN: ${{ steps.release-bot.outputs.token }}
-        run: gh auth setup-git
-      - id: release
-        uses: cycjimmy/semantic-release-action@b12c8f6015dc215fe37bc154d4ad456dd3833c90 # v6.0.0
-        with:
-          semantic_version: 25.0.3
-          extra_plugins: |
-            @semantic-release/commit-analyzer@13.0.1
-            @semantic-release/release-notes-generator@14.1.1
-            @semantic-release/npm@13.1.5
-            @jno21/semantic-release-github-commit@1.0.1
-            @semantic-release/exec@7.1.0
-            @semantic-release/github@12.0.8
-            conventional-changelog-conventionalcommits@9.3.1
-        env:
-          GITHUB_TOKEN: ${{ steps.release-bot.outputs.token }}
-          GH_TOKEN: ${{ steps.release-bot.outputs.token }}
-
-      - name: Verify immutable release
-        if: steps.release.outputs.new_release_published == 'true'
-        env:
-          GH_TOKEN: ${{ steps.release-bot.outputs.token }}
-          RELEASE_TAG: ${{ steps.release.outputs.new_release_git_tag }}
-        run: |
-          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" --jq .immutable)" = true
+      id-token: write # OIDC for npm trusted publishing; the shared job needs it too
+    uses: uinaf/.github/.github/workflows/release-npm.yml@main
+    with:
+      extra-plugins: |
+        @semantic-release/commit-analyzer@13.0.1
+        @semantic-release/release-notes-generator@14.1.1
+        @semantic-release/npm@13.1.5
+        @jno21/semantic-release-github-commit@1.0.1
+        @semantic-release/exec@7.1.0
+        @semantic-release/github@12.0.8
+        conventional-changelog-conventionalcommits@9.3.1
+    # The App private key lives on this repository's release Environment. The
+    # shared job binds that Environment, so GitHub substitutes the Environment
+    # value for the one named here.
+    secrets:
+      UINAF_CI_APP_PRIVATE_KEY: ${{ secrets.UINAF_CI_APP_PRIVATE_KEY }}
