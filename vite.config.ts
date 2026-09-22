@@ -10,14 +10,10 @@ export default defineConfig({
     },
     server: {
       deps: {
-        // vite-plus/test re-exports vitest; without inlining, the re-export
-        // externalizes to a second vitest instance and no suite is found
-        // (upstream #1113 fixed the expect.extend flavor of this).
         inline: ["vite-plus"],
       },
     },
   },
-  // tsdown options: the published artifact is the bundled bin only.
   pack: {
     entry: ["src/cli.ts"],
     dts: false,

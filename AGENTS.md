@@ -39,6 +39,8 @@ consumers own their workspace policy and composition.
 
 ## Verify
 
+`vite.config.ts` inlines `vite-plus/test` because its vitest re-export otherwise externalizes to a second vitest instance and no suite is found (upstream #1113 fixed only the `expect.extend` flavor).
+
 The repo runs on the [Vite+](https://github.com/voidzero-dev/vite-plus)
 toolchain; all tool config lives in `vite.config.ts`.
 

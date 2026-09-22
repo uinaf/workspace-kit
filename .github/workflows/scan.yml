@@ -11,9 +11,6 @@ permissions: {}
 
 concurrency:
   group: scan-${{ github.workflow }}-${{ github.ref }}
-  # release.yml calls this as a pre-release gate; cancelling a queued
-  # release's scan would fail that pipeline, so only races between
-  # pull request runs are collapsed.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:

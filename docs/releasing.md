@@ -27,6 +27,7 @@ GitHub Release and version push-back commits are authored by
 `UINAF_CI_APP_PRIVATE_KEY`). The `protect-main` and
 `protect-release-tags` rulesets require verified signatures. The release App
 can create protected release tags but cannot bypass the default-branch rule.
+The App private key lives on the `release` Environment; the shared release-npm job binds that Environment, so GitHub substitutes the Environment value for the secret named in `release.yml`.
 
 ## Versioning
 
