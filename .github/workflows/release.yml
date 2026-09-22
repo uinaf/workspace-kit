@@ -51,7 +51,7 @@ jobs:
     permissions:
       contents: read
       id-token: write # OIDC for npm trusted publishing; the shared job needs it too
-    uses: uinaf/.github/.github/workflows/release-npm.yml@main
+    uses: uinaf/.github/.github/workflows/release-npm.yml@273d0888178ba4795605c440bef144d8882331fc # v1.0.0
     with:
       extra-plugins: |
         @semantic-release/commit-analyzer@13.0.1
