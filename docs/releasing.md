@@ -5,7 +5,7 @@ then the shared
 [uinaf release workflow](https://github.com/uinaf/.github/blob/main/.github/workflows/release-npm.yml),
 pinned in `.github/workflows/release.yml`, which runs semantic-release. The
 caller passes the App private key by name; the shared job binds the `release`
-Environment and receives the Environment's value.
+Environment, so GitHub injects that Environment's secret value into it.
 
 - semantic-release computes the next version from Conventional Commits
   (`fix:` → patch, `feat:` → minor, `BREAKING CHANGE:` → major), commits the
