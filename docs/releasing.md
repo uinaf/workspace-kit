@@ -1,7 +1,11 @@
 # Releasing
 
 Releases are **fully automatic**: every push to `main` runs verification and
-then semantic-release.
+then the shared
+[uinaf release workflow](https://github.com/uinaf/.github/blob/main/.github/workflows/release-npm.yml),
+pinned in `.github/workflows/release.yml`, which runs semantic-release. The
+caller passes the App private key by name; the shared job binds the `release`
+Environment, so GitHub injects that Environment's secret value into it.
 
 - semantic-release computes the next version from Conventional Commits
   (`fix:` → patch, `feat:` → minor, `BREAKING CHANGE:` → major), commits the
@@ -23,6 +27,7 @@ GitHub Release and version push-back commits are authored by
 `UINAF_CI_APP_PRIVATE_KEY`). The `protect-main` and
 `protect-release-tags` rulesets require verified signatures. The release App
 can create protected release tags but cannot bypass the default-branch rule.
+The App private key lives on the `release` Environment; the shared release-npm job binds that Environment, so GitHub substitutes the Environment value for the secret named in `release.yml`.
 
 ## Versioning
 
@@ -68,8 +73,8 @@ can create protected release tags but cannot bypass the default-branch rule.
 
 - The release job runs only after verification and secret scanning pass. PRs
   run the same gates with read-only permissions and no environment access.
-- All workflows use standard GitHub-hosted Linux runners. Verification uses
-  Ubuntu 24.04; publishing retains `ubuntu-latest` for npm provenance.
+- All workflows use standard GitHub-hosted `ubuntu-24.04` runners; npm trusted
+  publishing accepts cloud-hosted runners only.
 - Publish concurrency is non-cancellable (queued, never killed mid-publish).
 - `prepack` runs the full verify gate (which rebuilds a clean `dist/`)
   before any tarball is produced. The gate stages the effective version the
@@ -77,5 +82,5 @@ can create protected release tags but cannot bypass the default-branch rule.
   contents, installs it offline, and exercises its bin, scaffold, manifest
   version, and validation paths.
 - Workflow permissions are per-job and minimal; actions are SHA-pinned;
-  `persist-credentials: false` everywhere. The workflows themselves are
-  linted by actionlint + zizmor in CI (`actions-lint.yml`).
+  `persist-credentials: false` everywhere. The shared scan lints the
+  workflows with actionlint and zizmor.

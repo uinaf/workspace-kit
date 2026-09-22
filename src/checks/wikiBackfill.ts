@@ -103,7 +103,6 @@ function allSources(repoRoot: string, root: string): Source[] {
     "README.md",
     "CONTRIBUTING.md",
   ].filter(
-    // Missing optional root convention files are skipped.
     (p, i, a) =>
       a.indexOf(p) === i &&
       p !== root &&
@@ -275,7 +274,6 @@ ${tagEntries.map(([tag, list]) => (list.length >= 2 ? `- [[${tag}]] — ${list.l
 `,
   );
 
-  // Purge stale tag pages (tags that no longer materialize)
   const keepTags = new Set(materializedTagEntries.map(([tag]) => tag));
   const tagsDir = posix.join(root, "tags");
   for (const entry of readWorkspaceDirectory(repoRoot, tagsDir, "empty")) {

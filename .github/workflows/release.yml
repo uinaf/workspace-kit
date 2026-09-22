@@ -1,13 +1,5 @@
 name: Release
 
-# Canonical verify -> release on push to main. Publishing uses npm Trusted
-# Publishing (OIDC): npmjs.com lists this workflow filename (release.yml)
-# and the "release" environment as the package's trusted publisher. See
-# docs/releasing.md. The release job body is the shared
-# uinaf/.github release-npm workflow, which binds the release environment. Version push-back and GitHub Release writes use a
-# short-lived uinaf-ci installation token. GitHub signs the App-authored
-# version commit before semantic-release creates the tag.
-
 on:
   push:
     branches: [main]
@@ -33,11 +25,9 @@ jobs:
         with:
           node-version-file: ".node-version"
           cache: true
-          # vp install alone maps to `npm install`; frozen keeps CI on `npm ci`
-          # semantics so lockfile drift fails loudly instead of re-resolving.
           run-install: |
             - args: ["--frozen-lockfile"]
-      - run: vp run verify # vp check + vp test + vp pack + cli smoke
+      - run: vp run verify
 
   scan:
     if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
@@ -50,7 +40,7 @@ jobs:
     needs: [verify, scan]
     permissions:
       contents: read
-      id-token: write # OIDC for npm trusted publishing; the shared job needs it too
+      id-token: write
     uses: uinaf/.github/.github/workflows/release-npm.yml@273d0888178ba4795605c440bef144d8882331fc # v1.0.0
     with:
       extra-plugins: |
@@ -61,8 +51,5 @@ jobs:
         @semantic-release/exec@7.1.0
         @semantic-release/github@12.0.8
         conventional-changelog-conventionalcommits@9.3.1
-    # The App private key lives on this repository's release Environment. The
-    # shared job binds that Environment, so GitHub substitutes the Environment
-    # value for the one named here.
     secrets:
       UINAF_CI_APP_PRIVATE_KEY: ${{ secrets.UINAF_CI_APP_PRIVATE_KEY }}

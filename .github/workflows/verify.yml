@@ -1,7 +1,5 @@
 name: Verify
 
-# Pull-request verification only: pushes to main verify inside release.yml
-# so verification and release stay coupled.
 on:
   pull_request:
   workflow_dispatch:
@@ -29,8 +27,6 @@ jobs:
         with:
           node-version-file: ".node-version"
           cache: true
-          # vp install alone maps to `npm install`; frozen keeps CI on `npm ci`
-          # semantics so lockfile drift fails loudly instead of re-resolving.
           run-install: |
             - args: ["--frozen-lockfile"]
-      - run: vp run verify # vp check + vp test + vp pack + cli smoke
+      - run: vp run verify
