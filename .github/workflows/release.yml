@@ -3,7 +3,8 @@ name: Release
 # Canonical verify -> release on push to main. Publishing uses npm Trusted
 # Publishing (OIDC): npmjs.com lists this workflow filename (release.yml)
 # and the "release" environment as the package's trusted publisher. See
-# docs/releasing.md. Version push-back and GitHub Release writes use a
+# docs/releasing.md. The release job body is the shared
+# uinaf/.github release-npm workflow, which binds the release environment. Version push-back and GitHub Release writes use a
 # short-lived uinaf-ci installation token. GitHub signs the App-authored
 # version commit before semantic-release creates the tag.
 
@@ -52,8 +53,6 @@ jobs:
       id-token: write # OIDC for npm trusted publishing; the shared job needs it too
     uses: uinaf/.github/.github/workflows/release-npm.yml@main
     with:
-      app-client-id: ${{ vars.UINAF_CI_APP_CLIENT_ID }}
-      ref: main
       extra-plugins: |
         @semantic-release/commit-analyzer@13.0.1
         @semantic-release/release-notes-generator@14.1.1
@@ -62,5 +61,6 @@ jobs:
         @semantic-release/exec@7.1.0
         @semantic-release/github@12.0.8
         conventional-changelog-conventionalcommits@9.3.1
-    secrets:
-      app-private-key: ${{ secrets.UINAF_CI_APP_PRIVATE_KEY }}
+    # The App credentials live on this repository's release Environment; the
+    # shared job binds that Environment and reads them itself.
+    secrets: inherit
