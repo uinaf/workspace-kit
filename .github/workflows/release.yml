@@ -61,6 +61,8 @@ jobs:
         @semantic-release/exec@7.1.0
         @semantic-release/github@12.0.8
         conventional-changelog-conventionalcommits@9.3.1
-    # The App credentials live on this repository's release Environment; the
-    # shared job binds that Environment and reads them itself.
-    secrets: inherit
+    # The App private key lives on this repository's release Environment. The
+    # shared job binds that Environment, so GitHub substitutes the Environment
+    # value for the one named here.
+    secrets:
+      UINAF_CI_APP_PRIVATE_KEY: ${{ secrets.UINAF_CI_APP_PRIVATE_KEY }}
