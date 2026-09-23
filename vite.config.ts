@@ -4,6 +4,7 @@ import { kitVersion } from "./src/version.ts";
 export default defineConfig({
   test: {
     include: ["test/**/*.test.ts"],
+    setupFiles: ["test/setup.ts"],
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts"],
