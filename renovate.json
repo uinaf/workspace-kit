@@ -1,6 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["github>uinaf/renovate-config"],
+  "ignoreDeps": ["@vitest/coverage-v8"],
   "platformAutomerge": true,
   "automergeType": "pr"
 }

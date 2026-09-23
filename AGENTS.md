@@ -43,6 +43,8 @@ consumers own their workspace policy and composition.
 
 The repo runs on the [Vite+](https://github.com/voidzero-dev/vite-plus)
 toolchain; all tool config lives in `vite.config.ts`.
+Keep `@vitest/coverage-v8` pinned to the Vitest version reported by
+`pnpm exec vp toolchain vitest`; update it with Vite+ rather than separately.
 
 - `pnpm exec vp run verify` is the full gate: `vp check` (format, lint, type
   check), the full test suite with aggregate coverage across `src/`,
