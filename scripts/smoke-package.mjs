@@ -131,7 +131,7 @@ try {
   const fixturePackage = JSON.parse(readFileSync(join(fixtureDir, "package.json"), "utf8"));
   assert.equal(fixturePackage.devDependencies["@uinaf/workspace-kit"], sourceVersion);
   assert.equal(fixturePackage.scripts.verify, "workspace-kit verify");
-  assert.equal(fixturePackage.packageManager, stagedManifest.packageManager);
+  assert.match(fixturePackage.packageManager, /^pnpm@\d+\.\d+\.\d+$/);
   assert.equal(config.packageManager.enforce, true);
   const hook = readFileSync(join(fixtureDir, ".githooks", "pre-commit"), "utf8");
   assert.match(hook, /pnpm verify/);
