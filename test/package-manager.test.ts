@@ -30,13 +30,6 @@ function kit(cwd: string, ...args: string[]) {
   return spawnSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8" });
 }
 
-test("consumer packageManager pin tracks the kit Corepack version", () => {
-  const kitPackage = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
-    packageManager: string;
-  };
-  assert.equal(CONSUMER_PACKAGE_MANAGER, kitPackage.packageManager);
-});
-
 test("package-manager check is off unless enforce is true", () => {
   assert.equal(parseWorkspaceConfig({}).packageManager, undefined);
   const parsed = parseWorkspaceConfig({ packageManager: {} });

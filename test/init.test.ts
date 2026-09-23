@@ -17,7 +17,6 @@ import {
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { CONSUMER_PACKAGE_MANAGER } from "../src/checks/packageManager.ts";
 import { initWorkspace } from "../src/init.ts";
 import { kitVersion } from "../src/version.ts";
 
@@ -46,7 +45,7 @@ for (const profile of ["personal", "runtime", "work"] as const) {
     assert.equal(packageJson.scripts.doctor, "workspace-kit doctor");
     assert.equal(packageJson.scripts.test, "pnpm verify");
     assert.equal(packageJson.scripts.verify, "workspace-kit verify");
-    assert.equal(packageJson.packageManager, CONSUMER_PACKAGE_MANAGER);
+    assert.equal(packageJson.packageManager, "pnpm@12.0.0");
     if (profile === "personal" || profile === "runtime") {
       const hook = readFileSync(join(dir, ".githooks", "pre-commit"), "utf8");
       assert.match(hook, /pnpm verify/);
