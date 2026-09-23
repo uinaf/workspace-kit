@@ -2,7 +2,8 @@
 
 ## Setup
 
-Node >= 24.18 (see `.node-version`) with Corepack enabled, and git. The repo runs on the
+Needs git on PATH; [`package.json`](package.json) pins Node and pnpm. The repo
+runs on the
 [Vite+](https://github.com/voidzero-dev/vite-plus) toolchain (`vp`). Then:
 
 ```

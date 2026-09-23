@@ -164,8 +164,7 @@ Consumers own shared machine-global skill selection and installation.
 
 ## Adopting an existing workspace
 
-1. Enable Corepack if needed, then install `@uinaf/workspace-kit` as an
-   exact development dependency with
+1. Install `@uinaf/workspace-kit` as an exact development dependency with
    `pnpm add --save-dev --save-exact @uinaf/workspace-kit`.
 2. Pin `"packageManager": "pnpm@12.0.0"` in `package.json` and add a
    project-local `verify` script for `workspace-kit verify`; add direct
@@ -176,7 +175,7 @@ Consumers own shared machine-global skill selection and installation.
 5. Run `pnpm verify` and the repository's CI before deploying the checkout
    to a runtime.
 
-Existing npm-based agent workspaces migrate by enabling Corepack, rewriting
+Existing npm-based agent workspaces migrate by rewriting
 scripts and docs to `pnpm …`, running `pnpm import` or a fresh `pnpm install`,
 and deleting `package-lock.json`. Leave `packageManager.enforce` off until
 that cutover is done; set it true once the pin and lockfile match.
@@ -223,7 +222,7 @@ that cutover is done; set it true once the pin and lockfile match.
   a present-but-untracked target is reported as untracked rather than
   broken. The check never runs Git's check-in pipeline to decide that.
 - **Package manager (opt-in)**: convention workspaces use pnpm.
-  `init` writes a Corepack `packageManager` pin, pnpm scripts, and
+  `init` writes a `packageManager` pin, pnpm scripts, and
   `"packageManager": { "enforce": true }`. Existing configs without the
   section stay unchecked. When `packageManager.enforce` is true, `doctor`
   and `verify` require `package.json#packageManager` to be a `pnpm@` pin
