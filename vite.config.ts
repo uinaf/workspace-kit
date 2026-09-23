@@ -9,11 +9,6 @@ export default defineConfig({
       provider: "v8",
       include: ["src/**/*.ts"],
     },
-    server: {
-      deps: {
-        inline: ["vite-plus"],
-      },
-    },
   },
   pack: {
     entry: ["src/cli.ts"],
