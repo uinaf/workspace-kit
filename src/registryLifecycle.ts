@@ -21,10 +21,15 @@ export type RegistryLifecycleOptions = {
   stderr?: (text: string) => void;
 };
 
+// Fast-forwards across thousands of files print multi-megabyte diffstats;
+// spawnSync's 1 MiB default kills git mid-output with no status.
+const MAX_OUTPUT_BYTES = 256 * 1024 * 1024;
+
 function defaultRun(command: string, args: string[]): CommandResult {
   const result = spawnSync(command, args, {
     encoding: "utf8",
     env: command === "git" ? gitEnvironmentForRepository() : process.env,
+    maxBuffer: MAX_OUTPUT_BYTES,
   });
   const errorCode =
     result.error &&
@@ -33,10 +38,18 @@ function defaultRun(command: string, args: string[]): CommandResult {
     typeof result.error.code === "string"
       ? result.error.code
       : undefined;
+  let stderr = result.stderr ?? "";
+  if (result.status === null) {
+    const invocation = [command, ...args].join(" ");
+    const cause = result.error
+      ? `failed: ${result.error.message}`
+      : `terminated by ${result.signal ?? "an unknown signal"}`;
+    stderr += `${stderr && !stderr.endsWith("\n") ? "\n" : ""}${invocation} ${cause}\n`;
+  }
   return {
     status: result.status ?? 1,
     stdout: result.stdout ?? "",
-    stderr: result.stderr ?? "",
+    stderr,
     ...(errorCode ? { errorCode } : {}),
   };
 }

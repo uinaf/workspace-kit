@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "vite-plus/test";
+import { afterEach, test } from "vite-plus/test";
 import type { ProjectEntry } from "../src/checks/registry.ts";
 import {
   cloneProjects,
@@ -140,6 +140,62 @@ test("registry pull enforces configured branches and skips missing checkouts", (
   state.setBranch("other");
   assert.equal(pullProjects([entries[0]!], state.options), 1);
   assert.match(state.stderr.join(""), /expected branch main/);
+});
+
+const originalPath = process.env.PATH;
+
+afterEach(() => {
+  process.env.PATH = originalPath;
+});
+
+function installFakeGit(pullScript: string) {
+  const bin = mkdtempSync(join(tmpdir(), "registry-lifecycle-bin-"));
+  const git = join(bin, "git");
+  writeFileSync(
+    git,
+    [
+      "#!/bin/sh",
+      'case "$*" in',
+      "  *--is-inside-work-tree*) echo true ;;",
+      `  *pull*) ${pullScript} ;;`,
+      "  *) exit 1 ;;",
+      "esac",
+      "",
+    ].join("\n"),
+  );
+  chmodSync(git, 0o755);
+  process.env.PATH = `${bin}:${originalPath}`;
+}
+
+function pullWithRealProcess() {
+  const home = mkdtempSync(join(tmpdir(), "registry-lifecycle-home-"));
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  const status = pullProjects([entry("present")], {
+    homeDirectory: home,
+    stdout: (text) => stdout.push(text),
+    stderr: (text) => stderr.push(text),
+  });
+  return { status, stdout: stdout.join(""), stderr: stderr.join("") };
+}
+
+test("registry pull relays git output larger than the default child-process buffer", () => {
+  installFakeGit("head -c 2097152 /dev/zero | tr '\\0' x; echo");
+
+  const result = pullWithRealProcess();
+
+  assert.equal(result.stderr, "");
+  assert.equal(result.status, 0);
+  assert.ok(result.stdout.length > 2_097_152);
+});
+
+test("registry pull reports a git process killed by a signal", () => {
+  installFakeGit("kill -TERM $$");
+
+  const result = pullWithRealProcess();
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /git -C \S+ pull --ff-only terminated by SIGTERM/);
 });
 
 test("registry path resolves an exact label and optional mode", () => {
