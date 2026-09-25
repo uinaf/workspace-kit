@@ -2,6 +2,7 @@ name: Verify
 
 on:
   pull_request:
+  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -9,7 +10,7 @@ permissions:
 
 concurrency:
   group: verify-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify:
@@ -30,3 +31,7 @@ jobs:
           run-install: |
             - args: ["--frozen-lockfile"]
       - run: vp run verify
+
+      - name: Scan
+        if: ${{ !cancelled() }}
+        uses: uinaf/.github/.github/actions/scan@7bc3f9ea25b5494f4026dfdb64fb866a520afcd0 # v3.0.0

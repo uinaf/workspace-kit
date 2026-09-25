@@ -71,8 +71,9 @@ The App private key lives on the `release` Environment; the shared release-npm j
 
 ## Guard rails
 
-- The release job runs only after verification and secret scanning pass. PRs
-  run the same gates with read-only permissions and no environment access.
+- The release job runs only after `verify` passes; on push its last step scans
+  the pushed range. PRs run the same gate, unscanned, with read-only
+  permissions and no environment access.
 - All workflows use standard GitHub-hosted `ubuntu-24.04` runners; npm trusted
   publishing accepts cloud-hosted runners only.
 - Publish concurrency is non-cancellable (queued, never killed mid-publish).
@@ -82,5 +83,5 @@ The App private key lives on the `release` Environment; the shared release-npm j
   contents, installs it offline, and exercises its bin, scaffold, manifest
   version, and validation paths.
 - Workflow permissions are per-job and minimal; actions are SHA-pinned;
-  `persist-credentials: false` everywhere. The shared scan lints the
+  `persist-credentials: false` everywhere. The push-time scan lints changed
   workflows with actionlint and zizmor.
