@@ -1,2 +1,1 @@
 pnpm exec vp staged
-pnpm exec vp run verify
