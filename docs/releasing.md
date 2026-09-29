@@ -74,7 +74,7 @@ The App private key lives on the `release` Environment; the shared release-npm j
 - The release job runs only after `verify` passes; on push its last step scans
   the pushed range. PRs run the same gate, unscanned, with read-only
   permissions and no environment access.
-- All workflows use standard GitHub-hosted `ubuntu-24.04` runners; npm trusted
+- All workflows use standard GitHub-hosted `ubuntu-26.04` runners; npm trusted
   publishing accepts cloud-hosted runners only.
 - Publish concurrency is non-cancellable (queued, never killed mid-publish).
 - `prepack` runs the full verify gate (which rebuilds a clean `dist/`)
