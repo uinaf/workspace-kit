@@ -12,6 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { gitEnvironmentForRepository } from "../src/lib/gitProcess.ts";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const npm = "npm";
@@ -21,8 +22,9 @@ function run(command, args, cwd) {
   const result = spawnSync(command, args, {
     cwd,
     encoding: "utf8",
+    // Git hooks export the outer repository's GIT_DIR; the fixture `git init` must not reinitialize it.
     env: {
-      ...process.env,
+      ...gitEnvironmentForRepository(),
       npm_config_cache: join(scratch, "npm-cache"),
       npm_config_update_notifier: "false",
     },

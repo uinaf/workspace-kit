@@ -1,7 +1,8 @@
 import { gitEnvironmentForRepository } from "../src/lib/gitProcess.ts";
 
-// Git hooks export the outer repository's GIT_INDEX_FILE and GIT_DIR; fixture repos must not inherit them.
+// Git hooks export the outer repository's GIT_DIR, GIT_INDEX_FILE, and other repository-local
+// variables; fixture repos must not inherit anything gitEnvironmentForRepository strips.
 const repositoryEnvironment = gitEnvironmentForRepository();
 for (const key of Object.keys(process.env)) {
-  if (!(key in repositoryEnvironment)) delete process.env[key];
+  if (!Object.hasOwn(repositoryEnvironment, key)) delete process.env[key];
 }
