@@ -50,19 +50,17 @@ Keep `@vitest/coverage-v8` pinned to the Vitest version reported by
 - Executable source-line coverage across in-process and spawned CLI tests
   stays at or above 90%.
 - After `pnpm install --frozen-lockfile`, run `pnpm exec vp config --no-agent`
-  to install the pre-commit hook; it runs the repository-local `vp staged`
-  plus the full gate.
+  to install the git hooks: pre-commit runs `vp staged`, pre-push runs the
+  full gate.
+- Docs-only changes need no runtime proof; the pre-push gate still runs.
 - Fix issues with `pnpm exec vp check --fix`.
 - `parity/legacy/` and `parity/fixtures/` are frozen and exempt from
   lint/format.
 
 ## Releases
 
+Changes land through pull requests; `verify` is the required check.
 Conventional Commits drive publishing: every push to `main` with `feat:` or
 `fix:` commits auto-releases to npm (see
 [docs/releasing.md](docs/releasing.md)). Choose prefixes accordingly;
 `docs:`/`chore:`/`test:` publish nothing.
-
-## Compatibility
-
-`CLAUDE.md` is a symlink to this file. Codex reads `AGENTS.md` natively.
