@@ -21,9 +21,10 @@ pnpm exec vp run verify    # checks + tests + pack + installed-tarball CLI smoke
 pnpm exec vp check --fix   # fix lint/format issues
 ```
 
-The pre-commit hook runs `pnpm exec vp staged` plus the same gate. The gate asserts the
-exact release tarball contents, installs that version-stamped tarball offline
-without suppressing lifecycle behavior, and exercises the installed CLI.
+The pre-commit hook runs `pnpm exec vp staged`; the pre-push hook runs the
+gate. The gate asserts the exact release tarball contents, installs that
+version-stamped tarball offline without suppressing lifecycle behavior, and
+exercises the installed CLI.
 
 Checks are parity-locked to golden outputs; read the
 [parity oracle](parity/README.md) before touching any check's behavior, and
