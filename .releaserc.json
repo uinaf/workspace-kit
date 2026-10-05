@@ -6,17 +6,10 @@
     "@semantic-release/release-notes-generator",
     "@semantic-release/npm",
     [
-      "@jno21/semantic-release-github-commit",
-      {
-        "files": ["package.json"],
-        "commitMessage": "chore(release): ${nextRelease.version} [skip ci]"
-      }
-    ],
-    [
       "@semantic-release/exec",
       {
         "verifyReleaseCmd": "test \"$(gh api repos/$GITHUB_REPOSITORY/git/ref/heads/main --jq .object.sha)\" = \"$GITHUB_SHA\" || { echo \"main moved past the verified commit $GITHUB_SHA\" >&2; exit 1; }",
-        "prepareCmd": "release=\"$(gh api repos/$GITHUB_REPOSITORY/git/ref/heads/main --jq .object.sha)\" && { [ \"$release\" = \"$GITHUB_SHA\" ] || { [ \"$(git rev-parse \"$release^@\")\" = \"$GITHUB_SHA\" ] && git diff --quiet \"$GITHUB_SHA\" \"$release\" -- . ':(exclude)package.json' && git switch --detach \"$release\"; }; } || { echo \"main is not the verified commit $GITHUB_SHA plus its version commit\" >&2; exit 1; }"
+        "prepareCmd": "set -e; git diff --quiet \"$GITHUB_SHA\" -- package.json && exit 0; tree=\"$(gh api \"repos/$GITHUB_REPOSITORY/git/trees\" -f base_tree=\"$(git rev-parse \"$GITHUB_SHA^{tree}\")\" -f 'tree[][path]=package.json' -f 'tree[][mode]=100644' -f 'tree[][type]=blob' -F 'tree[][content]=@package.json' --jq .sha)\"; release=\"$(gh api \"repos/$GITHUB_REPOSITORY/git/commits\" -f message='chore(release): ${nextRelease.version} [skip ci]' -f tree=\"$tree\" -f \"parents[]=$GITHUB_SHA\" --jq .sha)\"; gh api -X PATCH \"repos/$GITHUB_REPOSITORY/git/refs/heads/main\" -f sha=\"$release\" -F force=false --silent || { echo \"could not fast-forward main from the verified commit $GITHUB_SHA\" >&2; exit 1; }; git fetch -q origin main; git checkout -q -- package.json; git switch -q --detach \"$release\""
       }
     ],
     [
