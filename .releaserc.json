@@ -15,7 +15,8 @@
     [
       "@semantic-release/exec",
       {
-        "prepareCmd": "git switch --detach \"$(gh api repos/$GITHUB_REPOSITORY/git/ref/heads/main --jq .object.sha)\""
+        "verifyReleaseCmd": "test \"$(gh api repos/$GITHUB_REPOSITORY/git/ref/heads/main --jq .object.sha)\" = \"$GITHUB_SHA\" || { echo \"main moved past the verified commit $GITHUB_SHA\" >&2; exit 1; }",
+        "prepareCmd": "release=\"$(gh api repos/$GITHUB_REPOSITORY/git/ref/heads/main --jq .object.sha)\" && { [ \"$release\" = \"$GITHUB_SHA\" ] || { [ \"$(git rev-parse \"$release^@\")\" = \"$GITHUB_SHA\" ] && git diff --quiet \"$GITHUB_SHA\" \"$release\" -- . ':(exclude)package.json' && git switch --detach \"$release\"; }; } || { echo \"main is not the verified commit $GITHUB_SHA plus its version commit\" >&2; exit 1; }"
       }
     ],
     [
