@@ -31,17 +31,16 @@ The App private key lives on the `release` Environment; the shared release-npm j
 
 ## Versioning
 
-- During semantic-release prepare, the workflow commits the released
-  `package.json` through GitHub's API as the authenticated App. GitHub signs
-  the commit. The ephemeral checkout then switches to that commit before
-  semantic-release creates the tag and publishes the package. This handoff is
-  required because the API plugin advances the remote ref without updating the
-  action's working tree.
-- A release publishes only the commit `verify` passed on (`github.sha`). It
-  stops before preparing if `main` has moved past that commit, and switches
-  only to a version commit whose sole parent is that commit and which changes
-  nothing but `package.json`. A push that lands mid-release fails the run
-  before tagging or publishing; a later release picks up its commits.
+- During semantic-release prepare, an `@semantic-release/exec` step commits
+  the released `package.json` through GitHub's API as the authenticated App.
+  GitHub signs the commit. Its sole parent is the commit `verify` passed on
+  (`github.sha`), and it changes nothing but `package.json`. The step then
+  fast-forwards `main` to it and switches the ephemeral checkout to it, so
+  semantic-release tags that commit and publishes its `package.json`.
+- A release publishes only the verified commit. It stops before preparing if
+  `main` has moved past that commit. If a push lands after that check, GitHub
+  rejects the fast-forward: the run fails before tagging or publishing and
+  leaves `main` untouched, and a later release picks up the push.
 - Full source checkouts still resolve the greater of the checked-in manifest
   and the latest reachable strict `vX.Y.Z` tag (see `src/version.ts`); builds
   bake that effective version into the CLI.
