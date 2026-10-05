@@ -21,13 +21,8 @@ identity to npm per-run and provenance attestations are generated
 automatically. No npm token exists in this repository, its secrets, or any
 maintainer machine.
 
-GitHub Release and version push-back commits are authored by
-`uinaf-ci[bot]` via a short-lived App installation token minted in the
-`release` Environment (`UINAF_CI_APP_CLIENT_ID` /
-`UINAF_CI_APP_PRIVATE_KEY`). The `protect-main` and
-`protect-release-tags` rulesets require verified signatures. The release App
-can create protected release tags but cannot bypass the default-branch rule.
-The App private key lives on the `release` Environment; the shared release-npm job binds that Environment, so GitHub substitutes the Environment value for the secret named in `release.yml`.
+GitHub Releases and version commits are authored by `uinaf-ci[bot]` with a
+short-lived App installation token minted in the `release` Environment.
 
 ## Versioning
 
@@ -57,8 +52,14 @@ The App private key lives on the `release` Environment; the shared release-npm j
 - GitHub `release` environment restricted to `main` branch runs.
 - `release` Environment holds `UINAF_CI_APP_CLIENT_ID` (variable) and
   `UINAF_CI_APP_PRIVATE_KEY` (secret) for git/GitHub writeback.
-- The release-tag ruleset allows `uinaf-ci` to create tags; the
-  default-branch ruleset has no bypass actors.
+- Organization rulesets on this repository:
+  - `default-branch-baseline` requires verified signatures on `main` and
+    blocks its deletion and force pushes. Nobody bypasses it.
+  - `default-branch-checks-release` requires status checks on `main`.
+    Repository admins and `uinaf-ci` bypass it, which lets the `[skip ci]`
+    version commit land.
+  - `protect-release-tags` requires verified signatures on `v*` tags and
+    blocks updating or deleting them. `uinaf-ci` bypasses it.
 - `v0.1.0` was the one-time manual bootstrap publish (trusted publishing
   requires an existing package); it carries no provenance. Every CI-published
   version does.
