@@ -355,11 +355,10 @@ operation and exits 1 when any are present; a clean generated catalog exits 0.
 
 ## Repository security composition
 
-Workspace repositories run full-history secret detection in a dedicated CI
-workflow on pull requests and default-branch pushes, with scheduled and manual
-runs for recurring coverage. The consumer may add the workflow path to
-`workspace.json.required` so `doctor` verifies that the repository keeps the
-workflow as part of its structure.
+Secret detection runs in the workspace repository's own CI; the consumer
+chooses the workflow and when it scans. The consumer may add that workflow's
+path to `workspace.json.required` so `doctor` verifies that the repository
+keeps it as part of its structure.
 
 Local workspace validation stays focused on deterministic structure, wiki,
 registry, documentation, and skill contracts. Host configuration audits and

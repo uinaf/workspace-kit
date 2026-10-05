@@ -112,10 +112,10 @@ records those copies in `skills/workspace-kit-lock.json` so later syncs retire
 only workspace-kit-managed copies. Machine-global capabilities remain
 consumer-owned.
 
-Workspace repositories run history-based secret detection in a dedicated CI
-workflow. Consumers can list that workflow in `workspace.json.required` when
-its presence is part of their structural contract. Local `workspace-kit`
-commands remain deterministic, credential-free workspace checks.
+Secret detection runs in each workspace repository's own CI, not in
+`workspace-kit` ([security composition](docs/convention.md#repository-security-composition)).
+Local `workspace-kit` commands remain deterministic, credential-free workspace
+checks.
 
 ## Docs
 
