@@ -19,7 +19,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    uses: uinaf/.github/.github/workflows/release-npm.yml@dbeb4a0b5f9ceb0b0af48044dfc94205b2b70248 # v3.0.2
+    uses: uinaf/.github/.github/workflows/release-npm.yml@2b588469fa5f1ce13502fba8870c74ff285a0130 # v3.0.3
     with:
       extra-plugins: |
         @semantic-release/commit-analyzer@13.0.1
