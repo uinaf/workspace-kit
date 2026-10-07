@@ -18,33 +18,21 @@ owner-reviewed.
 
 ## 2. Memory (optional)
 
-A workspace may declare one memory strategy in `workspace.json`:
-
-- **`llm-wiki`** keeps the repository-maintained raw-log and compiled-wiki
-  lifecycle described below. It requires both `dailyLogs` and `wiki`.
-- **`hindsight`** delegates recall and retention to an existing Hindsight
-  integration. `integration` names the client contract (`coding-agent` or
-  `openclaw`), while `namespace` is the canonical `owner/repository` identity
-  used to route that repository's banks. Workspace-kit validates this
-  declaration but never installs a plugin, reads machine-global configuration,
-  checks credentials, or calls Hindsight.
-
-The strategy is an ownership declaration, not an authorization layer. A
-Hindsight client and server remain responsible for bank routing, credentials,
-and runtime health. Existing configurations without `memory` retain their
-current behavior; `dailyLogs` and `wiki` remain the legacy llm-wiki signal.
+A workspace may declare `"memory": { "strategy": "llm-wiki" }` in
+`workspace.json` to adopt the repository-maintained raw-log and compiled-wiki
+lifecycle described below. It requires both `dailyLogs` and `wiki`. Without
+`memory`, `dailyLogs` and `wiki` remain the legacy llm-wiki signal.
 
 Consumers decide which paths their runtime owns and which paths must be absent.
 The memory strategy alone does not establish runtime ownership. Configure
 `forbidden` for paths that this workspace must reject.
 
-For an OpenClaw workspace using Hindsight, preserve OpenClaw's normal file
-memory workflow: write daily logs in `memory/YYYY-MM-DD.md`, curate
-`MEMORY.md`, and follow its session privacy boundaries. Hindsight provides
-complementary recall and retention; it does not replace file memory, logging,
-or curation. Commit authored memory files under the workspace's privacy
-policy. Ignore only specific generated runtime artifacts, never all of
-`memory/`. Runtime feature settings remain the runtime owner's responsibility.
+A workspace whose runtime keeps its own file memory, such as OpenClaw's daily
+`memory/YYYY-MM-DD.md` logs and curated `MEMORY.md`, omits `memory`,
+`dailyLogs`, and `wiki`: those sections enable workspace-kit's llm-wiki
+validators, not the runtime's memory workflow. Its memory files remain ordinary
+authored content, committed under the workspace's privacy policy. Runtime
+feature settings remain the runtime owner's responsibility.
 
 ### LLM wiki
 
@@ -276,23 +264,6 @@ that cutover is done; set it true once the pin and lockfile match.
 }
 ```
 
-A repository using the coding-agent Hindsight integration instead declares:
-
-```jsonc
-{
-  "memory": {
-    "strategy": "hindsight",
-    "integration": "coding-agent",
-    "namespace": "fixture-owner/fixture-workspace",
-  },
-}
-```
-
-Do not combine the Hindsight strategy with `dailyLogs` or `wiki`: these
-sections enable workspace-kit's llm-wiki validators, not OpenClaw's native
-memory workflow. OpenClaw memory files and other source documents remain
-ordinary authored content and may be committed without those sections.
-
 - Strict JSON, no comments in the real file; every section optional.
 - Unknown keys at every supported nesting level are ignored at runtime
   (additive schema evolution across staggered kit versions) and reported with
@@ -387,10 +358,8 @@ repository-history security scans remain independently operated surfaces.
 - `runtime`: personal + HEARTBEAT.md and IDENTITY.md placeholders for
   always-on runtime identities.
 
-Personal and runtime profiles default to `llm-wiki`. Pass `--memory
-hindsight`, `--integration coding-agent|openclaw`, and `--namespace
-owner/repository` together to scaffold Hindsight instructions without raw-log
-or wiki artifacts. The `work` profile still defaults to no memory strategy.
+Personal and runtime profiles default to `llm-wiki`. The `work` profile
+declares no memory strategy.
 
 A fresh scaffold is verify-green immediately. The ownership contract stays
 unconfigured until an origin remote and a peer actually exist.

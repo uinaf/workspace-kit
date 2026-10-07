@@ -21,13 +21,7 @@ export type RegistryConfig = {
   project?: ProjectRegistryConfig;
 };
 export type DailyLogsConfig = { root: string; contexts: string };
-export type MemoryConfig =
-  | { strategy: "llm-wiki" }
-  | {
-      strategy: "hindsight";
-      integration: "coding-agent" | "openclaw";
-      namespace: string;
-    };
+export type MemoryConfig = { strategy: "llm-wiki" };
 export type WikiConfig = {
   root: string;
   requiredFields: string[];
@@ -144,7 +138,7 @@ const CONFIG_SHAPE: ConfigShape = {
       catalog: { field: true, modes: true },
     },
   },
-  memory: { strategy: true, integration: true, namespace: true },
+  memory: { strategy: true },
   dailyLogs: { root: true, contexts: true },
   wiki: {
     root: true,
@@ -347,24 +341,8 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
   if ("memory" in value) {
     if (!isRecord(value.memory)) fail("memory must be an object");
     const strategy = text(value.memory.strategy, "memory.strategy");
-    if (strategy === "llm-wiki") {
-      if ("integration" in value.memory || "namespace" in value.memory) {
-        fail("memory.integration and memory.namespace are only valid for hindsight");
-      }
-      out.memory = { strategy };
-    } else if (strategy === "hindsight") {
-      const integration = text(value.memory.integration, "memory.integration");
-      if (integration !== "coding-agent" && integration !== "openclaw") {
-        fail("memory.integration must be coding-agent or openclaw");
-      }
-      const namespace = text(value.memory.namespace, "memory.namespace");
-      if (!isGitRepositoryPath(namespace)) {
-        fail("memory.namespace must be a Git repository path (owner/repository)");
-      }
-      out.memory = { strategy, integration, namespace };
-    } else {
-      fail("memory.strategy must be llm-wiki or hindsight");
-    }
+    if (strategy !== "llm-wiki") fail("memory.strategy must be llm-wiki");
+    out.memory = { strategy };
   }
 
   if ("dailyLogs" in value) {
@@ -469,9 +447,6 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
 
   if (out.memory?.strategy === "llm-wiki" && (!out.dailyLogs || !out.wiki)) {
     fail("memory strategy llm-wiki requires dailyLogs and wiki sections");
-  }
-  if (out.memory?.strategy === "hindsight" && (out.dailyLogs || out.wiki)) {
-    fail("memory strategy hindsight cannot be combined with dailyLogs or wiki sections");
   }
 
   return out;
