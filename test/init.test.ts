@@ -11,7 +11,6 @@ import {
   mkdtempSync,
   readFileSync,
   readlinkSync,
-  rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -165,70 +164,7 @@ test("init explains malformed existing package metadata", () => {
   assert.throws(() => initWorkspace(dir, "work"), /package.json is not usable by init/);
 });
 
-test("init scaffolds a Hindsight workspace without llm-wiki artifacts", () => {
-  const dir = scratchDirectory("init-hindsight-");
-  initWorkspace(dir, "personal", {
-    strategy: "hindsight",
-    integration: "coding-agent",
-    namespace: "fixture-owner/fixture-workspace",
-  });
-
-  const config = JSON.parse(readFileSync(join(dir, "workspace.json"), "utf8")) as Record<
-    string,
-    unknown
-  >;
-  assert.deepEqual(config.memory, {
-    strategy: "hindsight",
-    integration: "coding-agent",
-    namespace: "fixture-owner/fixture-workspace",
-  });
-  assert.equal(config.dailyLogs, undefined);
-  assert.equal(config.wiki, undefined);
-  assert.equal(existsSync(join(dir, "memory", "wiki")), false);
-  assert.match(readFileSync(join(dir, "AGENTS.md"), "utf8"), /Search Hindsight knowledge pages/);
-
-  execSync("git init -q", { cwd: dir });
-  const verify = spawnSync(process.execPath, [cli, "verify"], {
-    cwd: dir,
-    encoding: "utf8",
-  });
-  assert.equal(verify.status, 0, verify.stderr);
-});
-
-test("OpenClaw Hindsight scaffolding preserves native file memory", () => {
-  for (const integration of ["openclaw", "coding-agent"] as const) {
-    const dir = scratchDirectory("init-native-memory-");
-    initWorkspace(dir, "runtime", {
-      strategy: "hindsight",
-      integration,
-      namespace: "fixture-owner/fixture-workspace",
-    });
-    const instructions = readFileSync(join(dir, "AGENTS.md"), "utf8");
-    if (integration === "openclaw") {
-      assert.match(instructions, /Hindsight complements OpenClaw's native file memory/);
-      assert.match(instructions, /daily logs in `memory\/YYYY-MM-DD.md`/);
-      assert.match(instructions, /curating `MEMORY.md`/);
-      assert.match(instructions, /Commit authored memory files/);
-      assert.match(instructions, /never ignore all of `memory\/`/);
-    } else {
-      assert.doesNotMatch(instructions, /OpenClaw|MEMORY\.md|Commit authored memory/);
-    }
-  }
-});
-
 test("init validates explicit memory selections before writing", () => {
-  const invalidNamespace = scratchDirectory("init-memory-namespace-");
-  assert.throws(
-    () =>
-      initWorkspace(invalidNamespace, "personal", {
-        strategy: "hindsight",
-        integration: "coding-agent",
-        namespace: "invalid",
-      }),
-    /namespace must be a Git repository path/,
-  );
-  assert.equal(existsSync(join(invalidNamespace, "AGENTS.md")), false);
-
   const workWiki = scratchDirectory("init-work-wiki-");
   assert.throws(
     () => initWorkspace(workWiki, "work", { strategy: "llm-wiki" }),
@@ -239,33 +175,6 @@ test("init validates explicit memory selections before writing", () => {
 
 function scratchDirectory(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix));
-}
-
-for (const profile of ["personal", "runtime"] as const) {
-  test(`reinitializing ${profile} preserves existing Hindsight and rejects migration options`, () => {
-    const dir = scratchDirectory("reinit-memory-");
-    const memory = {
-      strategy: "hindsight",
-      integration: "coding-agent",
-      namespace: "fixture-owner/workspace",
-    } as const;
-    initWorkspace(dir, profile, memory);
-    const before = readFileSync(join(dir, "workspace.json"), "utf8");
-    assert.equal(initWorkspace(dir, profile).created.length, 0);
-    assert.equal(initWorkspace(dir, profile, memory).created.length, 0);
-    assert.equal(existsSync(join(dir, "memory/wiki")), false);
-    rmSync(join(dir, "README.md"));
-    for (const requested of [
-      { strategy: "llm-wiki" } as const,
-      { ...memory, namespace: "fixture-owner/other" },
-      { ...memory, integration: "openclaw" } as const,
-    ]) {
-      assert.throws(() => initWorkspace(dir, profile, requested), /conflicts with workspace.json/);
-      assert.equal(existsSync(join(dir, "README.md")), false);
-      assert.equal(existsSync(join(dir, "memory/wiki")), false);
-      assert.equal(readFileSync(join(dir, "workspace.json"), "utf8"), before);
-    }
-  });
 }
 
 test("init preserves legacy or disabled memory and refuses malformed existing configuration", () => {
@@ -280,15 +189,6 @@ test("init preserves legacy or disabled memory and refuses malformed existing co
   assert.deepEqual(saved.dailyLogs, { root: "memory", contexts: "memory/contexts" });
   assert.deepEqual(saved.wiki, { root: "memory/wiki" });
   assert.equal(initWorkspace(legacy, "personal", { strategy: "llm-wiki" }).created.length, 0);
-  assert.throws(
-    () =>
-      initWorkspace(legacy, "personal", {
-        strategy: "hindsight",
-        integration: "coding-agent",
-        namespace: "fixture-owner/workspace",
-      }),
-    /conflicts with workspace.json/,
-  );
 
   const disabled = scratchDirectory("init-disabled-memory-");
   writeFileSync(join(disabled, "workspace.json"), "{}");

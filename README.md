@@ -29,15 +29,6 @@ pnpm install
 pnpm verify
 ```
 
-To scaffold repository-scoped Hindsight instructions without the llm-wiki
-layout:
-
-```bash
-pnpm dlx @uinaf/workspace-kit@latest init --profile personal \
-  --memory hindsight --integration coding-agent \
-  --namespace fixture-owner/fixture-workspace
-```
-
 For a repository that already has `package.json`, follow
 [Adopting an existing workspace](docs/convention.md#adopting-an-existing-workspace)
 so its existing scripts and dependencies remain explicit. `init` validates a
@@ -68,9 +59,8 @@ pnpm exec workspace-kit skills sync               # materialize workspace skills
   eligibility.
 - Absent config sections disable their checks, unknown files are always
   tolerated, and all validation runs offline with zero runtime dependencies.
-- `memory` declares either the repository-maintained `llm-wiki` lifecycle or a
-  repository-scoped Hindsight integration. Workspace-kit validates the
-  contract but never installs or contacts Hindsight.
+- `memory` opts into the repository-maintained `llm-wiki` lifecycle; omit it
+  when the runtime owns its memory files.
 - `workspace-kit --help` lists all commands.
 
 - `registry validate` is an explicit project-registry gate: it validates the

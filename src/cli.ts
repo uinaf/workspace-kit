@@ -66,8 +66,7 @@ commands:
   skills check | sync      verify or install configured workspace-local skills
   config validate          validate ${CONFIG_FILE} itself
   init [--profile personal|runtime|work] [--dir <path>]
-       [--memory llm-wiki|hindsight] [--integration coding-agent|openclaw]
-       [--namespace owner/repository]  scaffold a workspace
+       [--memory llm-wiki]  scaffold a workspace
   --version                print the kit version
 `;
 
@@ -402,9 +401,7 @@ function main(): void {
   if (command === "init") {
     let profile = "personal";
     let dir = ".";
-    let memoryStrategy: "llm-wiki" | "hindsight" | undefined;
-    let memoryIntegration: "coding-agent" | "openclaw" | undefined;
-    let memoryNamespace: string | undefined;
+    let memory: import("./config.ts").MemoryConfig | undefined;
     for (let i = 0; i < rest.length; i += 1) {
       if (rest[i] === "--profile" && rest[i + 1]) {
         profile = rest[i + 1]!;
@@ -413,37 +410,14 @@ function main(): void {
         dir = rest[i + 1]!;
         i += 1;
       } else if (rest[i] === "--memory" && rest[i + 1]) {
-        const candidate = rest[i + 1]!;
-        if (candidate !== "llm-wiki" && candidate !== "hindsight") usageExit();
-        memoryStrategy = candidate;
-        i += 1;
-      } else if (rest[i] === "--integration" && rest[i + 1]) {
-        const candidate = rest[i + 1]!;
-        if (candidate !== "coding-agent" && candidate !== "openclaw") usageExit();
-        memoryIntegration = candidate;
-        i += 1;
-      } else if (rest[i] === "--namespace" && rest[i + 1]) {
-        memoryNamespace = rest[i + 1]!;
+        if (rest[i + 1] !== "llm-wiki") usageExit();
+        memory = { strategy: "llm-wiki" };
         i += 1;
       } else {
         usageExit();
       }
     }
     if (!["personal", "runtime", "work"].includes(profile)) usageExit();
-    let memory: import("./config.ts").MemoryConfig | undefined;
-    if (memoryStrategy === "llm-wiki") {
-      if (memoryIntegration || memoryNamespace) usageExit();
-      memory = { strategy: "llm-wiki" };
-    } else if (memoryStrategy === "hindsight") {
-      if (!memoryIntegration || !memoryNamespace) usageExit();
-      memory = {
-        strategy: "hindsight",
-        integration: memoryIntegration,
-        namespace: memoryNamespace,
-      };
-    } else if (memoryIntegration || memoryNamespace) {
-      usageExit();
-    }
     let result;
     try {
       result = initWorkspace(dir, profile as "personal" | "runtime" | "work", memory);

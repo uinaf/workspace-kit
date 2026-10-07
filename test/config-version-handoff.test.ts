@@ -68,7 +68,7 @@ test("config enables the conventional workspace skill manifest", () => {
   assert.throws(() => parseWorkspaceConfig({ skills: true }), /skills must be an object/);
 });
 
-test("config models llm-wiki and repository-scoped hindsight memory", () => {
+test("config models llm-wiki memory and rejects other strategies", () => {
   const llmWiki = parseWorkspaceConfig({
     memory: { strategy: "llm-wiki" },
     dailyLogs: { root: "memory", contexts: "memory/contexts" },
@@ -76,56 +76,13 @@ test("config models llm-wiki and repository-scoped hindsight memory", () => {
   });
   assert.deepEqual(llmWiki.memory, { strategy: "llm-wiki" });
 
-  const codingAgent = parseWorkspaceConfig({
-    memory: {
-      strategy: "hindsight",
-      integration: "coding-agent",
-      namespace: "fixture-owner/fixture-workspace",
-    },
-  });
-  assert.deepEqual(codingAgent.memory, {
-    strategy: "hindsight",
-    integration: "coding-agent",
-    namespace: "fixture-owner/fixture-workspace",
-  });
-
   assert.throws(
     () => parseWorkspaceConfig({ memory: { strategy: "llm-wiki" } }),
     /requires dailyLogs and wiki/,
   );
   assert.throws(
-    () =>
-      parseWorkspaceConfig({
-        memory: {
-          strategy: "hindsight",
-          integration: "openclaw",
-          namespace: "fixture-owner/fixture-workspace",
-        },
-        wiki: { root: "memory/wiki" },
-      }),
-    /cannot be combined with dailyLogs or wiki/,
-  );
-  assert.throws(
-    () =>
-      parseWorkspaceConfig({
-        memory: {
-          strategy: "hindsight",
-          integration: "unknown",
-          namespace: "fixture-owner/fixture-workspace",
-        },
-      }),
-    /integration must be coding-agent or openclaw/,
-  );
-  assert.throws(
-    () =>
-      parseWorkspaceConfig({
-        memory: {
-          strategy: "hindsight",
-          integration: "coding-agent",
-          namespace: "not-a-repository",
-        },
-      }),
-    /namespace must be a Git repository path/,
+    () => parseWorkspaceConfig({ memory: { strategy: "external" } }),
+    /memory.strategy must be llm-wiki/,
   );
 });
 
@@ -413,19 +370,5 @@ test("source version requires full tag history and prefers a newer stamped packa
     rmSync(packageOnly, { recursive: true, force: true });
     rmSync(checkout, { recursive: true, force: true });
     rmSync(cloneParent, { recursive: true, force: true });
-  }
-});
-
-test("forbidden paths remain consumer policy regardless of memory integration", () => {
-  const forbidden = ["memory", "memory/dreaming", "DREAMS.md", ".openclaw-repair"];
-  assert.deepEqual(parseWorkspaceConfig({ forbidden }).forbidden, forbidden);
-  for (const integration of ["coding-agent", "openclaw"]) {
-    assert.deepEqual(
-      parseWorkspaceConfig({
-        forbidden,
-        memory: { strategy: "hindsight", integration, namespace: "fixture-owner/workspace" },
-      }).forbidden,
-      forbidden,
-    );
   }
 });

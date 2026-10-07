@@ -15,32 +15,7 @@ import {
 export type Profile = "personal" | "runtime" | "work";
 export type InitResult = { created: string[]; skipped: string[] };
 
-function memoryInstructions(memory: MemoryConfig | undefined): string {
-  if (memory?.strategy === "hindsight") {
-    const retrieval =
-      memory.integration === "coding-agent"
-        ? "Search Hindsight knowledge pages before re-deriving repository history. Use deeper reflection only when those pages are insufficient."
-        : "Use the OpenClaw Hindsight plugin's bank for the active session context. Do not select another repository or channel bank.";
-    const retention =
-      memory.integration === "openclaw"
-        ? "Hindsight complements OpenClaw's native file memory. Continue writing daily logs in `memory/YYYY-MM-DD.md`, curating `MEMORY.md`, and following OpenClaw's normal memory workflow and session privacy boundaries. Commit authored memory files under the workspace's privacy policy; ignore only specific generated runtime artifacts, never ignore all of `memory/`. Hindsight recall and retention do not replace these files or their curation."
-        : "Hindsight owns retained experience and recall.";
-    return `## Memory
-
-This repository uses the \`${memory.integration}\` Hindsight integration under
-the \`${memory.namespace}\` namespace. ${retrieval}
-Keep current policy and operational contracts in repository documentation.
-${retention}
-`;
-  }
-  return `## Memory
-
-TODO: define how daily evidence is promoted into the repository-maintained wiki.
-`;
-}
-
-function agentsSkeleton(memory: MemoryConfig | undefined): string {
-  return `# AGENTS.md
+const AGENTS_SKELETON = `# AGENTS.md
 
 <!-- Owner-authored: workspace-kit scaffolds structure only and never edits
      this file again. Replace every TODO with your own operating rules. -->
@@ -53,7 +28,9 @@ TODO: what this workspace is, who owns it, and what belongs here.
 
 TODO: what an agent should read first, and when.
 
-${memoryInstructions(memory)}
+## Memory
+
+TODO: define how daily evidence is promoted into the repository-maintained wiki.
 
 ## Working Agreement
 
@@ -72,7 +49,6 @@ Run \`pnpm verify\` before committing.
 
 TODO: what is private, what may leave this workspace, and how.
 `;
-}
 
 function packageDefinition(profile: Profile) {
   const scripts: Record<string, string> = {
@@ -166,10 +142,6 @@ export function initWorkspace(
   if (profile === "work" && requestedMemory?.strategy === "llm-wiki") {
     throw new Error("init --profile work does not scaffold the llm-wiki memory layout");
   }
-  const validatedRequestedMemory =
-    requestedMemory?.strategy === "hindsight"
-      ? parseWorkspaceConfig({ memory: requestedMemory }).memory
-      : requestedMemory;
   const root = realpathSync(dir);
   assertCompatiblePackage(root, profile);
   const existingConfig = workspaceLstat(root, "workspace.json")
@@ -182,8 +154,8 @@ export function initWorkspace(
       : undefined);
   if (
     existingConfig &&
-    validatedRequestedMemory &&
-    JSON.stringify(validatedRequestedMemory) !== JSON.stringify(existingMemory)
+    requestedMemory &&
+    JSON.stringify(requestedMemory) !== JSON.stringify(existingMemory)
   ) {
     throw new Error(
       "requested memory configuration conflicts with workspace.json; update the existing workspace explicitly",
@@ -191,7 +163,7 @@ export function initWorkspace(
   }
   const memory = existingConfig
     ? existingMemory
-    : (validatedRequestedMemory ??
+    : (requestedMemory ??
       (profile === "personal" || profile === "runtime"
         ? ({ strategy: "llm-wiki" } as const)
         : undefined));
@@ -227,7 +199,7 @@ export function initWorkspace(
     created.push(rel);
   };
 
-  put("AGENTS.md", agentsSkeleton(memory));
+  put("AGENTS.md", AGENTS_SKELETON);
   link("CLAUDE.md", "AGENTS.md");
   put("package.json", packageSkeleton(profile));
   put("docs/README.md", "# Docs\n\nTODO: index the documents that live under docs/.\n");
