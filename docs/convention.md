@@ -84,9 +84,11 @@ feature settings remain the runtime owner's responsibility.
   `log.md` entry dates to never decrease (append-only proxy);
   `wiki.requiredFields` lets a workspace extend the frontmatter atom (e.g.
   add `created`); top-level `limits` enforces the convention's soft size
-  limits as warnings that never fail a run; the audit flags, the human
-  decides. Contradiction and duplicate detection remain agentic maintenance
-  work by design: a deterministic linter cannot judge semantics.
+  limits as warnings that never fail a run. File inspection and read failures
+  produce warnings while other matching files are still checked; the audit
+  flags, the human decides. Contradiction and duplicate detection remain
+  agentic maintenance work by design: a deterministic linter cannot judge
+  semantics.
 
 ## 3. Skills (optional)
 

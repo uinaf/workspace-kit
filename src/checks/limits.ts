@@ -41,12 +41,17 @@ export function limitWarnings(rules: LimitRule[]): string[] {
     const regex = globToRegExp(rule.pattern);
     for (const file of tracked) {
       if (!regex.test(file)) continue;
-      const stat = workspaceLstat(".", file, "tracked file");
-      if (stat?.isSymbolicLink()) continue;
-      const content = readWorkspaceText(".", file, "tracked file");
-      const lines = content.split("\n").length - (content.endsWith("\n") ? 1 : 0);
-      if (lines > rule.maxLines) {
-        warnings.push(`warning: ${file}: ${lines} lines exceeds soft limit ${rule.maxLines}`);
+      try {
+        const stat = workspaceLstat(".", file, "tracked file");
+        if (stat?.isSymbolicLink()) continue;
+        const content = readWorkspaceText(".", file, "tracked file");
+        const lines = content.split("\n").length - (content.endsWith("\n") ? 1 : 0);
+        if (lines > rule.maxLines) {
+          warnings.push(`warning: ${file}: ${lines} lines exceeds soft limit ${rule.maxLines}`);
+        }
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        warnings.push(`warning: could not check soft limit for ${file} (${detail})`);
       }
     }
   }
