@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 import { execSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -137,3 +137,46 @@ test("doctor counts limit warnings without failing, and limits command works", (
   assert.equal(limits.status, 0);
   assert.match(limits.stderr, /exceeds soft limit 1/);
 });
+
+for (const shape of ["missing", "directory", "symlink-parent"] as const) {
+  test(`soft limits keep unreadable tracked files nonfatal (${shape})`, () => {
+    const dir = mkdtempSync(join(tmpdir(), "soft-limits-"));
+    execSync("git init -q", { cwd: dir });
+    writeFileSync(
+      join(dir, "workspace.json"),
+      JSON.stringify({ limits: [{ pattern: "notes/*.md", maxLines: 1 }] }),
+    );
+    mkdirSync(join(dir, "notes"));
+    writeFileSync(join(dir, "notes", "a.md"), "short\n");
+    writeFileSync(join(dir, "notes", "z.md"), "one\ntwo\n");
+    execSync("git add -A", { cwd: dir });
+    rmSync(join(dir, "notes", "a.md"));
+    if (shape === "directory") mkdirSync(join(dir, "notes", "a.md"));
+    if (shape === "symlink-parent") {
+      rmSync(join(dir, "notes"), { recursive: true });
+      const outside = mkdtempSync(join(tmpdir(), "soft-limits-outside-"));
+      writeFileSync(join(outside, "a.md"), "outside\n".repeat(10));
+      symlinkSync(outside, join(dir, "notes"));
+    }
+
+    const limits = spawnSync(process.execPath, [cli, "limits"], { cwd: dir, encoding: "utf8" });
+    assert.equal(limits.status, 0, limits.stderr);
+    assert.match(limits.stderr, /warning: could not check soft limit for notes\/a\.md/);
+    if (shape === "symlink-parent") {
+      assert.match(limits.stderr, /symbolic-link parent is not allowed/);
+      assert.doesNotMatch(limits.stderr, /10 lines exceeds/);
+    } else {
+      assert.match(limits.stderr, /notes\/z\.md: 2 lines exceeds soft limit 1/);
+    }
+    for (const command of ["doctor", "verify"]) {
+      const result = spawnSync(process.execPath, [cli, command, "--json"], {
+        cwd: dir,
+        encoding: "utf8",
+      });
+      assert.equal(result.status, 0, result.stderr);
+      const payload = JSON.parse(result.stdout);
+      assert.equal(payload.status, "pass");
+      assert.equal(payload.warnings, 2);
+    }
+  });
+}
