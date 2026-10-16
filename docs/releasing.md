@@ -44,7 +44,7 @@ short-lived App installation token minted in the `release` Environment.
 - Look up the released version with `npm view @uinaf/workspace-kit version` or
   the latest tag when in doubt.
 
-## Configuration record (already done)
+## Configuration
 
 - Trusted publisher registered on npm for `@uinaf/workspace-kit`:
   repository `uinaf/workspace-kit`, workflow `release.yml`, environment
