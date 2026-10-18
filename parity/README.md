@@ -5,9 +5,9 @@ The TypeScript checks in `src/` must reproduce these goldens byte-for-byte.
 ## Layout
 
 - `legacy/`: frozen validator scripts (bun) from the private workspaces that
-  originated the convention, at extraction time. Do not edit; the
+  originated the convention, at extraction time. They stay frozen; the
   [fixes](#known-legacy-behaviors-that-are-fixes-in-src-not-parity-targets)
-  land in `src/`, never here.
+  land in `src/`.
 - `fixtures/green-personal/`: one synthetic workspace exercising every green
   code path. Error scenarios are defined as mutations inside `capture.ts`,
   not as separate trees.

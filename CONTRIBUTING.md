@@ -26,9 +26,9 @@ gate. The gate asserts the exact release tarball contents, installs that
 version-stamped tarball offline without suppressing lifecycle behavior, and
 exercises the installed CLI.
 
-Checks are parity-locked to golden outputs; read the
-[parity oracle](parity/README.md) before touching any check's behavior, and
-never edit a golden by hand.
+Checks are parity-locked to golden outputs. Read the
+[parity oracle](parity/README.md) before touching any check's behavior;
+goldens change only by regeneration.
 
 ## Pull requests
 
