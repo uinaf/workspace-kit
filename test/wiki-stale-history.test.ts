@@ -1,18 +1,11 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  symlinkSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readFileSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { test } from "vite-plus/test";
 import { wikiStaleReport } from "../src/checks/wikiStale.ts";
+import { tempDir } from "./temp-dir.ts";
 
 function inDir<T>(dir: string, fn: () => T): T {
   const previous = process.cwd();
@@ -62,7 +55,7 @@ function merge(dir: string, branch: string, date: string): void {
 }
 
 test("wiki stale detects a source committed later on the page's updated date", () => {
-  const dir = mkdtempSync(join(tmpdir(), "wiki-stale-history-"));
+  const dir = tempDir("wiki-stale-history-");
   mkdirSync(join(dir, "docs"), { recursive: true });
   mkdirSync(join(dir, "memory", "wiki"), { recursive: true });
   writeFileSync(join(dir, "docs", "source.md"), "# Source\n\nInitial.\n");
@@ -125,7 +118,7 @@ test("wiki stale detects a source committed later on the page's updated date", (
 });
 
 test("wiki stale stops updated-only attestation churn but follows substantive nested changes", () => {
-  const dir = mkdtempSync(join(tmpdir(), "wiki-stale-chain-"));
+  const dir = tempDir("wiki-stale-chain-");
   const source = join(dir, "docs", "source.md");
   const middle = join(dir, "memory", "wiki", "middle.md");
   const top = join(dir, "memory", "wiki", "top.md");
@@ -175,7 +168,7 @@ test("wiki stale stops updated-only attestation churn but follows substantive ne
 });
 
 test("wiki stale covers every source state across a divergent merge", () => {
-  const dir = mkdtempSync(join(tmpdir(), "wiki-stale-merge-"));
+  const dir = tempDir("wiki-stale-merge-");
   const source = join(dir, "docs", "source.md");
   const page = join(dir, "memory", "wiki", "topic.md");
   mkdirSync(join(dir, "docs"), { recursive: true });
@@ -209,7 +202,7 @@ test("wiki stale covers every source state across a divergent merge", () => {
 });
 
 test("wiki stale ignores substantive edits discarded by a metadata-only merge", () => {
-  const dir = mkdtempSync(join(tmpdir(), "wiki-stale-discarded-merge-"));
+  const dir = tempDir("wiki-stale-discarded-merge-");
   const source = join(dir, "memory", "wiki", "source.md");
   mkdirSync(join(dir, "docs"), { recursive: true });
   mkdirSync(join(dir, "memory", "wiki"), { recursive: true });
@@ -263,7 +256,7 @@ test("wiki stale ignores substantive edits discarded by a metadata-only merge", 
 });
 
 test("wiki stale handles Unicode and quoted source paths literally", () => {
-  const dir = mkdtempSync(join(tmpdir(), "wiki-stale-unicode-"));
+  const dir = tempDir("wiki-stale-unicode-");
   const sourcePath = 'docs/café "notes".md';
   mkdirSync(join(dir, "docs"), { recursive: true });
   mkdirSync(join(dir, "memory", "wiki"), { recursive: true });
@@ -282,7 +275,7 @@ test("wiki stale handles Unicode and quoted source paths literally", () => {
 });
 
 test("wiki stale detects untracked and staged-new source files", () => {
-  const dir = mkdtempSync(join(tmpdir(), "wiki-stale-new-source-"));
+  const dir = tempDir("wiki-stale-new-source-");
   const source = join(dir, "docs", "new.md");
   mkdirSync(join(dir, "docs"), { recursive: true });
   mkdirSync(join(dir, "memory", "wiki"), { recursive: true });
@@ -303,7 +296,7 @@ test("wiki stale detects untracked and staged-new source files", () => {
 });
 
 test("wiki stale reports a deleted tracked source instead of failing", () => {
-  const dir = mkdtempSync(join(tmpdir(), "wiki-stale-deleted-source-"));
+  const dir = tempDir("wiki-stale-deleted-source-");
   mkdirSync(join(dir, "docs"), { recursive: true });
   mkdirSync(join(dir, "memory", "wiki"), { recursive: true });
   writeFileSync(join(dir, "docs", "source.md"), "# Source\n");
@@ -322,7 +315,7 @@ test("wiki stale reports a deleted tracked source instead of failing", () => {
 });
 
 test("wiki stale dates a committed wiki-source deletion at the deletion commit", () => {
-  const dir = mkdtempSync(join(tmpdir(), "wiki-stale-committed-deletion-"));
+  const dir = tempDir("wiki-stale-committed-deletion-");
   mkdirSync(join(dir, "memory", "wiki"), { recursive: true });
   writeFileSync(
     join(dir, "memory", "wiki", "source.md"),
@@ -344,7 +337,7 @@ test("wiki stale dates a committed wiki-source deletion at the deletion commit",
 });
 
 test("wiki stale keeps the latest commit date with mixed uncommitted sources", () => {
-  const dir = mkdtempSync(join(tmpdir(), "wiki-stale-mixed-sources-"));
+  const dir = tempDir("wiki-stale-mixed-sources-");
   mkdirSync(join(dir, "docs"), { recursive: true });
   mkdirSync(join(dir, "memory", "wiki"), { recursive: true });
   writeFileSync(join(dir, "docs", "committed.md"), "# Committed\n\nInitial.\n");
@@ -365,7 +358,7 @@ test("wiki stale keeps the latest commit date with mixed uncommitted sources", (
 });
 
 test("wiki stale compares clean CRLF worktrees by semantic content", () => {
-  const dir = mkdtempSync(join(tmpdir(), "wiki-stale-crlf-"));
+  const dir = tempDir("wiki-stale-crlf-");
   const leaf = join(dir, "docs", "leaf.md");
   const nested = join(dir, "memory", "wiki", "nested.md");
   const page = join(dir, "memory", "wiki", "topic.md");
@@ -402,9 +395,9 @@ test("wiki stale compares clean CRLF worktrees by semantic content", () => {
 });
 
 test("wiki stale rejects a source replaced by a link or non-regular file", () => {
-  const dir = mkdtempSync(join(tmpdir(), "wiki-stale-source-link-"));
+  const dir = tempDir("wiki-stale-source-link-");
   const source = join(dir, "docs", "source.md");
-  const outside = join(mkdtempSync(join(tmpdir(), "wiki-stale-outside-")), "outside.md");
+  const outside = join(tempDir("wiki-stale-outside-"), "outside.md");
   mkdirSync(join(dir, "docs"), { recursive: true });
   mkdirSync(join(dir, "memory", "wiki"), { recursive: true });
   writeFileSync(source, "# Source\n");
@@ -430,7 +423,7 @@ test("wiki stale rejects a source replaced by a link or non-regular file", () =>
 });
 
 test("wiki stale rejects source paths outside the workspace", () => {
-  const dir = mkdtempSync(join(tmpdir(), "wiki-stale-path-"));
+  const dir = tempDir("wiki-stale-path-");
   mkdirSync(join(dir, "memory", "wiki"), { recursive: true });
   writeFileSync(
     join(dir, "memory", "wiki", "topic.md"),
@@ -444,7 +437,7 @@ test("wiki stale rejects source paths outside the workspace", () => {
 });
 
 test("wiki stale refuses a misleading clean report in a shallow repository", () => {
-  const origin = mkdtempSync(join(tmpdir(), "wiki-stale-origin-"));
+  const origin = tempDir("wiki-stale-origin-");
   mkdirSync(join(origin, "memory", "wiki"), { recursive: true });
   writeFileSync(
     join(origin, "memory", "wiki", "index.md"),
@@ -453,7 +446,7 @@ test("wiki stale refuses a misleading clean report in a shallow repository", () 
   execFileSync("git", ["init", "-q", "-b", "main"], { cwd: origin });
   commitAll(origin, "baseline", "2026-07-21T08:00:00Z");
 
-  const clone = join(mkdtempSync(join(tmpdir(), "wiki-stale-clone-")), "workspace");
+  const clone = join(tempDir("wiki-stale-clone-"), "workspace");
   execFileSync("git", ["clone", "-q", "--depth", "1", pathToFileURL(origin).href, clone]);
   const result = inDir(clone, () => strictReport("memory/wiki"));
   assert.deepEqual(result.out, []);

@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { delimiter, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "vite-plus/test";
+import { tempDir } from "./temp-dir.ts";
 
 type ExecConfig = { verifyReleaseCmd: string; prepareCmd: string };
 
@@ -46,7 +46,7 @@ function commit(dir: string, files: Record<string, string>, message: string): st
 // fake-gh.ts. `release` follows semantic-release: verifyRelease, then prepare (npm writes the
 // version, then exec), then it tags HEAD and publishes the working tree.
 function fixture() {
-  const root = mkdtempSync(join(tmpdir(), "release-handoff-"));
+  const root = tempDir("release-handoff-");
   const remote = join(root, "remote.git");
   const dir = join(root, "checkout");
   const bin = join(root, "bin");

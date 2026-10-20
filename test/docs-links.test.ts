@@ -1,16 +1,16 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { test } from "vite-plus/test";
 import { docsLinkErrors } from "../src/checks/docsLinks.ts";
 import { parseWorkspaceConfig, type DocsLinksConfig } from "../src/config.ts";
+import { tempDir } from "./temp-dir.ts";
 
 const config: DocsLinksConfig = { enabled: true, exclude: [] };
 
 function repository(): string {
-  const dir = mkdtempSync(join(tmpdir(), "docs-links-"));
+  const dir = tempDir("docs-links-");
   execFileSync("git", ["init", "-q"], { cwd: dir });
   return dir;
 }

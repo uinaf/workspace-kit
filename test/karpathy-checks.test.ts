@@ -4,13 +4,13 @@
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 import { execSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { wikiLintErrors } from "../src/checks/wikiLint.ts";
 import { globToRegExp, limitWarnings } from "../src/checks/limits.ts";
 import { initWorkspace } from "../src/init.ts";
+import { tempDir } from "./temp-dir.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = join(root, "src", "cli.ts");
@@ -20,7 +20,7 @@ function page(title: string, extra = "", body = ""): string {
 }
 
 function makeWiki(): string {
-  const dir = mkdtempSync(join(tmpdir(), "kwiki-"));
+  const dir = tempDir("kwiki-");
   mkdirSync(join(dir, "wiki", "topics"), { recursive: true });
   writeFileSync(join(dir, "wiki", "index.md"), page("Index", "", "- [[alpha]]\n"));
   writeFileSync(
@@ -94,7 +94,7 @@ test("glob matcher handles segment wildcards and date shapes", () => {
 });
 
 test("limits: warnings for oversized tracked files, silence under the limit", () => {
-  const dir = mkdtempSync(join(tmpdir(), "limits-"));
+  const dir = tempDir("limits-");
   execSync("git init -q", { cwd: dir });
   writeFileSync(join(dir, "MEMORY.md"), `# M\n${"line\n".repeat(10)}`);
   mkdirSync(join(dir, "memory"), { recursive: true });
@@ -113,7 +113,7 @@ test("limits: warnings for oversized tracked files, silence under the limit", ()
 });
 
 test("doctor counts limit warnings without failing, and limits command works", () => {
-  const dir = mkdtempSync(join(tmpdir(), "softdoc-"));
+  const dir = tempDir("softdoc-");
   initWorkspace(dir, "work");
   const config = JSON.parse(readFileSync(join(dir, "workspace.json"), "utf8"));
   config.limits = [{ pattern: "docs/README.md", maxLines: 1 }];
@@ -140,7 +140,7 @@ test("doctor counts limit warnings without failing, and limits command works", (
 
 for (const shape of ["missing", "directory", "symlink-parent"] as const) {
   test(`soft limits keep unreadable tracked files nonfatal (${shape})`, () => {
-    const dir = mkdtempSync(join(tmpdir(), "soft-limits-"));
+    const dir = tempDir("soft-limits-");
     execSync("git init -q", { cwd: dir });
     writeFileSync(
       join(dir, "workspace.json"),
@@ -154,7 +154,7 @@ for (const shape of ["missing", "directory", "symlink-parent"] as const) {
     if (shape === "directory") mkdirSync(join(dir, "notes", "a.md"));
     if (shape === "symlink-parent") {
       rmSync(join(dir, "notes"), { recursive: true });
-      const outside = mkdtempSync(join(tmpdir(), "soft-limits-outside-"));
+      const outside = tempDir("soft-limits-outside-");
       writeFileSync(join(outside, "a.md"), "outside\n".repeat(10));
       symlinkSync(outside, join(dir, "notes"));
     }

@@ -15,6 +15,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "vite-plus/test";
 import { gitEnvironmentForRepository } from "../src/lib/gitProcess.ts";
+import { tempDir } from "./temp-dir.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = join(root, "src", "cli.ts");
@@ -85,7 +86,7 @@ function git(cwd: string, ...args: string[]): string {
 }
 
 test("hooks install configures a linked worktree and makes the hook executable", () => {
-  const temporaryRoot = mkdtempSync(join(tmpdir(), "workspace-hooks-"));
+  const temporaryRoot = tempDir("workspace-hooks-");
   const fixture = join(temporaryRoot, "workspace");
   const linked = join(temporaryRoot, "linked");
   mkdirSync(join(fixture, ".githooks"), { recursive: true });

@@ -1,19 +1,19 @@
 import assert from "node:assert/strict";
 import { execSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "vite-plus/test";
 import { CONSUMER_PACKAGE_MANAGER, packageManagerErrors } from "../src/checks/packageManager.ts";
 import { parseWorkspaceConfig } from "../src/config.ts";
 import { initWorkspace } from "../src/init.ts";
+import { tempDir } from "./temp-dir.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = join(root, "src", "cli.ts");
 
 function scratch(): string {
-  return mkdtempSync(join(tmpdir(), "package-manager-"));
+  return tempDir("package-manager-");
 }
 
 function inDir<T>(dir: string, fn: () => T): T {

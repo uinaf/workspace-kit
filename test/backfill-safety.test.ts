@@ -3,18 +3,17 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { test } from "vite-plus/test";
 import { wikiBackfill } from "../src/checks/wikiBackfill.ts";
+import { tempDir } from "./temp-dir.ts";
 
 function scratch(prefix = "backfill-safety-"): string {
-  const dir = mkdtempSync(join(tmpdir(), prefix));
+  const dir = tempDir(prefix);
   writeFileSync(join(dir, "AGENTS.md"), "# Agents\n");
   return dir;
 }
@@ -48,7 +47,7 @@ test("backfill canonicalizes wiki.root and excludes its generated pages", () => 
 
 test("backfill rejects a symlink in a source scan before writing", () => {
   const dir = scratch();
-  const outside = mkdtempSync(join(tmpdir(), "backfill-source-outside-"));
+  const outside = tempDir("backfill-source-outside-");
   writeFileSync(join(outside, "leak.md"), "# Outside\n");
   mkdirSync(join(dir, "docs"));
   symlinkSync(join(outside, "leak.md"), join(dir, "docs", "leak.md"));
@@ -62,7 +61,7 @@ test("backfill rejects a symlink in a source scan before writing", () => {
 
 test("backfill rejects a symlinked output root", () => {
   const dir = scratch();
-  const outside = mkdtempSync(join(tmpdir(), "backfill-output-outside-"));
+  const outside = tempDir("backfill-output-outside-");
   mkdirSync(join(dir, "memory"));
   symlinkSync(outside, join(dir, "memory", "wiki"), "dir");
 
@@ -91,7 +90,7 @@ test("backfill preflights purge candidates before any write", () => {
 
 test("backfill rejects an escaping configured root", () => {
   const dir = scratch();
-  const outside = mkdtempSync(join(tmpdir(), "backfill-escape-outside-"));
+  const outside = tempDir("backfill-escape-outside-");
 
   assert.throws(
     () => inDir(dir, () => wikiBackfill({ root: `../${basename(outside)}`, dryRun: false })),

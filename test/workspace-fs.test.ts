@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, symlinkSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "vite-plus/test";
 import { initWorkspace } from "../src/init.ts";
 import { normalizeLinkTarget, normalizeWorkspacePath } from "../src/lib/workspaceFs.ts";
+import { tempDir } from "./temp-dir.ts";
 
 test("workspace paths use portable repository-relative semantics", () => {
   assert.equal(normalizeWorkspacePath("./memory//wiki/"), "memory/wiki");
@@ -44,8 +44,8 @@ test("link targets may traverse only within the workspace", () => {
 });
 
 test("init refuses an escaping intermediate symlink", () => {
-  const workspace = mkdtempSync(join(tmpdir(), "init-contained-"));
-  const outside = mkdtempSync(join(tmpdir(), "init-outside-"));
+  const workspace = tempDir("init-contained-");
+  const outside = tempDir("init-outside-");
   symlinkSync(outside, join(workspace, "docs"));
 
   assert.throws(() => initWorkspace(workspace, "work"), /docs: symbolic-link parent/);

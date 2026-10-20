@@ -8,23 +8,22 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   readlinkSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { initWorkspace } from "../src/init.ts";
 import { kitVersion } from "../src/version.ts";
+import { tempDir } from "./temp-dir.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = join(root, "src", "cli.ts");
 
 for (const profile of ["personal", "runtime", "work"] as const) {
   test(`init --profile ${profile} scaffolds a verify-green workspace`, () => {
-    const dir = mkdtempSync(join(tmpdir(), `init-${profile}-`));
+    const dir = tempDir(`init-${profile}-`);
     const result = initWorkspace(dir, profile);
     assert.ok(result.created.includes("AGENTS.md"));
     assert.ok(lstatSync(join(dir, "CLAUDE.md")).isSymbolicLink());
@@ -101,7 +100,7 @@ for (const profile of ["personal", "runtime", "work"] as const) {
   });
 
   test(`init --profile ${profile} never overwrites existing files`, () => {
-    const dir = mkdtempSync(join(tmpdir(), `reinit-${profile}-`));
+    const dir = tempDir(`reinit-${profile}-`);
     initWorkspace(dir, profile);
     const before = readFileSync(join(dir, "AGENTS.md"), "utf8");
     const second = initWorkspace(dir, profile);
@@ -174,7 +173,7 @@ test("init validates explicit memory selections before writing", () => {
 });
 
 function scratchDirectory(prefix: string): string {
-  return mkdtempSync(join(tmpdir(), prefix));
+  return tempDir(prefix);
 }
 
 test("init preserves legacy or disabled memory and refuses malformed existing configuration", () => {
