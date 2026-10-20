@@ -2,8 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 import { execSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { clean, parseFrontmatter } from "../src/lib/frontmatter.ts";
 import {
@@ -14,6 +13,7 @@ import {
 } from "../src/checks/contract.ts";
 import { wikiLintErrors } from "../src/checks/wikiLint.ts";
 import { wikiBackfill } from "../src/checks/wikiBackfill.ts";
+import { tempDir } from "./temp-dir.ts";
 
 const HANDOFF = {
   paths: ["AGENTS.md", "SOUL.md"],
@@ -31,7 +31,7 @@ function inDir<T>(dir: string, fn: () => T): T {
 }
 
 function scratch(prefix: string): string {
-  return mkdtempSync(join(tmpdir(), prefix));
+  return tempDir(prefix);
 }
 
 test("frontmatter parser preserves its legacy syntax", () => {

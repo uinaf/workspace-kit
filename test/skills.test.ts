@@ -2,14 +2,12 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
   mkdirSync,
-  mkdtempSync,
   lstatSync,
   readFileSync,
   readlinkSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "vite-plus/test";
@@ -20,13 +18,14 @@ import {
   workspaceSkillErrors,
   type SkillsRunner,
 } from "../src/skills.ts";
+import { tempDir } from "./temp-dir.ts";
 
 const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = join(repositoryRoot, "src", "cli.ts");
 const config: SkillsConfig = { manifest: "skills/skills.json" };
 
 function scratch(): string {
-  return mkdtempSync(join(tmpdir(), "workspace-skills-"));
+  return tempDir("workspace-skills-");
 }
 
 function writeSkill(

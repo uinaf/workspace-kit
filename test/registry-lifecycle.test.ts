@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
-import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, test } from "vite-plus/test";
 import type { ProjectEntry } from "../src/checks/registry.ts";
@@ -11,6 +10,7 @@ import {
   statusProjects,
   type RegistryLifecycleOptions,
 } from "../src/registryLifecycle.ts";
+import { tempDir } from "./temp-dir.ts";
 
 type Result = { status: number; stdout: string; stderr: string; errorCode?: string };
 
@@ -73,7 +73,7 @@ function harness(home: string, worktrees: Set<string>) {
 }
 
 test("registry clone skips existing worktrees and clones missing managed entries", () => {
-  const home = mkdtempSync(join(tmpdir(), "registry-lifecycle-home-"));
+  const home = tempDir("registry-lifecycle-home-");
   const existing = join(home, "projects", "fixture-owner", "existing");
   mkdirSync(existing, { recursive: true });
   const state = harness(home, new Set([existing]));
@@ -100,7 +100,7 @@ test("registry clone skips existing worktrees and clones missing managed entries
 });
 
 test("registry clone reports a missing GitHub CLI", () => {
-  const home = mkdtempSync(join(tmpdir(), "registry-lifecycle-home-"));
+  const home = tempDir("registry-lifecycle-home-");
   const state = harness(home, new Set());
   state.setMissingGh(true);
 
@@ -109,7 +109,7 @@ test("registry clone reports a missing GitHub CLI", () => {
 });
 
 test("registry status reports present and missing managed entries but hides missing routes", () => {
-  const home = mkdtempSync(join(tmpdir(), "registry-lifecycle-home-"));
+  const home = tempDir("registry-lifecycle-home-");
   const present = join(home, "projects", "fixture-owner", "present");
   mkdirSync(present, { recursive: true });
   const state = harness(home, new Set([present]));
@@ -127,7 +127,7 @@ test("registry status reports present and missing managed entries but hides miss
 });
 
 test("registry pull enforces configured branches and skips missing checkouts", () => {
-  const home = mkdtempSync(join(tmpdir(), "registry-lifecycle-home-"));
+  const home = tempDir("registry-lifecycle-home-");
   const present = join(home, "projects", "fixture-owner", "present");
   mkdirSync(present, { recursive: true });
   const state = harness(home, new Set([present]));
@@ -149,7 +149,7 @@ afterEach(() => {
 });
 
 function installFakeGit(pullScript: string) {
-  const bin = mkdtempSync(join(tmpdir(), "registry-lifecycle-bin-"));
+  const bin = tempDir("registry-lifecycle-bin-");
   const git = join(bin, "git");
   writeFileSync(
     git,
@@ -168,7 +168,7 @@ function installFakeGit(pullScript: string) {
 }
 
 function pullWithRealProcess() {
-  const home = mkdtempSync(join(tmpdir(), "registry-lifecycle-home-"));
+  const home = tempDir("registry-lifecycle-home-");
   const stdout: string[] = [];
   const stderr: string[] = [];
   const status = pullProjects([entry("present")], {
@@ -199,7 +199,7 @@ test("registry pull reports a git process killed by a signal", () => {
 });
 
 test("registry path resolves an exact label and optional mode", () => {
-  const home = mkdtempSync(join(tmpdir(), "registry-lifecycle-home-"));
+  const home = tempDir("registry-lifecycle-home-");
   const entries = [entry("agents")];
 
   assert.equal(

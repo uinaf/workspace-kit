@@ -5,7 +5,6 @@ import {
   existsSync,
   linkSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   readlinkSync,
   rmSync,
@@ -13,12 +12,12 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "vite-plus/test";
 import { initWorkspace } from "../src/init.ts";
 import { writeWorkspaceText } from "../src/lib/workspaceFs.ts";
+import { tempDir } from "./temp-dir.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = join(root, "src", "cli.ts");
@@ -28,13 +27,13 @@ function kit(cwd: string, ...args: string[]) {
 }
 
 function scaffold(profile: "personal" | "work" = "work"): string {
-  const dir = mkdtempSync(join(tmpdir(), "workspace-boundary-"));
+  const dir = tempDir("workspace-boundary-");
   initWorkspace(dir, profile);
   return dir;
 }
 
 test("links fix validates every rule before mutating", () => {
-  const parent = mkdtempSync(join(tmpdir(), "link-boundary-"));
+  const parent = tempDir("link-boundary-");
   const dir = join(parent, "workspace");
   mkdirSync(dir);
   initWorkspace(dir, "work");
@@ -71,7 +70,7 @@ test("links fix rejects portable case-folded path collisions before mutating", (
 
 test("links fix rejects targets reached through symlinked directories", () => {
   const dir = scaffold();
-  const outside = mkdtempSync(join(tmpdir(), "link-target-outside-"));
+  const outside = tempDir("link-target-outside-");
   writeFileSync(join(outside, "AGENTS.md"), "# Outside\n");
   symlinkSync(outside, join(dir, "external"));
   const config = JSON.parse(readFileSync(join(dir, "workspace.json"), "utf8"));
@@ -124,7 +123,7 @@ test("doctor treats a dangling required symlink as missing", () => {
 
 test("workspace writes replace hard links without mutating the outside inode", () => {
   const dir = scaffold();
-  const outside = mkdtempSync(join(tmpdir(), "hard-link-outside-"));
+  const outside = tempDir("hard-link-outside-");
   const outsideFile = join(outside, "shared.md");
   writeFileSync(outsideFile, "outside\n");
   linkSync(outsideFile, join(dir, "generated.md"));
@@ -161,7 +160,7 @@ test.skipIf(process.getuid?.() === 0)(
 
 test("doctor operational failures preserve the JSON contract", () => {
   const dir = scaffold("personal");
-  const outside = mkdtempSync(join(tmpdir(), "doctor-outside-"));
+  const outside = tempDir("doctor-outside-");
   symlinkSync(outside, join(dir, "memory", "contexts"));
 
   const result = kit(dir, "doctor", "--json");
@@ -184,7 +183,7 @@ test("doctor operational failures preserve the JSON contract", () => {
 
 test("configuration is never read through a workspace symlink", () => {
   const dir = scaffold();
-  const outside = mkdtempSync(join(tmpdir(), "config-outside-"));
+  const outside = tempDir("config-outside-");
   const planted = join(outside, "workspace.json");
   writeFileSync(planted, '{"required":["outside-only-marker"]}\n');
   rmSync(join(dir, "workspace.json"));
@@ -200,7 +199,7 @@ test("configuration is never read through a workspace symlink", () => {
 
 test("wiki scans reject symlinks instead of following them", () => {
   const dir = scaffold("personal");
-  const outside = mkdtempSync(join(tmpdir(), "wiki-outside-"));
+  const outside = tempDir("wiki-outside-");
   const secret = join(outside, "secret.md");
   writeFileSync(secret, "# outside-only-marker\n");
   symlinkSync(secret, join(dir, "memory", "wiki", "outside.md"));

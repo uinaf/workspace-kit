@@ -7,17 +7,16 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
-  mkdtempSync,
   openSync,
   readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { initWorkspace } from "../src/init.ts";
+import { tempDir } from "./temp-dir.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = join(root, "src", "cli.ts");
@@ -27,7 +26,7 @@ function kit(cwd: string, ...args: string[]) {
 }
 
 function kitCombined(cwd: string, ...args: string[]) {
-  const outputPath = join(mkdtempSync(join(tmpdir(), "cli-output-")), "combined.log");
+  const outputPath = join(tempDir("cli-output-"), "combined.log");
   const output = openSync(outputPath, "w");
   const result = spawnSync(process.execPath, [cli, ...args], {
     cwd,
@@ -38,7 +37,7 @@ function kitCombined(cwd: string, ...args: string[]) {
 }
 
 function scaffold(profile: "personal" | "work" = "personal"): string {
-  const dir = mkdtempSync(join(tmpdir(), `cli-${profile}-`));
+  const dir = tempDir(`cli-${profile}-`);
   initWorkspace(dir, profile);
   execSync("git init -q", { cwd: dir });
   return dir;
@@ -124,7 +123,7 @@ test("wiki stale fails clearly instead of reporting clean in a shallow clone", (
   config.wiki.revisionStaleness = true;
   writeFileSync(join(origin, "workspace.json"), JSON.stringify(config, null, 2));
   commitAll(origin);
-  const clone = join(mkdtempSync(join(tmpdir(), "cli-shallow-")), "workspace");
+  const clone = join(tempDir("cli-shallow-"), "workspace");
   execFileSync("git", ["clone", "-q", "--depth", "1", pathToFileURL(origin).href, clone]);
 
   const result = kit(clone, "wiki", "stale");
@@ -330,8 +329,8 @@ test("links check and fix, including refusal and subdirectory creation", () => {
 });
 
 test("init refuses to write through pre-existing dangling symlinks", () => {
-  const victim = mkdtempSync(join(tmpdir(), "victim-"));
-  const elsewhere = mkdtempSync(join(tmpdir(), "elsewhere-"));
+  const victim = tempDir("victim-");
+  const elsewhere = tempDir("elsewhere-");
   const plantedTarget = join(elsewhere, "planted.json");
   symlinkSync(plantedTarget, join(victim, "workspace.json"));
   assert.throws(
@@ -344,7 +343,7 @@ test("init refuses to write through pre-existing dangling symlinks", () => {
 });
 
 test("init points workspace owners to the packaged bootstrap convention", () => {
-  const parent = mkdtempSync(join(tmpdir(), "init-guide-"));
+  const parent = tempDir("init-guide-");
   const result = kit(parent, "init", "--profile", "runtime");
   assert.equal(result.status, 0, result.stderr);
   assert.match(
@@ -355,7 +354,7 @@ test("init points workspace owners to the packaged bootstrap convention", () => 
 });
 
 test("init --dir pointing at an existing file fails cleanly", () => {
-  const parent = mkdtempSync(join(tmpdir(), "notadir-"));
+  const parent = tempDir("notadir-");
   const file = join(parent, "occupied");
   writeFileSync(file, "x\n");
   const result = kit(parent, "init", "--dir", file);
