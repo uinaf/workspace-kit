@@ -1,38 +1,28 @@
 # The agent workspace convention
 
-An **agent workspace** is a git repository that gives coding/assistant
-agents a stable operating context. `workspace-kit` validates the structure and
-scaffolds an owner-editable skeleton; workspace owners supply operating content
-and policy. The convention has four layers, and a workspace declares which of
-them it uses in `workspace.json`; absent
-sections disable their checks, and unknown files are always tolerated
-(harnesses and runtimes add their own state; tooling must not fight them).
+An **agent workspace** is a git repository that gives coding agents a stable
+operating context. `workspace-kit` validates its structure and scaffolds an
+owner-editable skeleton; the owner supplies content and policy. A workspace
+declares the layers it uses in `workspace.json`. An absent section disables
+its checks, and unknown files are always tolerated.
 
 ## 1. Instructions
 
-One canonical `AGENTS.md` at the repo root. `CLAUDE.md` is a relative
-symlink to it so both Codex-style and Claude-style harnesses read the same
-file. Harness- or runtime-specific mechanics stay out of the canonical file.
-The structural check covers presence and link integrity; prose remains
-owner-reviewed.
+One canonical `AGENTS.md` at the repo root, with `CLAUDE.md` as a relative
+symlink to it. Harness- and runtime-specific mechanics stay out of it. The
+check covers presence and the link; the owner reviews the prose.
 
 ## 2. Memory (optional)
 
-A workspace may declare `"memory": { "strategy": "llm-wiki" }` in
-`workspace.json` to adopt the repository-maintained raw-log and compiled-wiki
-lifecycle described below. It requires both `dailyLogs` and `wiki`. Without
-`memory`, `dailyLogs` and `wiki` remain the legacy llm-wiki signal.
+`"memory": { "strategy": "llm-wiki" }` adopts the repository-maintained
+raw-log and compiled-wiki lifecycle below, and requires `dailyLogs` and
+`wiki`. Without `memory`, `dailyLogs` and `wiki` alone still enable it. The
+strategy does not claim paths from a runtime: list paths the workspace must
+reject in `forbidden`.
 
-Consumers decide which paths their runtime owns and which paths must be absent.
-The memory strategy alone does not establish runtime ownership. Configure
-`forbidden` for paths that this workspace must reject.
-
-A workspace whose runtime keeps its own file memory, such as OpenClaw's daily
-`memory/YYYY-MM-DD.md` logs and curated `MEMORY.md`, omits `memory`,
-`dailyLogs`, and `wiki`: those sections enable workspace-kit's llm-wiki
-validators, not the runtime's memory workflow. Its memory files remain ordinary
-authored content, committed under the workspace's privacy policy. Runtime
-feature settings remain the runtime owner's responsibility.
+A workspace whose runtime keeps its own file memory (for example OpenClaw's
+`memory/YYYY-MM-DD.md` logs and `MEMORY.md`) omits `memory`, `dailyLogs`, and
+`wiki`. Its memory files are then ordinary authored content.
 
 ### LLM wiki
 
@@ -48,47 +38,27 @@ feature settings remain the runtime owner's responsibility.
   sources must exist (external URLs and `[[links]]` exempt).
   `log.md` records changes with `## [YYYY-MM-DD] slug | summary` headings.
 - **Generated catalogs**: `wiki backfill` maintains `sources/` and `tags/`
-  indexes from the raw layer (tag pages materialize at two or more sources;
-  stale tag pages are purged). `wiki backfill --dry-run` prints the same write
-  and deletion plan without applying it and always exits zero;
-  `wiki backfill --check` is also non-mutating but exits one when that plan is
-  non-empty, making catalog drift enforceable in CI.
+  indexes from the raw layer. A tag page appears at two or more sources;
+  stale tag pages are purged.
 - **Staleness**: `wiki stale` reports committed sources whose latest commit
-  date is after the page's `updated:` stamp. This legacy-compatible default is
-  date-only.
-  - Opt-in `wiki.revisionStaleness` compares each source's current
-    working-tree state with the state visible in the page's latest commit; a
-    different state proves that the page revision did not see the proposed
-    source state, including dirty, same-day, backdated, and divergent-branch
-    changes.
-  - A page edited in the working tree is itself the proposed attestation
-    revision, but its `updated:` date must still cover the source's latest
-    substantive commit.
-  - For sources inside the wiki, changes only to the top-level frontmatter
-    `updated:` field are attestation metadata: they neither advance that
-    substantive date nor stale dependent pages. Substantive nested edits still
-    propagate across their direct source edge; the check does not speculate
-    over untouched transitive dependents.
-  - Revision mode evaluates staged and unstaged files together as the proposed
-    working tree, not the Git index in isolation. A partial commit can
-    therefore differ from the state that was checked; rerun the check after
-    committing a subset.
-  - Findings remain informational and exit zero. Missing or shallow Git
-    history is an operational error because a clean result could not be
-    proven.
-
-- **llm-wiki enforcement (opt-in)**: for workspaces adopting the full
-  LLM-maintained-wiki discipline: `wiki.indexCoverage` requires every
-  non-exempt page to be cataloged directly in `index.md` (the index is a
-  content catalog, not just a landing page); `wiki.logChronology` requires
-  `log.md` entry dates to never decrease (append-only proxy);
-  `wiki.requiredFields` lets a workspace extend the frontmatter atom (e.g.
-  add `created`); top-level `limits` enforces the convention's soft size
-  limits as warnings that never fail a run. File inspection and read failures
-  produce warnings while other matching files are still checked; the audit
-  flags, the human decides. Contradiction and duplicate detection remain
-  agentic maintenance work by design: a deterministic linter cannot judge
-  semantics.
+  date is after the page's `updated:` date.
+  - Opt-in `wiki.revisionStaleness` instead compares each source's
+    working-tree state with the state in the page's latest commit, so dirty,
+    same-day, backdated, and divergent-branch changes count.
+  - A page edited in the working tree attests the proposed state, but its
+    `updated:` date must still cover the source's latest substantive commit.
+  - For sources inside the wiki, an edit to only the top-level `updated:`
+    field is metadata: it does not stale dependent pages. Substantive edits
+    stale direct dependents only.
+  - Revision mode reads staged and unstaged files together, not the index
+    alone. After a partial commit, rerun the check.
+  - Revision-mode findings exit zero; missing or shallow history is an error.
+- **Opt-in enforcement**: `wiki.indexCoverage` requires every non-exempt page
+  to be listed directly in `index.md`. `wiki.logChronology` requires `log.md`
+  dates to never decrease. `wiki.requiredFields` extends the frontmatter
+  fields. Top-level `limits` reports soft size limits as warnings that never
+  fail a run. Unreadable files produce warnings; other files are still
+  checked.
 
 ## 3. Skills (optional)
 
@@ -102,8 +72,7 @@ source:
 }
 ```
 
-`workspace-kit skills sync` keeps authored source and generated discovery
-separate:
+`workspace-kit skills sync` produces this layout:
 
 ```text
 skills/howdy/                         authored source
@@ -114,111 +83,73 @@ skills/workspace-kit-lock.json        generated workspace-kit ownership
 .claude/skills                        link to ../.agents/skills
 ```
 
-[OpenClaw](https://docs.openclaw.ai/skills) discovers both `skills/` and
-`.agents/skills`; the authored `skills/` root has higher precedence. Codex and
-other project-agent harnesses use `.agents/skills`, while the Claude link
-exposes that generated tree without another copy. A local link therefore makes
-one authored skill available across harnesses, and a remote copy remains
-workspace-local.
+Enable it with `"skills": {}` in `workspace.json`, then run
+`pnpm exec workspace-kit skills sync`.
 
-Enable workspace skill management with `"skills": {}` in `workspace.json`,
-then run:
+- Sync validates every destination first and stops at the first conflict.
+  Unmanaged directories, symlinks, and mismatched provenance need the owner
+  to resolve them.
+- Remote entries install through a pinned `skills` CLI (project scope, copy
+  mode, telemetry off), which owns retrieval, security assessment, and
+  hashes.
+- Sync removes a copy that left the manifest only when
+  `skills/workspace-kit-lock.json` and `skills-lock.json` still record the
+  same source.
 
-```bash
-pnpm exec workspace-kit skills sync
-```
-
-- Before changing files, sync validates declared destinations and stops at the
-  first conflict. Replacing an
-  existing remote copy requires matching source records in both ownership locks.
-  Unmanaged directories, symlinks, and mismatched provenance stop sync for
-  explicit owner handling.
-- Sync links every locally authored skill into `.agents/skills`, ensures the
-  Claude discovery link, then delegates each remote entry to a pinned `skills`
-  CLI with telemetry disabled, project scope, and copy mode.
-- The dependency owns source retrieval, security assessment, copying, and
-  content hashes.
-- After each successful install, workspace-kit verifies the copied directory
-  and the dependency lock, then records that name and source in
-  `skills/workspace-kit-lock.json`.
-- When an entry leaves the manifest, sync removes it only when the manager
-  lock and current dependency lock still record the same source. Generic
-  `skills-lock.json` entries alone remain dependency metadata.
-
-Commit both generated lock files with the copied remote skills. Use `skills
-check` for an offline check of workspace declarations, runtime links/copies,
-and declared-versus-locked provenance. `doctor` includes the same check whenever
-the `skills` section exists.
-
-Consumers own shared machine-global skill selection and installation.
+Commit both lock files with the copied remote skills. `skills check` verifies
+declarations, links, copies, and provenance offline; `doctor` runs it when
+`skills` exists. Machine-global skills stay consumer-owned.
 
 ## Adopting an existing workspace
 
-1. Install `@uinaf/workspace-kit` as an exact development dependency with
-   `pnpm add --save-dev --save-exact @uinaf/workspace-kit`.
-2. Pin `"packageManager": "pnpm@12.0.0"` in `package.json` and add a
-   project-local `verify` script for `workspace-kit verify`; add direct
-   check shortcuts only when people use them independently.
-3. Describe the workspace's selected sections in `workspace.json`.
-4. Put authored skills in `skills/<name>/`, declare remote workspace skills in
+1. `pnpm add --save-dev --save-exact @uinaf/workspace-kit`
+2. Pin `"packageManager": "pnpm@12.0.0"` in `package.json` and add a `verify`
+   script that runs `workspace-kit verify`.
+3. Declare the workspace's sections in `workspace.json`.
+4. Put authored skills in `skills/<name>/`, declare remote ones in
    `skills/skills.json`, and run `skills sync`.
 5. Run `pnpm verify` and the repository's CI before deploying the checkout
    to a runtime.
 
-Existing npm-based agent workspaces migrate by rewriting
-scripts and docs to `pnpm …`, running `pnpm import` or a fresh `pnpm install`,
-and deleting `package-lock.json`. Leave `packageManager.enforce` off until
-that cutover is done; set it true once the pin and lockfile match.
+An npm workspace moves its scripts and docs to `pnpm`, runs `pnpm import` or
+`pnpm install`, and deletes `package-lock.json`. Set `packageManager.enforce`
+to true only after the pin and lockfile match.
 
 ## 4. Operations (optional)
 
-- **Registry**: a JSON file mapping project categories to entries
-  (`{name, repo, path, owns, mode, …}`); the entry shape is config-declared.
-  - `registry.project` enables `registry validate` and declares allowed modes,
-    checkout prefix, Git origin hosts (`["github.com"]` by default),
-    repository owners, required entries, and an optional entry limit.
-    Repository paths may include nested groups.
-  - Existing checkouts must match both the path and an allowed host using
-    HTTPS, SCP-style SSH, or `ssh://`; credentials and unsafe URL/path syntax
-    are rejected. Portable path aliases, duplicate checkout roots, and unsafe
-    catalogs also fail. Missing checkouts are valid.
-  - `verify` includes this gate whenever `registry.project` is configured.
-  - `registry clone`, `registry status`, and `registry pull` validate the same
-    contract before operating on checkouts. Clone and pull are restricted to
-    `managed` entries; pull uses `--ff-only` and enforces a configured branch.
+- **Registry**: a JSON file that maps project categories to entries
+  (`{name, repo, path, owns, mode, …}`); config declares the entry shape.
+  - `registry.project` enables `registry validate`: allowed modes, checkout
+    prefix, origin hosts (default `["github.com"]`), repository owners,
+    required entries, and an entry limit.
+  - A present checkout must match its path and an allowed host over HTTPS,
+    SCP-style SSH, or `ssh://`. Credentials in URLs, unsafe paths, portable
+    path aliases, duplicate roots, and unsafe catalogs fail. Missing checkouts
+    pass.
+  - `registry clone`, `status`, and `pull` validate first. Clone and pull act
+    only on `managed` entries; pull is `--ff-only` and enforces a configured
+    branch.
   - `registry path <category/name> [--mode <mode>]` prints one validated
-    absolute checkout path so consumers can compose owner-specific commands
-    without copying registry parsing into local scripts.
-- **Ownership contract**: for peered workspaces descended from one
-  historical ancestor: `workspace.contract.json` names the repository, its
-  peer, the shared ancestor commit, and required/forbidden owner paths.
-  `contract check` validates the local side; `contract peer` additionally
-  proves reciprocity and that no post-split commit id appears in both
-  histories (cherry-picks get new ids and are deliberately not detected;
-  cross-workspace movement stays a human-reviewed patch).
+    absolute checkout path for consumer scripts.
+- **Ownership contract**: for peered workspaces split from one ancestor,
+  `workspace.contract.json` names the repository, its peer, the shared
+  ancestor commit, and required and forbidden owner paths. `contract check`
+  validates the local side. `contract peer` also proves reciprocity and that
+  no post-split commit id appears in both histories; cherry-picks get new ids
+  and pass, so cross-workspace moves stay human-reviewed patches.
 - **Handoff gate**: `contract handoff <paths…>` screens proposed
-  cross-workspace paths against a configured denylist. Absolute paths,
-  `..` traversal, Windows drive/UNC paths, and `.env*` basenames are always
-  blocked; configured directory roots and their descendants are protected
-  with platform-independent path semantics. Passing means "eligible for human
-  review", never approval.
-- **Documentation links**: when enabled, `docs links` validates relative
-  destinations in tracked Markdown inline links, images, and reference
-  definitions. It supports angle-bracket destinations, balanced parentheses,
-  optional titles, and Markdown escapes; code spans/fences and external or
-  fragment-only destinations are ignored. Checked Markdown filenames must use
-  portable `/` separators; literal backslashes are reported as non-portable.
-  Targets must be tracked, so a gitignored-but-present file does not pass;
-  a present-but-untracked target is reported as untracked rather than
-  broken. The check never runs Git's check-in pipeline to decide that.
-- **Package manager (opt-in)**: convention workspaces use pnpm.
-  `init` writes a `packageManager` pin, pnpm scripts, and
-  `"packageManager": { "enforce": true }`. Existing configs without the
-  section stay unchecked. When `packageManager.enforce` is true, `doctor`
-  and `verify` require `package.json#packageManager` to be a `pnpm@` pin
-  and reject `package-lock.json` / `yarn.lock`. Set
-  `allowForeignLockfiles` only as a time-boxed escape hatch while a
-  lockfile is being replaced.
+  cross-workspace paths against the configured denylist. Absolute paths,
+  `..` traversal, Windows drive and UNC paths, and `.env*` basenames are
+  always blocked. Passing means "eligible for human review", never approval.
+- **Documentation links**: `docs links` checks relative destinations in
+  tracked Markdown links, images, and reference definitions; code, external,
+  and fragment-only links are skipped. Targets must be tracked: an ignored
+  file fails, and an untracked one is reported as untracked. Backslashes in
+  checked paths are reported as non-portable.
+- **Package manager (opt-in)**: with `packageManager.enforce`, `doctor` and
+  `verify` require a `pnpm@` pin in `package.json#packageManager` and reject
+  `package-lock.json` and `yarn.lock`. `init` turns it on. Use
+  `allowForeignLockfiles` only while replacing a lockfile.
 
 ## Configuration reference (`workspace.json`)
 
@@ -266,28 +197,20 @@ that cutover is done; set it true once the pin and lockfile match.
 }
 ```
 
-- Strict JSON, no comments in the real file; every section optional.
-- Unknown keys at every supported nesting level are ignored at runtime
-  (additive schema evolution across staggered kit versions) and reported with
-  their full paths as warnings by `config validate`.
-- Configured filesystem paths are normalized as portable repository-relative
-  paths and must stay inside the workspace; components ending in an ASCII
-  space or period are rejected because other platforms may reinterpret them.
-- Symlinked scan/output directories are rejected rather than followed.
-- Link targets may use `..` only when they still resolve inside the workspace,
-  and link output paths must be unique ignoring case.
-- The kit ships **no defaults that encode any consumer's specifics**; every
-  list above is policy and lives with the workspace. One deliberate exception:
-  `wiki backfill` scans a fixed raw-source layout (`memory/intake`,
+- The real file is strict JSON without comments; every section is optional.
+- Runtime ignores unknown keys; `config validate` warns with their full paths.
+- Configured paths are repository-relative and stay inside the workspace.
+  Components ending in a space or period are rejected; symlinked scan and
+  output directories are rejected. Link targets may use `..` only when they
+  resolve inside the workspace, and link paths must be unique ignoring case.
+- Every list is workspace policy; the kit ships no consumer defaults. The
+  exception is the raw-source layout `wiki backfill` scans: `memory/intake`,
   `memory/notes`, `docs/`, `user/`, `memory/contexts`, dated `memory/*.md`
-  logs, and the root convention files when present); that layout _is_ the
-  convention, and the generated catalogs land under the configured
-  `wiki.root`.
-
-`registry.project.allowedOwners` matches the first segment of every repository
-path. Each `mustContain` pair requires exactly one entry with that repository
-and mode. `maxEntries` counts entries across every top-level registry category;
-zero defines an intentionally empty registry.
+  logs, and the root convention files.
+- `allowedOwners` matches the first segment of each repository path. Each
+  `mustContain` pair requires exactly one entry with that repository and
+  mode. `maxEntries` counts entries across all categories; zero means an
+  intentionally empty registry.
 
 ## Output contract
 
@@ -301,57 +224,33 @@ zero defines an intentionally empty registry.
   never includes file-content excerpts.
 - Checks are deterministic, offline, and credential-free.
 - History-dependent checks (`contract`, `wiki stale`) need a full clone
-  (`fetch-depth: 0` in CI). With `wiki.revisionStaleness` enabled,
-  `wiki stale` exits 1 with an explicit error in a shallow clone instead of
-  printing `wiki-stale ok`; the default mode keeps the parity-locked legacy
-  fallback and output.
-
-`wiki backfill --check` prints every pending `would write` or `would delete`
-operation and exits 1 when any are present; a clean generated catalog exits 0.
-`--dry-run` prints the same plan but exits 0 whether or not work is pending.
-
-- `verify` loads and validates `workspace.json` once, runs the configured
-  `doctor` checks, includes `registry validate` when `registry.project`
-  exists, and runs `wiki backfill --check` when `wiki` exists.
-- `verify` does not run `wiki stale`, which is a separate history-based
-  operation. The package-manager check runs only when `packageManager.enforce`
-  is true.
-- `registry validate` exits 1 for malformed entries, ownership-policy
-  failures, or unsafe local checkout state and prints `registry ok` on
-  success. It reads Git metadata only; it never clones, fetches, pulls, or
-  changes a checkout.
-- `registry status` is read-only. `registry clone` invokes `gh repo clone` for
-  missing managed entries, while `registry pull` invokes `git pull --ff-only`
-  for present managed entries.
-- `hooks install` sets `core.hooksPath` to `.githooks` and makes the tracked
-  pre-commit hook executable.
+  (`fetch-depth: 0` in CI). In a shallow clone, `wiki stale` with
+  `wiki.revisionStaleness` exits 1; the default mode prints `wiki-stale ok`.
+- `wiki backfill --check` prints each pending `would write` or `would delete`
+  and exits 1 when any exist. `--dry-run` prints the same plan and exits 0.
+- `verify` validates `workspace.json`, runs the configured `doctor` checks,
+  `registry validate` when `registry.project` exists, and
+  `wiki backfill --check` when `wiki` exists. It never runs `wiki stale`.
+- `registry validate` and `registry status` only read Git metadata.
+  `registry clone` runs `gh repo clone`; `registry pull` runs
+  `git pull --ff-only`.
+- `hooks install` sets `core.hooksPath` to `.githooks`.
 
 ## Repository security composition
 
-Secret detection runs in the workspace repository's own CI; the consumer
-chooses the workflow and when it scans. The consumer may add that workflow's
-path to `workspace.json.required` so `doctor` verifies that the repository
-keeps it as part of its structure.
-
-Local workspace validation stays focused on deterministic structure, wiki,
-registry, documentation, and skill contracts. Host configuration audits and
-repository-history security scans remain independently operated surfaces.
+Secret detection runs in the workspace's own CI, not in `workspace-kit`.
+Add that workflow's path to `required` so `doctor` keeps it present.
 
 ## Profiles (`init`)
 
-- In an empty directory, `init` scaffolds an owner-editable instruction
-  skeleton with TODO markers, an exact local `@uinaf/workspace-kit`
-  development dependency, package scripts, and the selected profile's
-  structural files.
-- Run `pnpm install` once, then use `pnpm verify`; generated hooks use the
-  same local package and stay offline.
-- Existing files remain unchanged. A re-run accepts a compatible
-  `package.json`; an existing repository follows the adoption steps above, and
-  init stops before writing when its package contract is incompatible.
-- A re-run follows the existing memory configuration, including legacy
-  `dailyLogs`/`wiki` sections. Conflicting explicit memory options fail before
-  scaffolding, as does an unreadable existing config. Changing memory strategy
-  is an owner-managed migration.
+- In an empty directory, `init` scaffolds an instruction skeleton with TODO
+  markers, an exact local `@uinaf/workspace-kit` dev dependency, package
+  scripts, and the profile's files. Run `pnpm install`, then `pnpm verify`.
+- `init` never overwrites files. A re-run accepts a compatible
+  `package.json` and stops before writing on an incompatible one; adopt
+  those repositories with the steps above.
+- A re-run keeps the existing memory configuration. Conflicting memory
+  options or an unreadable config fail before scaffolding.
 
 - `work`: AGENTS.md + CLAUDE.md symlink + package.json + docs/README.md + workspace.json.
 - `personal`: work + README, `.env.example`, project-registry stub and
@@ -363,20 +262,16 @@ repository-history security scans remain independently operated surfaces.
 Personal and runtime profiles default to `llm-wiki`. The `work` profile
 declares no memory strategy.
 
-A fresh scaffold is verify-green immediately. The ownership contract stays
-unconfigured until an origin remote and a peer actually exist.
+A fresh scaffold passes `verify`. Configure the ownership contract once an
+origin remote and a peer exist.
 
-After scaffolding, the workspace owner replaces the `AGENTS.md` TODOs before
-treating the repository as operational. The runtime profile creates an empty
-`skills/skills.json` remote manifest, a `.agents/skills/` discovery directory,
-and the `.claude/skills` compatibility link; the owner then declares and syncs
-the skills that runtime uses.
+Replace the `AGENTS.md` TODOs before using the workspace. The runtime profile
+also creates an empty `skills/skills.json`, `.agents/skills/`, and the
+`.claude/skills` link; declare and sync the runtime's skills there.
 
 ## Exact check semantics
 
-The executable specification lives in the repository's `parity/` directory:
-frozen predecessor scripts, a synthetic fixture workspace, and golden
-outputs that the shipped implementation reproduces byte-for-byte
-(`test/golden-parity.test.ts`). Where behavior is quirky on purpose (the
-frontmatter dialect, non-string `updated:` skipping validation), unit tests
-in `test/unit.test.ts` pin the kept quirks.
+The executable specification is the repository's
+[`parity/`](https://github.com/uinaf/workspace-kit/tree/main/parity) goldens,
+which the checks reproduce byte-for-byte. Deliberate quirks, such as the
+frontmatter dialect, are pinned in `test/unit.test.ts`.

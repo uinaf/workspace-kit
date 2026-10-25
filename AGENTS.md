@@ -1,55 +1,43 @@
 # AGENTS.md
 
-Contributor guide for agents working in `uinaf/workspace-kit`.
-
-## What this repo is
-
-The public, config-driven CLI that validates and scaffolds agent workspaces.
-This repository owns the portable mechanism and its public documentation;
-consumers own their workspace policy, composition, and machine-global state.
-[docs/convention.md](docs/convention.md) describes what each command does.
+`uinaf/workspace-kit` is the public, config-driven CLI that validates and
+scaffolds agent workspaces. It owns the portable mechanism and its docs;
+consumers own workspace policy, composition, and machine-global state.
+[docs/convention.md](docs/convention.md) is the user contract; it ships in
+the npm package and `init` points users at it.
 
 ## Hard rules
 
 - **This repo is public.** Code, fixtures, docs, commits, and issues stay
   generic: no consumer workspace, person, brand, employer, hostname, or
-  private path. Fixtures are synthetic (`fixture-owner/fixture-workspace`
-  style).
+  private path. Fixtures are synthetic (`fixture-owner/fixture-workspace`).
+  Packages, scripts, CI, and validation depend on nothing consumer-specific.
 - **Zero runtime dependencies, no install lifecycle scripts, no telemetry.**
-  Validation and scaffolding run offline. Network access belongs to explicit
-  commands: `skills sync` delegates to a pinned `skills` CLI, and
-  `registry clone`/`registry pull` delegate to `gh` and `git`.
-  devDependencies are for build and test.
-- The release contract covers macOS and Linux. Windows-shaped absolute paths
-  are untrusted portable input and get rejected.
-- The repo stands alone: packages, scripts, CI, and validation depend on
-  nothing consumer-specific.
-- **Parity is law.** The ported validators reproduce `parity/goldens/`
-  byte-for-byte, and new behavior ships config-gated and default-off. Goldens
-  change only by regeneration; read [parity/README.md](parity/README.md)
-  before touching any check.
+  Validation and scaffolding run offline. Only explicit commands touch the
+  network: `skills sync` through a pinned `skills` CLI, `registry clone` and
+  `registry pull` through `gh` and `git`.
+- macOS and Linux only. Reject Windows-shaped absolute paths as untrusted
+  input.
+- **Parity is law.** The checks reproduce `parity/goldens/` byte-for-byte,
+  and new behavior ships config-gated and default-off. `parity/legacy/` and
+  `parity/fixtures/` are frozen; goldens change only by regeneration. Read
+  [parity/README.md](parity/README.md) before touching any check.
 
 ## Verify
 
-The repo runs on [Vite+](https://github.com/voidzero-dev/vite-plus); tool
-config lives in `vite.config.ts`. Setup and hooks are in
-[CONTRIBUTING.md](CONTRIBUTING.md).
+Setup is in [CONTRIBUTING.md](CONTRIBUTING.md#setup).
 
-- `pnpm exec vp run verify` is the full gate: `vp check`, tests with
-  aggregate coverage, `vp pack`, and an installed-tarball CLI smoke.
-- Line coverage across in-process and spawned CLI tests stays at or above 90%
-  (`scripts/coverage.mjs`).
-- `pnpm exec vp check --fix` fixes format and lint.
-- Docs-only changes need no runtime proof; the pre-push hook still runs the
-  gate.
-- Keep `@vitest/coverage-v8` at the Vitest version from
-  `pnpm exec vp toolchain vitest`, and update both through Vite+.
-- `parity/legacy/` and `parity/fixtures/` are frozen and exempt from lint and
-  format.
+```
+pnpm exec vp run verify    # full gate
+pnpm exec vp check --fix   # format and lint
+```
+
+- Docs-only changes need no runtime proof.
+- Keep `@vitest/coverage-v8` at the Vitest version
+  `pnpm exec vp toolchain vitest` prints; update both through Vite+.
 
 ## Releases
 
-Changes land through pull requests with `verify` required. Every push to
-`main` containing `feat:` or `fix:` publishes to npm
-([Releasing](CONTRIBUTING.md#releasing)); `docs:`, `chore:`, and `test:`
-publish nothing, so choose the prefix deliberately.
+Every push to `main` with a `feat:` or `fix:` commit publishes to npm;
+`docs:`, `chore:`, and `test:` publish nothing, so choose the prefix
+deliberately. Never move or delete a `v*` tag.

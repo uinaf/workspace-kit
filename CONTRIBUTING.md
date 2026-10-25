@@ -2,39 +2,28 @@
 
 ## Setup
 
-Needs git on PATH; [`package.json`](package.json) pins Node and pnpm. The repo
-runs on the
-[Vite+](https://github.com/voidzero-dev/vite-plus) toolchain (`vp`). Then:
+Needs git; [`package.json`](package.json) pins Node and pnpm. The toolchain is
+[Vite+](https://github.com/voidzero-dev/vite-plus) (`vp`).
 
 ```
 pnpm install --frozen-lockfile
-pnpm exec vp config --no-agent
+pnpm exec vp config --no-agent   # installs the git hooks from .vite-hooks
 ```
 
-The second command installs the repo's git hooks from `.vite-hooks`. It stays
-explicit so the published package has no consumer install lifecycle.
+Keep the hook install explicit: the published package has no install
+lifecycle.
 
-## Validation
+## Verify
 
 ```
-pnpm exec vp run verify    # checks + tests + pack + installed-tarball CLI smoke
-pnpm exec vp check --fix   # fix lint/format issues
+pnpm exec vp run verify    # full gate; the pre-push hook runs it too
+pnpm exec vp check --fix   # format and lint
 ```
 
-The pre-commit hook runs `pnpm exec vp staged`; the pre-push hook runs the
-gate.
-
-Checks are parity-locked to golden outputs. Read the
-[parity oracle](parity/README.md) before touching any check's behavior;
-goldens change only by regeneration.
+Checks are parity-locked: read [parity/README.md](parity/README.md) before
+changing a check's behavior.
 
 ## Pull requests
 
-Branch from `main`, keep PRs scoped, use Conventional Commits, and fill the
-PR template. CI must be green; `main` requires signed commits.
-
-## Releasing
-
-Every push to `main` releases from its Conventional Commits
-([`release.yml`](.github/workflows/release.yml)). Never move or delete a `v*`
-tag.
+Use Conventional Commits; the prefix decides the release
+([Releases](AGENTS.md#releases)). `main` requires green CI and signed commits.
