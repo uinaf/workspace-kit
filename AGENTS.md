@@ -38,6 +38,6 @@ pnpm exec vp check --fix   # format and lint
 
 ## Releases
 
-Every push to `main` with a `feat:` or `fix:` commit publishes to npm;
-`docs:`, `chore:`, and `test:` publish nothing, so choose the prefix
-deliberately. Never move or delete a `v*` tag.
+Every push to `main` with a `feat:`, `fix:`, `perf:`, or breaking commit
+publishes to npm; `docs:`, `chore:`, and `test:` publish nothing. Never move
+or delete a `v*` tag.
