@@ -51,5 +51,5 @@ config lives in `vite.config.ts`. Setup and hooks are in
 
 Changes land through pull requests with `verify` required. Every push to
 `main` containing `feat:` or `fix:` publishes to npm
-([docs/releasing.md](docs/releasing.md)); `docs:`, `chore:`, and `test:`
+([Releasing](CONTRIBUTING.md#releasing)); `docs:`, `chore:`, and `test:`
 publish nothing, so choose the prefix deliberately.

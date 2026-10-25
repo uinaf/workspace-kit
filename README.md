@@ -114,7 +114,7 @@ checks.
   what each check enforces
 - [Parity oracle](parity/README.md): the executable spec the checks are
   held to, byte-for-byte
-- [Release workflow](docs/releasing.md): automatic, tokenless publishing
+- [Release workflow](CONTRIBUTING.md#releasing): automatic, tokenless publishing
 
 ## Contributing
 
