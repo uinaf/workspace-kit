@@ -32,9 +32,7 @@ pnpm exec vp run verify    # full gate
 pnpm exec vp check --fix   # format and lint
 ```
 
-- Docs-only changes need no runtime proof.
-- Keep `@vitest/coverage-v8` at the Vitest version
-  `pnpm exec vp toolchain vitest` prints; update both through Vite+.
+Docs-only changes need no runtime proof.
 
 ## Releases
 
