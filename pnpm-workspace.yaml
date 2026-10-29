@@ -3,7 +3,7 @@ packages:
 
 overrides:
   brace-expansion@>=4.0.0 <5.0.9: 5.0.12
-  postcss@<=8.5.22: 8.5.31
+  postcss@<=8.5.22: 8.5.32
   vite@*: "catalog:"
   vitest@*: "catalog:"
 catalog:
