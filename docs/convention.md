@@ -103,8 +103,8 @@ declarations, links, copies, and provenance offline; `doctor` runs it when
 ## Adopting an existing workspace
 
 1. `pnpm add --save-dev --save-exact @uinaf/workspace-kit`
-2. Pin `"packageManager": "pnpm@12.0.0"` in `package.json` and add a `verify`
-   script that runs `workspace-kit verify`.
+2. Pin `packageManager` in `package.json` to an exact `pnpm@` version and add
+   a `verify` script that runs `workspace-kit verify`.
 3. Declare the workspace's sections in `workspace.json`.
 4. Put authored skills in `skills/<name>/`, declare remote ones in
    `skills/skills.json`, and run `skills sync`.
