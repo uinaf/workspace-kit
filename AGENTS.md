@@ -36,6 +36,6 @@ Docs-only changes need no runtime proof.
 
 ## Releases
 
-Every push to `main` with a `feat:`, `fix:`, `perf:`, or breaking commit
-publishes to npm; `docs:`, `chore:`, and `test:` publish nothing. Never move
-or delete a `v*` tag.
+Every push to `main` whose commits warrant a version publishes to npm; the
+commit analyzer in [`.releaserc.json`](.releaserc.json) decides. Never move or
+delete a `v*` tag.
