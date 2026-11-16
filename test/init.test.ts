@@ -22,11 +22,13 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = join(root, "src", "cli.ts");
 
 for (const profile of ["personal", "runtime", "work"] as const) {
-  for (const memory of [undefined, { strategy: "llm-wiki" } as const]) {
-    test(`init --profile ${profile} ${memory ? "--memory llm-wiki " : ""}scaffolds a verify-green workspace`, () => {
+  for (const wiki of [false, true]) {
+    test(`init --profile ${profile} ${wiki ? "--wiki " : ""}scaffolds a verify-green workspace`, () => {
       const dir = tempDir(`init-${profile}-`);
-      const result = initWorkspace(dir, profile, memory);
-      assert.equal(existsSync(join(dir, "memory", "wiki", "index.md")), memory !== undefined);
+      const result = initWorkspace(dir, profile, { wiki });
+      assert.equal(existsSync(join(dir, "docs", "index.md")), wiki);
+      assert.equal(existsSync(join(dir, "docs", "README.md")), !wiki);
+      assert.equal(existsSync(join(dir, "memory")), false);
       assert.match(
         readFileSync(join(dir, "docs", "projects", "README.md"), "utf8"),
         /No registered projects/,
@@ -177,28 +179,23 @@ function scratchDirectory(prefix: string): string {
   return tempDir(prefix);
 }
 
-test("init preserves legacy or disabled memory and refuses malformed existing configuration", () => {
-  const legacy = scratchDirectory("init-legacy-memory-");
-  initWorkspace(legacy, "personal", { strategy: "llm-wiki" });
-  const config = JSON.parse(readFileSync(join(legacy, "workspace.json"), "utf8"));
-  delete config.memory;
-  writeFileSync(join(legacy, "workspace.json"), JSON.stringify(config));
-  assert.equal(initWorkspace(legacy, "personal").created.length, 0);
-  const saved = JSON.parse(readFileSync(join(legacy, "workspace.json"), "utf8"));
-  assert.deepEqual(saved, config);
-  assert.deepEqual(saved.dailyLogs, { root: "memory", contexts: "memory/contexts" });
-  assert.deepEqual(saved.wiki, { root: "memory/wiki" });
-  assert.equal(initWorkspace(legacy, "personal", { strategy: "llm-wiki" }).created.length, 0);
+test("init keeps the existing wiki choice and refuses malformed existing configuration", () => {
+  const withWiki = scratchDirectory("init-existing-wiki-");
+  initWorkspace(withWiki, "personal", { wiki: true });
+  const config = readFileSync(join(withWiki, "workspace.json"), "utf8");
+  assert.equal(initWorkspace(withWiki, "personal").created.length, 0);
+  assert.equal(initWorkspace(withWiki, "personal", { wiki: true }).created.length, 0);
+  assert.equal(readFileSync(join(withWiki, "workspace.json"), "utf8"), config);
 
-  const disabled = scratchDirectory("init-disabled-memory-");
-  writeFileSync(join(disabled, "workspace.json"), "{}");
-  initWorkspace(disabled, "personal");
-  assert.equal(existsSync(join(disabled, "memory/wiki")), false);
-  assert.throws(() => initWorkspace(disabled, "personal", { strategy: "llm-wiki" }), /conflicts/);
+  const without = scratchDirectory("init-existing-no-wiki-");
+  writeFileSync(join(without, "workspace.json"), "{}");
+  initWorkspace(without, "personal");
+  assert.equal(existsSync(join(without, "docs", "index.md")), false);
+  assert.throws(() => initWorkspace(without, "personal", { wiki: true }), /conflicts/);
 
   const invalid = scratchDirectory("init-invalid-config-");
-  writeFileSync(join(invalid, "workspace.json"), '{"memory":{"strategy":"invalid"}}');
-  assert.throws(() => initWorkspace(invalid, "personal"), /memory.strategy/);
+  writeFileSync(join(invalid, "workspace.json"), '{"wiki":{"root":"../out"}}');
+  assert.throws(() => initWorkspace(invalid, "personal"), /wiki.root/);
   assert.equal(existsSync(join(invalid, "AGENTS.md")), false);
   writeFileSync(join(invalid, "workspace.json"), "{");
   assert.throws(() => initWorkspace(invalid, "personal"), SyntaxError);

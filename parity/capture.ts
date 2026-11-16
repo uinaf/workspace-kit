@@ -10,7 +10,6 @@ import {
   makeEnv,
   normalize,
   runScenarios,
-  snapshotTree,
   utcToday,
   type Runner,
   type RunResult,
@@ -29,10 +28,6 @@ const env = makeEnv();
 // Translate the kit's semantic argv into legacy bun script invocations.
 function legacyArgv(command: string[]): string[] {
   const [tool, mode, ...rest] = command;
-  if (tool === "doctor") return ["scripts/doctor.ts"];
-  if (tool === "wiki" && mode === "lint") return ["scripts/wiki-lint.ts"];
-  if (tool === "wiki" && mode === "stale") return ["scripts/wiki-stale.ts"];
-  if (tool === "wiki" && mode === "backfill") return ["scripts/wiki-backfill.ts"];
   if (tool === "contract" && mode === "check") return ["scripts/workspace-contract.ts", "--check"];
   if (tool === "contract" && mode === "peer")
     return ["scripts/workspace-contract.ts", "--peer", ...rest];
@@ -58,12 +53,6 @@ const sink: Sink = {
     writeFileSync(join(goldenDir, `${name}.out`), scrub(name, result.stdout, dir));
     writeFileSync(join(goldenDir, `${name}.err`), scrub(name, result.stderr, dir));
     writeFileSync(join(goldenDir, `${name}.exit`), `${result.status}\n`);
-  },
-  snapshot(name: string, dir: string, subdirs: string[]): void {
-    writeFileSync(join(goldenDir, `${name}.tree`), scrub(name, snapshotTree(dir, subdirs), dir));
-  },
-  status(name: string, dir: string, statusText: string): void {
-    writeFileSync(join(goldenDir, `${name}.txt`), scrub(name, statusText, dir));
   },
 };
 

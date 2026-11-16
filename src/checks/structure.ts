@@ -1,13 +1,11 @@
 // Port of the legacy doctor's own checks (required files, alias symlinks,
-// registry shape, daily-log H1). Message strings and ordering are
+// registry shape). Message strings and ordering are
 // parity-locked to parity/goldens. Required files deliberately use
 // filesystem existence instead of git-tracked state. The contract check owns
 // tracked semantics.
-import { posix } from "node:path";
-import type { DailyLogsConfig, LinkRule, RegistryConfig, WorkspaceConfig } from "../config.ts";
+import type { LinkRule, RegistryConfig, WorkspaceConfig } from "../config.ts";
 import {
   assertWorkspaceLinkTarget,
-  readWorkspaceDirectory,
   readWorkspaceLink,
   readWorkspaceText,
   workspaceLstat,
@@ -111,48 +109,11 @@ export function registryErrors(registry: RegistryConfig, repoRoot = "."): string
   return bad;
 }
 
-export function dailyLogErrors(config: DailyLogsConfig): string[] {
-  const out: string[] = [];
-  for (const entry of readWorkspaceDirectory(".", config.root, "empty")) {
-    const path = posix.join(config.root, entry.name);
-    if (entry.isSymbolicLink()) {
-      throw new Error(`${path}: symbolic links are not allowed in daily logs`);
-    }
-    if (entry.isFile() && /^\d{4}-\d{2}-\d{2}\.md$/.test(entry.name)) out.push(path);
-  }
-  for (const entry of readWorkspaceDirectory(".", config.contexts, "empty")) {
-    const dir = posix.join(config.contexts, entry.name);
-    if (entry.isSymbolicLink()) {
-      throw new Error(`${dir}: symbolic links are not allowed in daily-log contexts`);
-    }
-    if (!entry.isDirectory()) continue;
-    for (const child of readWorkspaceDirectory(".", dir)) {
-      const path = posix.join(dir, child.name);
-      if (child.isSymbolicLink()) {
-        throw new Error(`${path}: symbolic links are not allowed in daily logs`);
-      }
-      if (child.isFile() && child.name.endsWith(".md")) out.push(path);
-    }
-  }
-  out.sort();
-
-  const missingH1: string[] = [];
-  for (const path of out) {
-    const text = readWorkspaceText(".", path).replace(/^﻿/, "");
-    if (!text.startsWith("# ")) missingH1.push(path);
-  }
-  if (missingH1.length > 0) {
-    return [`missing H1:\n${missingH1.join("\n")}`];
-  }
-  return [];
-}
-
 export function structureErrors(config: WorkspaceConfig): string[] {
   return [
     ...requiredFileErrors(config.required ?? []),
     ...linkErrors(config.links ?? []),
     ...(config.registry ? registryErrors(config.registry) : []),
     ...forbiddenFileErrors(config.forbidden ?? []),
-    ...(config.dailyLogs ? dailyLogErrors(config.dailyLogs) : []),
   ];
 }

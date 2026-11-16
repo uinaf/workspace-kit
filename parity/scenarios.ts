@@ -2,26 +2,15 @@
 // parity/capture.ts drives the frozen legacy scripts (bun) and writes
 // goldens; test/golden-parity.test.ts drives the kit CLI (node) and compares
 // against those goldens. Node-clean: no bun APIs.
-import {
-  cpSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
-import { existsSync } from "node:fs";
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
-import { join, relative } from "node:path";
+import { join } from "node:path";
 
 export type RunResult = { stdout: string; stderr: string; status: number | null };
 // Commands use the kit's semantic argv; the legacy runner translates.
 export type Runner = (command: string[], cwd: string) => RunResult;
 export type Sink = {
   emit(name: string, result: RunResult, dir: string): void;
-  snapshot(name: string, dir: string, subdirs: string[]): void;
-  status(name: string, dir: string, statusText: string): void;
 };
 
 // Scenarios whose outputs are legacy-only by design (usage text differs
@@ -88,8 +77,6 @@ const FIXTURE_CONFIG = {
     file: "projects.json",
     entry: { required: ["name", "repo", "path", "owns"], optional: ["branch"] },
   },
-  dailyLogs: { root: "memory", contexts: "memory/contexts" },
-  wiki: { root: "memory/wiki" },
   contract: { file: "workspace.contract.json" },
   handoff: {
     paths: [
@@ -115,19 +102,10 @@ export function buildBase(opts: BuildOptions, name: string): string {
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
   cpSync(opts.fixtureSrc, dir, { recursive: true, verbatimSymlinks: true });
-  mkdirSync(join(dir, "scripts", "lib"), { recursive: true });
-  for (const file of [
-    "doctor.ts",
-    "wiki-lint.ts",
-    "wiki-backfill.ts",
-    "wiki-stale.ts",
-    "workspace-contract.ts",
-  ]) {
-    cpSync(join(opts.legacyDir, file), join(dir, "scripts", file));
-  }
+  mkdirSync(join(dir, "scripts"), { recursive: true });
   cpSync(
-    join(opts.legacyDir, "lib", "frontmatter.ts"),
-    join(dir, "scripts", "lib", "frontmatter.ts"),
+    join(opts.legacyDir, "workspace-contract.ts"),
+    join(dir, "scripts", "workspace-contract.ts"),
   );
   writeFileSync(join(dir, "workspace.json"), `${JSON.stringify(FIXTURE_CONFIG, null, 2)}\n`);
   sh(dir, "git init -q -b main");
@@ -146,26 +124,6 @@ export function buildBase(opts: BuildOptions, name: string): string {
   sh(dir, "git add workspace.contract.json");
   sh(dir, 'git commit -qm "contract"', "2026-01-02T00:00:00Z");
   return dir;
-}
-
-export function snapshotTree(dir: string, subdirs: string[]): string {
-  const chunks: string[] = [];
-  const walk = (base: string): string[] => {
-    if (!existsSync(base)) return [];
-    return readdirSync(base)
-      .flatMap((entry) => {
-        const path = join(base, entry);
-        return statSync(path).isDirectory() ? walk(path) : [path];
-      })
-      .sort();
-  };
-  for (const sub of subdirs) {
-    for (const path of walk(join(dir, sub))) {
-      chunks.push(`=== ${relative(dir, path)} ===`);
-      chunks.push(readFileSync(path, "utf8"));
-    }
-  }
-  return chunks.join("\n");
 }
 
 const HANDOFF_BLOCKED_ARGS = [
@@ -198,10 +156,7 @@ export function runScenarios(opts: BuildOptions & { runner: Runner; sink: Sink }
   // --- Green path ---------------------------------------------------------
   {
     const dir = buildBase(opts, "green");
-    run("doctor-green", dir, ["doctor"]);
-    run("wiki-lint-green", dir, ["wiki", "lint"]);
     run("contract-check-green", dir, ["contract", "check"]);
-    run("wiki-stale-green", dir, ["wiki", "stale"]);
     run("handoff-allowed", dir, [
       "contract",
       "handoff",
@@ -210,16 +165,6 @@ export function runScenarios(opts: BuildOptions & { runner: Runner; sink: Sink }
       "Makefile",
     ]);
     run("handoff-blocked", dir, ["contract", "handoff", ...HANDOFF_BLOCKED_ARGS]);
-  }
-
-  // --- Backfill + post-backfill lint + idempotency --------------------------
-  {
-    const dir = buildBase(opts, "backfill");
-    run("backfill-first-run", dir, ["wiki", "backfill"]);
-    sink.snapshot("backfill-generated", dir, ["memory/wiki/sources", "memory/wiki/tags"]);
-    run("wiki-lint-post-backfill", dir, ["wiki", "lint"]);
-    run("backfill-second-run", dir, ["wiki", "backfill"]);
-    sink.status("backfill-worktree-status", dir, sh(dir, "git status --porcelain"));
   }
 
   // --- Peer check -----------------------------------------------------------
@@ -265,85 +210,6 @@ export function runScenarios(opts: BuildOptions & { runner: Runner; sink: Sink }
     run("contract-check-green-https", dir, ["contract", "check"]);
   }
 
-  // --- Doctor cascade: failing wiki child ------------------------------------
-  {
-    const dir = buildBase(opts, "doctor-cascade");
-    const alphaPath = join(dir, "memory", "wiki", "topics", "alpha.md");
-    writeFileSync(alphaPath, readFileSync(alphaPath, "utf8").replace("status: active\n", ""));
-    run("doctor-cascade-errors", dir, ["doctor"]);
-  }
-
-  // --- Structure errors (doctor) ---------------------------------------------
-  {
-    const dir = buildBase(opts, "errors-structure");
-    rmSync(join(dir, "CONTRIBUTING.md"));
-    rmSync(join(dir, "CLAUDE.md"));
-    writeFileSync(join(dir, "CLAUDE.md"), "# Not a symlink\n");
-    const projects = JSON.parse(readFileSync(join(dir, "projects.json"), "utf8"));
-    delete projects.examples[0].owns;
-    projects.examples[1].branch = "";
-    writeFileSync(join(dir, "projects.json"), `${JSON.stringify(projects, null, 2)}\n`);
-    writeFileSync(join(dir, "memory", "2026-01-02.md"), "no heading here\n");
-    run("doctor-structure-errors", dir, ["doctor"]);
-  }
-
-  // --- Wiki lint errors -------------------------------------------------------
-  {
-    const dir = buildBase(opts, "errors-wiki");
-    const wiki = join(dir, "memory", "wiki");
-    writeFileSync(
-      join(wiki, "topics", "orphan.md"),
-      `---\ntitle: Orphan\ntype: wiki\nstatus: active\nupdated: 2026-01-02\ntags: [demo]\nsources: [README.md]\n---\n\n# Orphan\n\nNo page links here.\n`,
-    );
-    writeFileSync(
-      join(wiki, "topics", "broken-frontmatter.md"),
-      `---\ntitle: Broken frontmatter\ntype: wiki\nupdated: January 2\ntags: [demo]\nsources: [does-not-exist.md]\n---\n\n# Broken frontmatter\n\nLinked from [[alpha]]? No — from index below.\n`,
-    );
-    writeFileSync(
-      join(wiki, "topics", "bad-status.md"),
-      `---\ntitle: Bad status\ntype: wiki\nstatus: paused\nupdated: 2026-01-02\ntags: [demo]\nsources: [README.md]\n---\n\n# Bad status\n`,
-    );
-    mkdirSync(join(wiki, "other"), { recursive: true });
-    writeFileSync(
-      join(wiki, "other", "alpha.md"),
-      `---\ntitle: Other alpha\ntype: wiki\nstatus: active\nupdated: 2026-01-02\ntags: [demo]\nsources: [README.md]\n---\n\n# Other alpha\n`,
-    );
-    writeFileSync(
-      join(wiki, "topics", "dead-links.md"),
-      `---\ntitle: Dead links\ntype: wiki\nstatus: active\nupdated: 2026-01-02\ntags: [demo]\nsources: [README.md]\n---\n\n# Dead links\n\nSee [[totally-missing-page]] and [gone](gone-file.md).\n`,
-    );
-    const indexPath = join(wiki, "index.md");
-    writeFileSync(
-      indexPath,
-      readFileSync(indexPath, "utf8") +
-        "\n- [[dead-links]]\n- [[broken-frontmatter]]\n- [[bad-status]]\n- [[other/alpha]]\n",
-    );
-    const logPath = join(wiki, "log.md");
-    writeFileSync(
-      logPath,
-      readFileSync(logPath, "utf8") + "\n## bad heading without the grammar\n",
-    );
-    writeFileSync(join(wiki, "topics", "no-frontmatter.md"), "# No frontmatter\n");
-    writeFileSync(
-      join(wiki, "topics", "unterminated.md"),
-      "---\ntitle: Unterminated\n\n# Unterminated\n",
-    );
-    writeFileSync(
-      join(wiki, "topics", "empty-tags.md"),
-      `---\ntitle: Empty tags\ntype: wiki\nstatus: active\nupdated: 2026-01-02\ntags: []\nsources: [README.md]\n---\n\n# Empty tags\n`,
-    );
-    writeFileSync(
-      join(wiki, "topics", "related-broken.md"),
-      `---\ntitle: Related broken\ntype: wiki\nstatus: active\nupdated: 2026-01-02\ntags: [demo]\nsources: [README.md]\nrelated: ["[[missing-related-target]]"]\n---\n\n# Related broken\n`,
-    );
-    writeFileSync(
-      indexPath,
-      readFileSync(indexPath, "utf8") +
-        "- [[no-frontmatter]]\n- [[unterminated]]\n- [[empty-tags]]\n- [[related-broken]]\n",
-    );
-    run("wiki-lint-errors", dir, ["wiki", "lint"]);
-  }
-
   // --- Contract errors --------------------------------------------------------
   {
     const dir = buildBase(opts, "errors-contract");
@@ -369,42 +235,5 @@ export function runScenarios(opts: BuildOptions & { runner: Runner; sink: Sink }
     run("contract-usage-error", dir, ["contract"]);
     writeFileSync(join(dir, "workspace.contract.json"), '{ "version": 1, "handoff": [] }\n');
     run("contract-malformed", dir, ["contract", "check"]);
-  }
-
-  // --- Stale report -----------------------------------------------------------
-  {
-    const dir = buildBase(opts, "stale");
-    const topics = join(dir, "memory", "wiki", "topics");
-    writeFileSync(
-      join(topics, "multi-stale.md"),
-      `---\ntitle: Multi stale\ntype: wiki\nstatus: active\nupdated: 2026-01-02\ntags: [demo]\nsources:\n  - AGENTS.md\n  - CONTRIBUTING.md\n  - MEMORY.md\n  - README.md\n  - SOUL.md\n  - TOOLS.md\n  - USER.md\n---\n\n# Multi stale\n`,
-    );
-    writeFileSync(
-      join(topics, "second-stale.md"),
-      `---\ntitle: Second stale\ntype: wiki\nstatus: active\nupdated: 2026-01-02\ntags: [demo]\nsources: [docs/README.md]\n---\n\n# Second stale\n`,
-    );
-    writeFileSync(
-      join(dir, "docs", "README.md"),
-      "# Docs\n\nTouched at the earlier of the two stale dates.\n",
-    );
-    sh(dir, "git add docs/README.md");
-    sh(dir, 'git commit -qm "february source change"', "2026-02-01T00:00:00Z");
-    for (const file of [
-      "AGENTS.md",
-      "CONTRIBUTING.md",
-      "MEMORY.md",
-      "README.md",
-      "SOUL.md",
-      "TOOLS.md",
-      "USER.md",
-    ]) {
-      writeFileSync(
-        join(dir, file),
-        `${readFileSync(join(dir, file), "utf8")}\nTouched after the updated date.\n`,
-      );
-    }
-    sh(dir, "git add -u");
-    sh(dir, 'git commit -qm "march source changes"', "2026-03-01T00:00:00Z");
-    run("wiki-stale-flagged", dir, ["wiki", "stale"]);
   }
 }

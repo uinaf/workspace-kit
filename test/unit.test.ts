@@ -2,17 +2,14 @@
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 import { execSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { clean, parseFrontmatter } from "../src/lib/frontmatter.ts";
 import {
   isPrivateHandoffPath,
   loadContract,
   workspaceErrors,
   peerErrors,
 } from "../src/checks/contract.ts";
-import { wikiLintErrors } from "../src/checks/wikiLint.ts";
-import { wikiBackfill } from "../src/checks/wikiBackfill.ts";
 import { tempDir } from "./temp-dir.ts";
 
 const HANDOFF = {
@@ -20,69 +17,9 @@ const HANDOFF = {
   prefixes: ["memory/"],
 };
 
-function inDir<T>(dir: string, fn: () => T): T {
-  const prev = process.cwd();
-  process.chdir(dir);
-  try {
-    return fn();
-  } finally {
-    process.chdir(prev);
-  }
-}
-
 function scratch(prefix: string): string {
   return tempDir(prefix);
 }
-
-test("frontmatter parser preserves its legacy syntax", () => {
-  // Inline arrays split on commas even inside quotes.
-  assert.deepEqual(parseFrontmatter('---\ntags: ["a, b"]\n---\n').tags, ["a", "b"]);
-  // Single- and double-quote stripping (one char per side).
-  assert.equal(clean("'hello'"), "hello");
-  assert.equal(clean('"hello"'), "hello");
-  // CRLF files never parse: the terminator is LF-only.
-  assert.deepEqual(parseFrontmatter("---\r\ntitle: x\r\n---\r\n"), {});
-  // Block lists accumulate under the current key.
-  assert.deepEqual(parseFrontmatter("---\nsources:\n  - a.md\n  - b.md\n---\n").sources, [
-    "a.md",
-    "b.md",
-  ]);
-});
-
-test("non-string updated values skip validation", () => {
-  const dir = scratch("wiki-");
-  mkdirSync(join(dir, "wiki"), { recursive: true });
-  writeFileSync(
-    join(dir, "wiki", "log.md"),
-    "---\ntitle: Log\ntype: wiki-log\nstatus: active\nupdated: 2026-01-01\ntags: [log]\nsources: [wiki/log.md]\n---\n\n# Log\n",
-  );
-  writeFileSync(
-    join(dir, "wiki", "index.md"),
-    "---\ntitle: Index\ntype: wiki-index\nstatus: active\nupdated: [2026]\ntags: [index]\nsources: [wiki/index.md]\n---\n\n# Index\n",
-  );
-  const result = inDir(dir, () => wikiLintErrors("wiki"));
-  assert.ok(
-    !result.errors.some((e) => e.includes("updated must be")),
-    `list-valued updated must skip validation: ${result.errors.join("; ")}`,
-  );
-});
-
-test("missing wiki root is a clean fatal error", () => {
-  const dir = scratch("nowiki-");
-  const result = inDir(dir, () => wikiLintErrors("memory/wiki"));
-  assert.equal(result.fatal, "missing memory/wiki");
-});
-
-test("missing wiki log is an error, not a crash", () => {
-  const dir = scratch("nolog-");
-  mkdirSync(join(dir, "wiki"), { recursive: true });
-  writeFileSync(
-    join(dir, "wiki", "index.md"),
-    "---\ntitle: Index\ntype: wiki-index\nstatus: active\nupdated: 2026-01-01\ntags: [index]\nsources: [wiki/index.md]\n---\n\n# Index\n",
-  );
-  const result = inDir(dir, () => wikiLintErrors("wiki"));
-  assert.ok(result.errors.includes("missing wiki/log.md"), result.errors.join("; "));
-});
 
 test("handoff invariants are not configurable", () => {
   for (const path of [
@@ -167,53 +104,4 @@ test("non-reciprocal peers error; different ancestors skip the history check", (
   );
   // Early return: the shared-history check must NOT have run.
   assert.ok(!errors.some((e) => e.startsWith("post-split history is shared")));
-});
-
-test("backfill cross-day idempotency: date-only diffs do not rewrite", () => {
-  const dir = scratch("backfill-");
-  for (const file of [
-    "AGENTS.md",
-    "MEMORY.md",
-    "USER.md",
-    "TOOLS.md",
-    "SOUL.md",
-    "README.md",
-    "CONTRIBUTING.md",
-  ]) {
-    writeFileSync(join(dir, file), `# ${file}\n`);
-  }
-  inDir(dir, () => wikiBackfill({ root: "memory/wiki", dryRun: false }));
-  // Simulate a previous-day generation: rewrite every generated updated:
-  // stamp to an old date.
-  const sourcesIndex = join(dir, "memory", "wiki", "sources", "index.md");
-  const aged = readFileSync(sourcesIndex, "utf8").replace(
-    /^updated: \d{4}-\d{2}-\d{2}$/m,
-    "updated: 2000-01-01",
-  );
-  writeFileSync(sourcesIndex, aged);
-  inDir(dir, () => wikiBackfill({ root: "memory/wiki", dryRun: false }));
-  assert.equal(
-    readFileSync(sourcesIndex, "utf8"),
-    aged,
-    "a date-only difference must not trigger a rewrite",
-  );
-});
-
-test("backfill --dry-run plans without writing", () => {
-  const dir = scratch("dryrun-");
-  for (const file of [
-    "AGENTS.md",
-    "MEMORY.md",
-    "USER.md",
-    "TOOLS.md",
-    "SOUL.md",
-    "README.md",
-    "CONTRIBUTING.md",
-  ]) {
-    writeFileSync(join(dir, file), `# ${file}\n`);
-  }
-  const result = inDir(dir, () => wikiBackfill({ root: "memory/wiki", dryRun: true }));
-  assert.ok(result.planned.length > 0);
-  assert.ok(result.planned.every((line) => line.startsWith("would ")));
-  assert.throws(() => readFileSync(join(dir, "memory", "wiki", "sources", "index.md")));
 });

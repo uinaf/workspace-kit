@@ -12,53 +12,23 @@ One canonical `AGENTS.md` at the repo root, with `CLAUDE.md` as a relative
 symlink to it. Harness- and runtime-specific mechanics stay out of it. The
 check covers presence and the link; the owner reviews the prose.
 
-## 2. Memory (optional)
+## 2. Wiki (optional)
 
-`"memory": { "strategy": "llm-wiki" }` adopts the repository-maintained
-raw-log and compiled-wiki lifecycle below, and requires `dailyLogs` and
-`wiki`. Without `memory`, `dailyLogs` and `wiki` alone still enable it. The
-strategy does not claim paths from a runtime: list paths the workspace must
-reject in `forbidden`.
+`"wiki": {}` adopts a Markdown wiki that agents maintain: one page per topic,
+an index, and an optional log. `root` sets its directory (default `docs`).
 
-A workspace whose runtime keeps its own file memory (for example OpenClaw's
-`memory/YYYY-MM-DD.md` logs and `MEMORY.md`) omits `memory`, `dailyLogs`, and
-`wiki`. Its memory files are then ordinary authored content.
+- Every `.md` page under the root is linked from `<root>/index.md`, except
+  `index.md` and `log.md`.
+- Relative links and `[[wikilinks]]` in every page resolve. A wikilink
+  resolves page-relative, then root-relative, with `.md` appended when it has
+  no extension. Code spans and fenced blocks are ignored.
+- When `<root>/log.md` exists, each `## ` heading reads
+  `## [YYYY-MM-DD] summary` and dates never go backwards.
+- The `registry.pointers.dir` tree is skipped; it carries its own index.
 
-### LLM wiki
-
-- **Raw layer**: dated daily logs (`memory/YYYY-MM-DD.md`) and per-context
-  logs (`memory/contexts/<slug>/*.md`), each starting with an H1.
-- **Compiled layer**: a wiki (`memory/wiki/`) of pages carrying frontmatter
-  (`title`, `type`, `status: active|draft|archived`, `updated: YYYY-MM-DD`,
-  `tags`, `sources`) and forming a link graph. Wikilinks resolve
-  page-relative, then root-relative, then by unique leaf basename;
-  ambiguity is an error. Every non-index page needs an inbound link.
-  Authored pages need at least one `sources:` entry; generated source and tag
-  catalogs may use `sources: []` when the represented set is empty. Listed
-  sources must exist (external URLs and `[[links]]` exempt).
-  `log.md` records changes with `## [YYYY-MM-DD] slug | summary` headings.
-- **Generated catalogs**: `wiki backfill` maintains `sources/` and `tags/`
-  indexes from the raw layer. A tag page appears at two or more sources;
-  stale tag pages are purged.
-- **Staleness**: `wiki stale` reports committed sources whose latest commit
-  date is after the page's `updated:` date.
-  - Opt-in `wiki.revisionStaleness` instead compares each source's
-    working-tree state with the state in the page's latest commit, so dirty,
-    same-day, backdated, and divergent-branch changes count.
-  - A page edited in the working tree attests the proposed state, but its
-    `updated:` date must still cover the source's latest substantive commit.
-  - For sources inside the wiki, an edit to only the top-level `updated:`
-    field is metadata: it does not stale dependent pages. Substantive edits
-    stale direct dependents only.
-  - Revision mode reads staged and unstaged files together, not the index
-    alone. After a partial commit, rerun the check.
-  - Revision-mode findings exit zero; missing or shallow history is an error.
-- **Opt-in enforcement**: `wiki.indexCoverage` requires every non-exempt page
-  to be listed directly in `index.md`. `wiki.logChronology` requires `log.md`
-  dates to never decrease. `wiki.requiredFields` extends the frontmatter
-  fields. Top-level `limits` reports soft size limits as warnings that never
-  fail a run. Unreadable files produce warnings; other files are still
-  checked.
+Without `wiki`, the kit runs no memory checks. A runtime that keeps its own
+memory files (for example OpenClaw's `memory/YYYY-MM-DD.md` logs and
+`MEMORY.md`) omits `wiki`; those files stay ordinary authored content.
 
 ## 3. Skills (optional)
 
@@ -182,15 +152,7 @@ to true only after the pin and lockfile match.
     },
     "pointers": { "dir": "docs/projects" }, // needs registry.project
   },
-  "dailyLogs": { "root": "memory", "contexts": "memory/contexts" },
-  "memory": { "strategy": "llm-wiki" },
-  "wiki": {
-    "root": "memory/wiki",
-    "requiredFields": ["title", "type", "status", "updated", "tags", "sources"],
-    "indexCoverage": false, // every page cataloged in index.md
-    "logChronology": false, // log.md dates never decrease (append-only proxy)
-    "revisionStaleness": false, // compare proposed source and page revisions
-  },
+  "wiki": { "root": "docs" },
   "limits": [
     // soft limits: warnings, never failures
     { "pattern": "MEMORY.md", "maxLines": 200 },
@@ -210,10 +172,7 @@ to true only after the pin and lockfile match.
   Components ending in a space or period are rejected; symlinked scan and
   output directories are rejected. Link targets may use `..` only when they
   resolve inside the workspace, and link paths must be unique ignoring case.
-- Every list is workspace policy; the kit ships no consumer defaults. The
-  exception is the raw-source layout `wiki backfill` scans: `memory/intake`,
-  `memory/notes`, `docs/`, `user/`, `memory/contexts`, dated `memory/*.md`
-  logs, and the root convention files.
+- Every list is workspace policy; the kit ships no consumer defaults.
 - `allowedOwners` matches the first segment of each repository path. Each
   `mustContain` pair requires exactly one entry with that repository and
   mode. `maxEntries` counts entries across all categories; zero means an
@@ -221,25 +180,21 @@ to true only after the pin and lockfile match.
 
 ## Output contract
 
-- Errors print one per line to stderr and exit 1 (two parity-locked
-  exceptions: the daily-log check prints one `missing H1:` block, and a green
-  handoff prints the eligible paths as a list); success prints a terse
+- Errors print one per line to stderr and exit 1 (one parity-locked
+  exception: a green handoff prints the eligible paths as a list); success
+  prints a terse
   `<check> ok`; usage errors exit 2.
 - `doctor --json` and `verify --json` each emit exactly one newline-terminated
   `{"status","failed","warnings","checks","errors"}` object on stdout and keep
   stderr empty, including configuration and operational failures. The object
   never includes file-content excerpts.
 - Checks are deterministic, offline, and credential-free.
-- History-dependent checks (`contract`, `wiki stale`) need a full clone
-  (`fetch-depth: 0` in CI). In a shallow clone, `wiki stale` with
-  `wiki.revisionStaleness` exits 1; the default mode prints `wiki-stale ok`.
-- `wiki backfill --check` prints each pending `would write` or `would delete`
-  and exits 1 when any exist. `--dry-run` prints the same plan and exits 0.
+- `contract peer` reads history and needs a full clone (`fetch-depth: 0` in
+  CI).
 - `verify` validates `workspace.json`, runs the configured `doctor` checks,
   `registry validate` when `registry.project` exists,
   `registry pointers --check` when `registry.pointers` exists and the
-  registry is valid, and `wiki backfill --check` when `wiki` exists. It never
-  runs `wiki stale`.
+  registry is valid.
 - `registry pointers --check` prints each pending `would write` or
   `would delete` to stderr and exits 1 when any exist.
 - `registry validate` and `registry status` only read Git metadata.
@@ -260,8 +215,8 @@ Add that workflow's path to `required` so `doctor` keeps it present.
 - `init` never overwrites files. A re-run accepts a compatible
   `package.json` and stops before writing on an incompatible one; adopt
   those repositories with the steps above.
-- A re-run keeps the existing memory configuration. Conflicting memory
-  options or an unreadable config fail before scaffolding.
+- A re-run keeps the existing wiki choice. `--wiki` against a config without
+  `wiki`, or an unreadable config, fails before scaffolding.
 
 - `work`: a launch-directory home repo with no personal files. AGENTS.md +
   CLAUDE.md symlink + package.json + docs/README.md + workspace.json, an empty
@@ -272,8 +227,9 @@ Add that workflow's path to `required` so `doctor` keeps it present.
 - `runtime`: personal + HEARTBEAT.md and IDENTITY.md placeholders for
   always-on runtime identities.
 
-No profile declares memory by default. `--memory llm-wiki` adds the
-memory/wiki skeleton and generated catalogs to any profile.
+No profile declares a wiki by default. `--wiki` replaces `docs/README.md`
+with `docs/index.md` and `docs/log.md`, sets `"wiki": { "root": "docs" }`, and
+adds a Knowledge section to `AGENTS.md` on how agents maintain the wiki.
 
 A fresh scaffold passes `verify`. Configure the ownership contract once an
 origin remote and a peer exist.
@@ -286,5 +242,5 @@ also creates an empty `skills/skills.json`, `.agents/skills/`, and the
 
 The executable specification is the repository's
 [`parity/`](https://github.com/uinaf/workspace-kit/tree/main/parity) goldens,
-which the checks reproduce byte-for-byte. Deliberate quirks, such as the
-frontmatter dialect, are pinned in `test/unit.test.ts`.
+which the contract and handoff checks reproduce byte-for-byte. Deliberate
+quirks are pinned in `test/unit.test.ts`.

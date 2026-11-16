@@ -1,7 +1,7 @@
 // Integration coverage for CLI surfaces outside the golden parity suite.
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
-import { execFileSync, execSync, spawnSync } from "node:child_process";
+import { execSync, spawnSync } from "node:child_process";
 import {
   closeSync,
   existsSync,
@@ -13,7 +13,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { initWorkspace } from "../src/init.ts";
 import { tempDir } from "./temp-dir.ts";
@@ -38,7 +38,7 @@ function kitCombined(cwd: string, ...args: string[]) {
 
 function scaffold(profile: "personal" | "work" = "personal"): string {
   const dir = tempDir(`cli-${profile}-`);
-  initWorkspace(dir, profile, profile === "personal" ? { strategy: "llm-wiki" } : undefined);
+  initWorkspace(dir, profile, { wiki: profile === "personal" });
   execSync("git init -q", { cwd: dir });
   return dir;
 }
@@ -48,89 +48,6 @@ function commitAll(dir: string): void {
     cwd: dir,
   });
 }
-
-test("wiki backfill accepts the kit's own scaffold", () => {
-  const dir = scaffold("personal");
-  const result = kit(dir, "wiki", "backfill");
-  assert.equal(result.status, 0, result.stderr);
-  assert.ok(existsSync(join(dir, "memory", "wiki", "sources", "index.md")));
-  assert.match(
-    readFileSync(join(dir, "memory", "wiki", "sources", "daily-log.md"), "utf8"),
-    /^sources: \[\]$/m,
-  );
-  assert.equal(kit(dir, "wiki", "lint").status, 0);
-});
-
-test("wiki backfill honors a configured wiki.root", () => {
-  const dir = scaffold("personal");
-  rmSync(join(dir, "memory", "wiki", "sources"), { recursive: true });
-  rmSync(join(dir, "memory", "wiki", "tags"), { recursive: true });
-  const config = JSON.parse(readFileSync(join(dir, "workspace.json"), "utf8"));
-  config.wiki = { root: "notes/wiki" };
-  writeFileSync(join(dir, "workspace.json"), JSON.stringify(config, null, 2));
-  mkdirSync(join(dir, "notes", "wiki"), { recursive: true });
-  const result = kit(dir, "wiki", "backfill");
-  assert.equal(result.status, 0, result.stderr);
-  assert.ok(existsSync(join(dir, "notes", "wiki", "sources", "index.md")));
-  assert.ok(!existsSync(join(dir, "memory", "wiki", "sources")), "must not write memory/wiki");
-});
-
-test("wiki backfill --check reports drift without mutating and --dry-run stays green", () => {
-  const dir = scaffold("personal");
-  commitAll(dir);
-  rmSync(join(dir, "memory", "wiki", "sources", "index.md"));
-
-  const check = kit(dir, "wiki", "backfill", "--check");
-  assert.equal(check.status, 1);
-  assert.match(check.stdout, /would write memory\/wiki\/sources\/index\.md/);
-  assert.ok(!existsSync(join(dir, "memory", "wiki", "sources", "index.md")));
-
-  const dryRun = kit(dir, "wiki", "backfill", "--dry-run");
-  assert.equal(dryRun.status, 0, dryRun.stderr);
-  assert.equal(dryRun.stdout, check.stdout);
-
-  assert.equal(kit(dir, "wiki", "backfill").status, 0);
-  const clean = kit(dir, "wiki", "backfill", "--check");
-  assert.equal(clean.status, 0, clean.stderr);
-  assert.doesNotMatch(clean.stdout, /^would /m);
-
-  const staleTag = join(dir, "memory", "wiki", "tags", "orphan.md");
-  writeFileSync(staleTag, "# Orphan\n");
-  const deleteCheck = kit(dir, "wiki", "backfill", "--check");
-  assert.equal(deleteCheck.status, 1);
-  assert.match(deleteCheck.stdout, /would delete memory\/wiki\/tags\/orphan\.md/);
-  assert.ok(existsSync(staleTag), "check mode must not delete stale generated pages");
-});
-
-test("help documents the wiki backfill check mode", () => {
-  const dir = scaffold("work");
-  const result = kit(dir, "--help");
-  assert.equal(result.status, 2);
-  assert.match(result.stderr, /wiki backfill \[--dry-run\|--check\]/);
-});
-
-test("wiki stale reports a missing root cleanly", () => {
-  const dir = scaffold("personal");
-  rmSync(join(dir, "memory", "wiki"), { recursive: true });
-  const result = kit(dir, "wiki", "stale");
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /missing memory\/wiki/);
-});
-
-test("wiki stale fails clearly instead of reporting clean in a shallow clone", () => {
-  const origin = scaffold("personal");
-  const config = JSON.parse(readFileSync(join(origin, "workspace.json"), "utf8"));
-  config.wiki.revisionStaleness = true;
-  writeFileSync(join(origin, "workspace.json"), JSON.stringify(config, null, 2));
-  commitAll(origin);
-  const clone = join(tempDir("cli-shallow-"), "workspace");
-  execFileSync("git", ["clone", "-q", "--depth", "1", pathToFileURL(origin).href, clone]);
-
-  const result = kit(clone, "wiki", "stale");
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /wiki stale requires a full Git history; repository is shallow/);
-  assert.doesNotMatch(result.stdout, /wiki-stale ok/);
-});
 
 test("contract handoff works without a contract section and blocks ./ paths", () => {
   const dir = scaffold("personal"); // personal profile has handoff, no contract
@@ -237,20 +154,16 @@ test("doctor --json carries errors and always emits JSON", () => {
   assert.equal(JSON.parse(noConfig.stdout).status, "fail");
 });
 
-test("doctor preserves check output order and authored pages still require sources", () => {
+test("doctor preserves check output order", () => {
   const dir = scaffold("personal");
   const configPath = join(dir, "workspace.json");
   const config = JSON.parse(readFileSync(configPath, "utf8"));
   config.docsLinks = { enabled: true };
   writeFileSync(configPath, JSON.stringify(config, null, 2));
-  const indexPath = join(dir, "memory", "wiki", "index.md");
-  writeFileSync(
-    indexPath,
-    readFileSync(indexPath, "utf8").replace("sources: [AGENTS.md]", "sources: []"),
-  );
+  writeFileSync(join(dir, "docs", "orphan.md"), "# Orphan\n");
 
   const result = kitCombined(dir, "doctor");
-  const wikiError = "memory/wiki/index.md: empty frontmatter field sources";
+  const wikiError = "docs/index.md: missing entry for docs/orphan.md";
   const laterSuccess = "docs-links ok";
   assert.equal(result.status, 1);
   assert.ok(result.output.includes(wikiError), result.output);
@@ -268,17 +181,20 @@ test("verify composes configured offline checks and emits one JSON result", () =
   assert.equal(passPayload.status, "pass");
   assert.equal(passPayload.checks.config, "ok");
   assert.equal(passPayload.checks.registry, "ok");
-  assert.equal(passPayload.checks.wikiBackfill, "ok");
+  assert.equal(passPayload.checks.wiki, "ok");
 
-  rmSync(join(dir, "memory", "wiki", "sources", "index.md"));
+  writeFileSync(join(dir, "docs", "orphan.md"), "# Orphan\n");
   const fail = kit(dir, "verify", "--json");
   assert.equal(fail.status, 1);
   assert.equal(fail.stderr, "");
   assert.equal(fail.stdout.trimEnd().includes("\n"), false);
   const failPayload = JSON.parse(fail.stdout);
   assert.equal(failPayload.status, "fail");
-  assert.equal(failPayload.checks.wikiBackfill, "fail");
-  assert.ok(failPayload.errors.includes("would write memory/wiki/sources/index.md"), fail.stdout);
+  assert.equal(failPayload.checks.wiki, "fail");
+  assert.ok(
+    failPayload.errors.includes("docs/index.md: missing entry for docs/orphan.md"),
+    fail.stdout,
+  );
 });
 
 test("verify reports registry shape errors once", () => {

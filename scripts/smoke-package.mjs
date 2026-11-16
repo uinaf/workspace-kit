@@ -122,8 +122,7 @@ try {
       "init",
       "--profile",
       "personal",
-      "--memory",
-      "llm-wiki",
+      "--wiki",
       "--dir",
       fixtureDir,
     ],
@@ -179,8 +178,7 @@ try {
     )}\n`,
   );
   run(process.execPath, [installedCli, "skills", "check"], fixtureDir);
-  run(process.execPath, [installedCli, "wiki", "backfill"], fixtureDir);
-  run(process.execPath, [installedCli, "wiki", "backfill", "--check"], fixtureDir);
+  run(process.execPath, [installedCli, "wiki", "check"], fixtureDir);
 
   console.log(`packed smoke ok (${sourceVersion})`);
 } finally {

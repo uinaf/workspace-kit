@@ -28,7 +28,7 @@ function kit(cwd: string, ...args: string[]) {
 
 function scaffold(profile: "personal" | "work" = "work"): string {
   const dir = tempDir("workspace-boundary-");
-  initWorkspace(dir, profile, profile === "personal" ? { strategy: "llm-wiki" } : undefined);
+  initWorkspace(dir, profile, { wiki: profile === "personal" });
   return dir;
 }
 
@@ -161,7 +161,7 @@ test.skipIf(process.getuid?.() === 0)(
 test("doctor operational failures preserve the JSON contract", () => {
   const dir = scaffold("personal");
   const outside = tempDir("doctor-outside-");
-  symlinkSync(outside, join(dir, "memory", "contexts"));
+  symlinkSync(outside, join(dir, "docs", "linked"));
 
   const result = kit(dir, "doctor", "--json");
   assert.equal(result.status, 1);
@@ -173,11 +173,11 @@ test("doctor operational failures preserve the JSON contract", () => {
   assert.equal(payload.warnings, 0);
   assert.deepEqual(payload.checks, {});
   assert.equal(payload.errors.length, 1);
-  assert.match(payload.errors[0], /memory\/contexts: symbolic links are not allowed/);
+  assert.match(payload.errors[0], /docs\/linked: symbolic links are not allowed/);
 
   const plain = kit(dir, "doctor");
   assert.equal(plain.status, 1);
-  assert.match(plain.stderr, /memory\/contexts: symbolic links are not allowed/);
+  assert.match(plain.stderr, /docs\/linked: symbolic links are not allowed/);
   assert.doesNotMatch(plain.stderr, /\n\s+at /);
 });
 
@@ -202,9 +202,9 @@ test("wiki scans reject symlinks instead of following them", () => {
   const outside = tempDir("wiki-outside-");
   const secret = join(outside, "secret.md");
   writeFileSync(secret, "# outside-only-marker\n");
-  symlinkSync(secret, join(dir, "memory", "wiki", "outside.md"));
+  symlinkSync(secret, join(dir, "docs", "outside.md"));
 
-  const result = kit(dir, "wiki", "lint");
+  const result = kit(dir, "wiki", "check");
   assert.equal(result.status, 1);
   assert.match(result.stderr, /outside\.md: symbolic links are not allowed/);
   assert.doesNotMatch(result.stderr, /outside-only-marker/);
