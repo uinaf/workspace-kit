@@ -7,7 +7,7 @@ import { posix } from "node:path";
 import { portablePathIdentity, type DocsLinksConfig } from "../config.ts";
 import { readWorkspaceText, workspaceLstat } from "../lib/workspaceFs.ts";
 
-type Destination = { offset: number; raw: string };
+type Destination = { offset: number; raw: string; reference?: true };
 type DestinationToken = { end: number; raw: string };
 type Fence = { marker: "`" | "~"; length: number; rest: string };
 
@@ -42,7 +42,7 @@ function blank(chars: string[], start: number, end: number): void {
   }
 }
 
-function maskFencedBlocks(text: string): string {
+export function maskFencedBlocks(text: string): string {
   const chars = text.split("");
   let open: Omit<Fence, "rest"> | undefined;
   let offset = 0;
@@ -73,7 +73,7 @@ function maskFencedBlocks(text: string): string {
   return chars.join("");
 }
 
-function maskCode(text: string): string {
+export function maskCode(text: string): string {
   const fenced = maskFencedBlocks(text);
   const chars = fenced.split("");
   let cursor = 0;
@@ -251,7 +251,7 @@ function referenceDestinations(text: string): Destination[] {
               valid = tail === lineEnd;
             }
           }
-          if (valid) out.push({ offset: bodyStart, raw: token.raw });
+          if (valid) out.push({ offset: bodyStart, raw: token.raw, reference: true });
         }
       }
     }
@@ -326,6 +326,32 @@ function isUntrackedTarget(target: string, trackedIdentities: Set<string>): bool
   }
 }
 
+export type RelativeLink =
+  | { raw: string; target: string; reference?: true }
+  | { raw: string; broken: true };
+
+export function relativeLinks(file: string, text: string): RelativeLink[] {
+  const out: RelativeLink[] = [];
+  for (const { raw, reference } of destinations(text)) {
+    const unescaped = unescapeMarkdown(raw);
+    if (/^[a-z][a-z0-9+.-]*:/i.test(unescaped) || unescaped.startsWith("//")) continue;
+    const encodedPath = pathPart(raw);
+    if (!encodedPath) continue;
+    let href: string;
+    try {
+      href = decodeURIComponent(unescapeMarkdown(encodedPath));
+    } catch {
+      out.push({ raw, broken: true });
+      continue;
+    }
+    if (href.startsWith("/")) continue;
+    const target = posix.normalize(posix.join(posix.dirname(file), href)).replace(/\/+$/, "");
+    if (target === ".." || target.startsWith("../")) out.push({ raw, broken: true });
+    else out.push(reference ? { raw, target, reference } : { raw, target });
+  }
+  return out;
+}
+
 export function docsLinkErrors(config: DocsLinksConfig): string[] {
   const bad: string[] = [];
   const result = spawnSync("git", ["ls-files", "-z"], { encoding: "utf8" });
@@ -378,29 +404,16 @@ export function docsLinkErrors(config: DocsLinksConfig): string[] {
       continue;
     }
 
-    for (const { raw } of destinations(text)) {
-      const unescaped = unescapeMarkdown(raw);
-      if (/^[a-z][a-z0-9+.-]*:/i.test(unescaped) || unescaped.startsWith("//")) continue;
-      const encodedPath = pathPart(raw);
-      if (!encodedPath) continue;
-      let href: string;
-      try {
-        href = decodeURIComponent(unescapeMarkdown(encodedPath));
-      } catch {
-        bad.push(`${file}: broken link (${raw})`);
-        continue;
-      }
-      if (href.startsWith("/")) continue;
-      const target = posix.normalize(posix.join(posix.dirname(file), href)).replace(/\/+$/, "");
-      if (target === ".." || target.startsWith("../")) {
-        bad.push(`${file}: broken link (${raw})`);
-      } else if (!isTracked(target)) {
+    for (const link of relativeLinks(file, text)) {
+      if ("broken" in link) {
+        bad.push(`${file}: broken link (${link.raw})`);
+      } else if (!isTracked(link.target)) {
         // The rule is deliberate: a present-but-untracked target would break
         // for everyone else. Name the cause; do not promise a remedy.
         bad.push(
-          isUntracked(target)
-            ? `${file}: untracked link target (${raw}); the link resolves only once it is tracked`
-            : `${file}: broken link (${raw})`,
+          isUntracked(link.target)
+            ? `${file}: untracked link target (${link.raw}); the link resolves only once it is tracked`
+            : `${file}: broken link (${link.raw})`,
         );
       }
     }

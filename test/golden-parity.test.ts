@@ -4,16 +4,16 @@
 // runners cannot drift.
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
-import { readFileSync, mkdirSync, rmSync } from "node:fs";
+import { readFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
   PARITY_EXEMPT,
+  buildBase,
   makeEnv,
   normalize,
   runScenarios,
-  snapshotTree,
   utcToday,
   type Runner,
   type RunResult,
@@ -66,12 +66,6 @@ test("kit CLI reproduces every legacy golden", () => {
       compare(`${name}.err`, scrub(name, result.stderr, dir), golden(`${name}.err`));
       compare(`${name}.exit`, `${result.status}\n`, golden(`${name}.exit`));
     },
-    snapshot(name: string, dir: string, subdirs: string[]): void {
-      compare(`${name}.tree`, scrub(name, snapshotTree(dir, subdirs), dir), golden(`${name}.tree`));
-    },
-    status(name: string, dir: string, statusText: string): void {
-      compare(`${name}.txt`, scrub(name, statusText, dir), golden(`${name}.txt`));
-    },
   };
 
   rmSync(workRoot, { recursive: true, force: true });
@@ -84,3 +78,31 @@ test("kit CLI reproduces every legacy golden", () => {
     `parity mismatches (${mismatches.length}):\n\n${mismatches.join("\n\n")}`,
   );
 }, 20_000);
+
+test("doctor reports structure errors on the parity fixture", () => {
+  const dir = buildBase({ workRoot, fixtureSrc, legacyDir }, "kit-structure-errors");
+  rmSync(join(dir, "CONTRIBUTING.md"));
+  rmSync(join(dir, "CLAUDE.md"));
+  writeFileSync(join(dir, "CLAUDE.md"), "# Not a symlink\n");
+  const projects = JSON.parse(readFileSync(join(dir, "projects.json"), "utf8"));
+  delete projects.examples[0].owns;
+  projects.examples[1].branch = "";
+  writeFileSync(join(dir, "projects.json"), `${JSON.stringify(projects, null, 2)}\n`);
+  const result = runner(["doctor"], dir);
+  assert.equal(result.status, 1);
+  assert.equal(result.stdout, "workspace boundary ok (fixture-owner/fixture-workspace)\n");
+  assert.equal(
+    result.stderr,
+    [
+      "missing CONTRIBUTING.md",
+      "CLAUDE.md should be a symlink to AGENTS.md",
+      "projects.json category examples entry missing string owns",
+      "projects.json category examples entry has invalid branch",
+      "",
+    ].join("\n"),
+  );
+  assert.equal(
+    runner(["doctor"], buildBase({ workRoot, fixtureSrc, legacyDir }, "kit-green")).stdout,
+    "workspace boundary ok (fixture-owner/fixture-workspace)\ndoctor ok\n",
+  );
+});

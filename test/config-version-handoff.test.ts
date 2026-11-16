@@ -27,12 +27,7 @@ test("config reports nested unknown keys and canonicalizes repository paths", ()
       },
     },
     dailyLogs: { root: "./memory", contexts: "memory\\contexts" },
-    wiki: {
-      root: "./memory//wiki",
-      indexCoverage: false,
-      revisionStaleness: true,
-      indexCoverge: true,
-    },
+    wiki: { root: "./memory//wiki", indexCoverge: true },
     contract: { file: ".\\workspace.contract.json" },
     handoff: { paths: [], prefixes: ["memory/"], prefxies: [] },
     skills: { typo: true },
@@ -41,6 +36,7 @@ test("config reports nested unknown keys and canonicalizes repository paths", ()
 
   assert.deepEqual(unknownConfigKeys(raw), [
     "links[0].targt",
+    "dailyLogs",
     "wiki.indexCoverge",
     "handoff.prefxies",
     "skills.typo",
@@ -54,9 +50,7 @@ test("config reports nested unknown keys and canonicalizes repository paths", ()
   assert.equal(parsed.registry?.file, "projects.json");
   assert.deepEqual(parsed.registry?.project?.originHosts, ["gitlab.com"]);
   assert.deepEqual(parsed.registry?.project?.allowedOwners, ["fixture-owner"]);
-  assert.deepEqual(parsed.dailyLogs, { root: "memory", contexts: "memory/contexts" });
-  assert.equal(parsed.wiki?.root, "memory/wiki");
-  assert.equal(parsed.wiki?.revisionStaleness, true);
+  assert.deepEqual(parsed.wiki, { root: "memory/wiki" });
   assert.equal(parsed.contract?.file, "workspace.contract.json");
   assert.deepEqual(parsed.skills, { manifest: "skills/skills.json" });
 });
@@ -68,34 +62,10 @@ test("config enables the conventional workspace skill manifest", () => {
   assert.throws(() => parseWorkspaceConfig({ skills: true }), /skills must be an object/);
 });
 
-test("config models llm-wiki memory and rejects other strategies", () => {
-  const llmWiki = parseWorkspaceConfig({
-    memory: { strategy: "llm-wiki" },
-    dailyLogs: { root: "memory", contexts: "memory/contexts" },
-    wiki: { root: "memory/wiki" },
-  });
-  assert.deepEqual(llmWiki.memory, { strategy: "llm-wiki" });
-
-  assert.throws(
-    () => parseWorkspaceConfig({ memory: { strategy: "llm-wiki" } }),
-    /requires dailyLogs and wiki/,
-  );
-  assert.throws(
-    () => parseWorkspaceConfig({ memory: { strategy: "external" } }),
-    /memory.strategy must be llm-wiki/,
-  );
-});
-
-test("revision staleness is opt-in and must be boolean", () => {
-  const parsed = parseWorkspaceConfig({ wiki: { root: "memory/wiki" } });
-  assert.equal(parsed.wiki?.revisionStaleness, false);
-  assert.throws(
-    () =>
-      parseWorkspaceConfig({
-        wiki: { root: "memory/wiki", revisionStaleness: "true" },
-      }),
-    /wiki\.revisionStaleness must be a boolean/,
-  );
+test("wiki root defaults to docs and stays inside the workspace", () => {
+  assert.deepEqual(parseWorkspaceConfig({ wiki: {} }).wiki, { root: "docs" });
+  assert.throws(() => parseWorkspaceConfig({ wiki: { root: "../out" } }), /wiki.root/);
+  assert.throws(() => parseWorkspaceConfig({ wiki: true }), /wiki must be an object/);
 });
 
 test("config rejects duplicate origin hosts after normalization", () => {

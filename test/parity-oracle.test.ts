@@ -9,22 +9,13 @@ const goldens = join(root, "parity", "goldens");
 const fixture = join(root, "parity", "fixtures", "green-personal");
 
 const greenScenarios = [
-  "doctor-green",
-  "wiki-lint-green",
   "contract-check-green",
   "contract-check-green-https",
-  "wiki-stale-green",
   "handoff-allowed",
   "peer-check-green",
-  "backfill-first-run",
-  "wiki-lint-post-backfill",
-  "backfill-second-run",
 ];
 
 const failingScenarios = [
-  "doctor-structure-errors",
-  "doctor-cascade-errors",
-  "wiki-lint-errors",
   "contract-check-errors",
   "contract-malformed",
   "handoff-blocked",
@@ -64,18 +55,6 @@ test("goldens contain no absolute or capture-day residue", () => {
       assert.ok(!content.includes("\u001b"), `${scenario}${ext} contains ANSI codes`);
     }
   }
-  const tree = readFileSync(join(goldens, "backfill-generated.tree"), "utf8");
-  assert.ok(!tree.includes("/Users/"), "tree snapshot leaks a path");
-  assert.ok(!/updated: \d{4}-\d{2}-\d{2}/.test(tree), "tree snapshot leaks capture date");
-});
-
-test("backfill idempotency golden shows an unchanged worktree", () => {
-  const status = readFileSync(join(goldens, "backfill-worktree-status.txt"), "utf8");
-  const lines = status.split("\n").filter(Boolean);
-  assert.ok(
-    lines.every((line) => line.startsWith("??") || /memory\/wiki\/(sources|tags)\//.test(line)),
-    `unexpected worktree changes: ${status}`,
-  );
 });
 
 test("fixture keeps its structural invariants", () => {

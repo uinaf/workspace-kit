@@ -21,15 +21,7 @@ export type RegistryConfig = {
   project?: ProjectRegistryConfig;
   pointers?: { dir: string };
 };
-export type DailyLogsConfig = { root: string; contexts: string };
-export type MemoryConfig = { strategy: "llm-wiki" };
-export type WikiConfig = {
-  root: string;
-  requiredFields: string[];
-  indexCoverage: boolean;
-  logChronology: boolean;
-  revisionStaleness: boolean;
-};
+export type WikiConfig = { root: string };
 export type LimitRule = { pattern: string; maxLines: number };
 export type ContractConfig = { file: string };
 export type HandoffConfig = { paths: string[]; prefixes: string[] };
@@ -43,8 +35,6 @@ export type WorkspaceConfig = {
   forbidden?: string[];
   links?: LinkRule[];
   registry?: RegistryConfig;
-  memory?: MemoryConfig;
-  dailyLogs?: DailyLogsConfig;
   wiki?: WikiConfig;
   limits?: LimitRule[];
   contract?: ContractConfig;
@@ -140,15 +130,7 @@ const CONFIG_SHAPE: ConfigShape = {
     },
     pointers: { dir: true },
   },
-  memory: { strategy: true },
-  dailyLogs: { root: true, contexts: true },
-  wiki: {
-    root: true,
-    requiredFields: true,
-    indexCoverage: true,
-    logChronology: true,
-    revisionStaleness: true,
-  },
+  wiki: { root: true },
   limits: [{ pattern: true, maxLines: true }],
   contract: { file: true },
   handoff: { paths: true, prefixes: true },
@@ -350,41 +332,13 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
     out.registry = registry;
   }
 
-  if ("memory" in value) {
-    if (!isRecord(value.memory)) fail("memory must be an object");
-    const strategy = text(value.memory.strategy, "memory.strategy");
-    if (strategy !== "llm-wiki") fail("memory.strategy must be llm-wiki");
-    out.memory = { strategy };
-  }
-
-  if ("dailyLogs" in value) {
-    if (!isRecord(value.dailyLogs)) fail("dailyLogs must be an object");
-    out.dailyLogs = {
-      root: normalizeWorkspacePath(text(value.dailyLogs.root, "dailyLogs.root"), "dailyLogs.root"),
-      contexts: normalizeWorkspacePath(
-        text(value.dailyLogs.contexts, "dailyLogs.contexts"),
-        "dailyLogs.contexts",
-      ),
-    };
-  }
-
   if ("wiki" in value) {
     if (!isRecord(value.wiki)) fail("wiki must be an object");
-    const wiki = value.wiki;
-    for (const flag of ["indexCoverage", "logChronology", "revisionStaleness"]) {
-      if (flag in wiki && typeof wiki[flag] !== "boolean") {
-        fail(`wiki.${flag} must be a boolean`);
-      }
-    }
     out.wiki = {
-      root: normalizeWorkspacePath(text(wiki.root, "wiki.root"), "wiki.root"),
-      requiredFields:
-        "requiredFields" in wiki
-          ? stringList(wiki.requiredFields, "wiki.requiredFields")
-          : ["title", "type", "status", "updated", "tags", "sources"],
-      indexCoverage: wiki.indexCoverage === true,
-      logChronology: wiki.logChronology === true,
-      revisionStaleness: wiki.revisionStaleness === true,
+      root:
+        "root" in value.wiki
+          ? normalizeWorkspacePath(text(value.wiki.root, "wiki.root"), "wiki.root")
+          : "docs",
     };
   }
 
@@ -455,10 +409,6 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
       enforce: value.packageManager.enforce === true,
       allowForeignLockfiles: value.packageManager.allowForeignLockfiles === true,
     };
-  }
-
-  if (out.memory?.strategy === "llm-wiki" && (!out.dailyLogs || !out.wiki)) {
-    fail("memory strategy llm-wiki requires dailyLogs and wiki sections");
   }
 
   return out;

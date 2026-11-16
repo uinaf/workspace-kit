@@ -184,6 +184,7 @@ export function walkWorkspaceMarkdown(
   root: string,
   path: string,
   missing: "empty" | "error" = "error",
+  skip: (relative: string) => boolean = () => false,
 ): string[] {
   const relativeRoot = normalizeWorkspacePath(path);
   const out: string[] = [];
@@ -194,6 +195,7 @@ export function walkWorkspaceMarkdown(
     );
     for (const entry of entries) {
       const child = posix.join(relative, entry.name);
+      if (skip(child)) continue;
       if (entry.isSymbolicLink()) {
         throw new Error(`${child}: symbolic links are not allowed in scanned directories`);
       }

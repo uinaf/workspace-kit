@@ -13,9 +13,7 @@ import {
   type WorkspaceConfig,
 } from "./config.ts";
 import { structureErrors } from "./checks/structure.ts";
-import { wikiLintErrors } from "./checks/wikiLint.ts";
-import { wikiStaleReport } from "./checks/wikiStale.ts";
-import { wikiBackfill } from "./checks/wikiBackfill.ts";
+import { wikiErrors } from "./checks/wiki.ts";
 import {
   isPrivateHandoffPath,
   loadContract,
@@ -51,9 +49,7 @@ const USAGE = `usage: workspace-kit <command>
 commands:
   verify [--json]          run the complete offline validation gate
   doctor [--json]          run all checks configured in ${CONFIG_FILE}
-  wiki lint                lint the wiki layer
-  wiki stale               report wiki pages older than their sources
-  wiki backfill [--dry-run|--check]  regenerate or verify wiki source/tag catalogs
+  wiki check               check the wiki index, links, and log
   limits                   report soft size-limit warnings (never fails)
   contract check           validate this repository's workspace contract
   contract peer <path>     validate both contracts and history separation
@@ -68,7 +64,7 @@ commands:
   skills check | sync      verify or install configured workspace-local skills
   config validate          validate ${CONFIG_FILE} itself
   init [--profile personal|runtime|work] [--dir <path>]
-       [--memory llm-wiki]  scaffold a workspace
+       [--wiki]            scaffold a workspace
   --version                print the kit version
 `;
 
@@ -134,20 +130,8 @@ function requireSection<T>(value: T | undefined, section: string): T {
   return value;
 }
 
-// Runs wiki lint exactly like the legacy standalone script: errors to
-// stderr + exit-style status, "wiki-lint ok" on stdout when green.
-function runWikiLint(wiki: import("./config.ts").WikiConfig): number {
-  const result = wikiLintErrors(wiki);
-  if (result.fatal) {
-    console.error(result.fatal);
-    return 1;
-  }
-  if (result.errors.length > 0) {
-    console.error(result.errors.join("\n"));
-    return 1;
-  }
-  console.log("wiki-lint ok");
-  return 0;
+function wikiExclusions(config: WorkspaceConfig): string[] {
+  return config.registry?.pointers ? [config.registry.pointers.dir] : [];
 }
 
 function runContractCheck(file: string): number {
@@ -219,14 +203,13 @@ function doctorReport(config: WorkspaceConfig): DoctorReport {
   };
 
   if (config.wiki) {
-    const result = wikiLintErrors(config.wiki);
-    const errors = result.fatal ? [result.fatal] : result.errors;
+    const errors = wikiErrors(config.wiki, wikiExclusions(config));
     if (errors.length > 0) {
       stderr(errors);
-      bad.push("wiki-lint failed (exit 1)");
+      bad.push("wiki check failed (exit 1)");
       checks.wiki = "fail";
     } else {
-      stdout("wiki-lint ok");
+      stdout("wiki ok");
       checks.wiki = "ok";
     }
   }
@@ -366,26 +349,6 @@ function verify(state: LoadedConfig, json: boolean): never {
     }
   }
 
-  if (state.config.wiki) {
-    try {
-      const result = wikiBackfill({ root: state.config.wiki.root, dryRun: true });
-      checks.wikiBackfill = result.planned.length === 0 ? "ok" : "fail";
-      if (result.planned.length === 0) {
-        events.push({ stream: "stdout", text: "wiki-backfill ok" });
-      } else {
-        const added = appendUnique(errors, result.planned);
-        if (added.length > 0) events.push({ stream: "stderr", text: added.join("\n") });
-        failures.push("wiki backfill check failed (exit 1)");
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      checks.wikiBackfill = "fail";
-      const added = appendUnique(errors, [message]);
-      if (added.length > 0) events.push({ stream: "stderr", text: added.join("\n") });
-      failures.push("wiki backfill check failed (exit 1)");
-    }
-  }
-
   if (json) {
     const failed = Object.values(checks).filter((value) => value === "fail").length;
     console.log(
@@ -423,7 +386,7 @@ function main(): void {
   if (command === "init") {
     let profile = "personal";
     let dir = ".";
-    let memory: import("./config.ts").MemoryConfig | undefined;
+    let wiki = false;
     for (let i = 0; i < rest.length; i += 1) {
       if (rest[i] === "--profile" && rest[i + 1]) {
         profile = rest[i + 1]!;
@@ -431,10 +394,8 @@ function main(): void {
       } else if (rest[i] === "--dir" && rest[i + 1]) {
         dir = rest[i + 1]!;
         i += 1;
-      } else if (rest[i] === "--memory" && rest[i + 1]) {
-        if (rest[i + 1] !== "llm-wiki") usageExit();
-        memory = { strategy: "llm-wiki" };
-        i += 1;
+      } else if (rest[i] === "--wiki") {
+        wiki = true;
       } else {
         usageExit();
       }
@@ -442,7 +403,7 @@ function main(): void {
     if (!["personal", "runtime", "work"].includes(profile)) usageExit();
     let result;
     try {
-      result = initWorkspace(dir, profile as "personal" | "runtime" | "work", memory);
+      result = initWorkspace(dir, profile as "personal" | "runtime" | "work", { wiki });
     } catch (error) {
       failWith(error instanceof Error ? error.message : String(error));
     }
@@ -479,30 +440,12 @@ function main(): void {
   }
 
   if (command === "wiki") {
-    const [mode, ...args] = rest;
+    if (rest.length !== 1 || rest[0] !== "check") usageExit();
     const config = loadConfigOrFail();
-    const wiki = requireSection(config.wiki, "wiki");
-    if (mode === "lint" && args.length === 0) {
-      process.exit(runWikiLint(wiki));
-    }
-    if (mode === "stale" && args.length === 0) {
-      const report = wikiStaleReport(wiki.root, {
-        revisionStaleness: wiki.revisionStaleness,
-      });
-      if (report.fatal) failWith(report.fatal);
-      for (const line of report.err) console.error(line);
-      for (const line of report.out) console.log(line);
-      process.exit(0);
-    }
-    const dryRun = args.length === 1 && args[0] === "--dry-run";
-    const check = args.length === 1 && args[0] === "--check";
-    if (mode === "backfill" && (args.length === 0 || dryRun || check)) {
-      const result = wikiBackfill({ root: wiki.root, dryRun: dryRun || check });
-      for (const line of result.planned) console.log(line);
-      for (const line of result.out) console.log(line);
-      process.exit(check && result.planned.length > 0 ? 1 : 0);
-    }
-    usageExit();
+    const errors = wikiErrors(requireSection(config.wiki, "wiki"), wikiExclusions(config));
+    if (errors.length > 0) failWith(errors.join("\n"));
+    console.log("wiki ok");
+    process.exit(0);
   }
 
   if (command === "contract") {
