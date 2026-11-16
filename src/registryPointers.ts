@@ -67,17 +67,20 @@ export function registryPointers(
   const dir = registry.pointers.dir;
   const files = plannedFiles(registry.file, JSON.parse(readWorkspaceText(repoRoot, registry.file)));
 
-  const writes: Array<{ path: string; content: string }> = [];
-  for (const [name, content] of files) {
-    const path = posix.join(dir, name);
-    const current = workspaceLstat(repoRoot, path) ? readWorkspaceText(repoRoot, path) : undefined;
-    if (current !== content) writes.push({ path, content });
-  }
   const deletes: string[] = [];
   for (const entry of readWorkspaceDirectory(repoRoot, dir, "empty")) {
     if (!entry.isFile() || !entry.name.endsWith(".md") || files.has(entry.name)) continue;
     const path = posix.join(dir, entry.name);
     if (readWorkspaceText(repoRoot, path).includes(marker(registry.file))) deletes.push(path);
+  }
+  const deleted = new Set(deletes.map((path) => portablePathIdentity(path)));
+  const writes: Array<{ path: string; content: string }> = [];
+  for (const [name, content] of files) {
+    const path = posix.join(dir, name);
+    const current = workspaceLstat(repoRoot, path) ? readWorkspaceText(repoRoot, path) : undefined;
+    if (current !== content || deleted.has(portablePathIdentity(path))) {
+      writes.push({ path, content });
+    }
   }
 
   const planned = [
@@ -85,8 +88,8 @@ export function registryPointers(
     ...deletes.map((path) => `would delete ${path}`),
   ];
   if (!options.check) {
-    for (const { path, content } of writes) writeWorkspaceText(repoRoot, path, content);
     for (const path of deletes) unlinkWorkspaceFile(repoRoot, path);
+    for (const { path, content } of writes) writeWorkspaceText(repoRoot, path, content);
   }
   return { planned };
 }

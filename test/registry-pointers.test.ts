@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "vite-plus/test";
@@ -100,6 +100,16 @@ test("verify fails on pointer drift and a rerun purges only generated files", ()
   assert.equal(kit(dir, "registry", "pointers").status, 0);
   assert.equal(existsSync(join(dir, "docs/projects/apps.md")), false);
   assert.equal(readFileSync(join(dir, "docs/projects/notes.md"), "utf8"), "# Notes\n");
+  assert.equal(kit(dir, "verify").status, 0);
+});
+
+test("renaming a category's case leaves exactly the new pointer file", () => {
+  const dir = workspace({ Tools: projects.tools });
+  assert.equal(kit(dir, "registry", "pointers").status, 0);
+  writeFileSync(join(dir, "projects.json"), JSON.stringify({ tools: projects.tools }));
+  assert.equal(kit(dir, "registry", "pointers").status, 0);
+  assert.deepEqual(readdirSync(join(dir, "docs/projects")).sort(), ["README.md", "tools.md"]);
+  assert.match(readFileSync(join(dir, "docs/projects/tools.md"), "utf8"), /^# tools\n/);
   assert.equal(kit(dir, "verify").status, 0);
 });
 
