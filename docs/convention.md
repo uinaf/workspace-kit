@@ -17,8 +17,9 @@ check covers presence and the link; the owner reviews the prose.
 `"wiki": {}` adopts a Markdown wiki that agents maintain: one page per topic,
 an index, and an optional log. `root` sets its directory (default `docs`).
 
-- Every `.md` page under the root is linked from `<root>/index.md`, except
-  `index.md` and `log.md`.
+- Every `.md` page under the root has an inline link or wikilink in
+  `<root>/index.md`, except `index.md` and `log.md`. Reference definitions do
+  not count as entries.
 - Relative links and `[[wikilinks]]` in every page resolve. A wikilink
   resolves page-relative, then root-relative, with `.md` appended when it has
   no extension. Code spans and fenced blocks are ignored.

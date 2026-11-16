@@ -118,7 +118,7 @@ test("a workspace without a wiki section gets no wiki check", () => {
   assert.equal(kit(dir, "wiki", "check").status, 1);
 });
 
-test("wiki check reads real log headings, used references, and real link targets", () => {
+test("wiki check reads real log headings, inline index entries, and real link targets", () => {
   const dir = workspace();
   writeFileSync(
     join(dir, "docs", "log.md"),
@@ -129,11 +129,14 @@ test("wiki check reads real log headings, used references, and real link targets
     "# Index\n\n- [Alpha][a]\n\n[a]: alpha.md\n[b]: topics/beta.md\n",
   );
   const unused = kit(dir, "wiki", "check");
-  assert.equal(unused.stderr, "docs/index.md: missing entry for docs/topics/beta.md\n");
+  assert.equal(
+    unused.stderr,
+    "docs/index.md: missing entry for docs/alpha.md\ndocs/index.md: missing entry for docs/topics/beta.md\n",
+  );
 
   writeFileSync(
     join(dir, "docs", "index.md"),
-    "# Index\n\n- [Alpha][a]\n- [beta][]\n\n[a]: alpha.md\n[beta]: topics/beta.md\n",
+    "# Index\n\n- [Alpha](alpha.md)\n- [[topics/beta]]\n\n[unused]: alpha.md\n",
   );
   assert.equal(kit(dir, "wiki", "check").status, 0, kit(dir, "wiki", "check").stderr);
 

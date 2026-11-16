@@ -15,21 +15,6 @@ function exists(path: string): boolean {
   }
 }
 
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function referenceUsed(text: string, label: string): boolean {
-  const body = maskCode(text)
-    .split(/\r?\n/)
-    .filter((line) => !/^ {0,3}\[[^\]]+\]:/.test(line))
-    .join("\n");
-  const name = escapeRegExp(label.trim()).replace(/\s+/g, "\\s+");
-  return new RegExp(`\\]\\[${name}\\]|\\[${name}\\]\\[\\]|\\[${name}\\](?!\\s*[:([])`, "i").test(
-    body,
-  );
-}
-
 function inside(path: string): boolean {
   return path !== ".." && !path.startsWith("../") && !path.startsWith("/");
 }
@@ -95,10 +80,7 @@ export function wikiErrors(wiki: WikiConfig, exclude: string[] = []): string[] {
     for (const link of [...relativeLinks(page, text), ...wikilinks(page, text, wiki.root)]) {
       if ("broken" in link || !exists(link.target)) {
         errors.push(`${page}: broken link (${link.raw})`);
-      } else if (
-        page === index &&
-        (!("label" in link) || !link.label || referenceUsed(text, link.label))
-      ) {
+      } else if (page === index && !("reference" in link)) {
         indexed.add(link.target);
       }
     }

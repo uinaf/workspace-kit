@@ -7,7 +7,7 @@ import { posix } from "node:path";
 import { portablePathIdentity, type DocsLinksConfig } from "../config.ts";
 import { readWorkspaceText, workspaceLstat } from "../lib/workspaceFs.ts";
 
-type Destination = { offset: number; raw: string; label?: string };
+type Destination = { offset: number; raw: string; reference?: true };
 type DestinationToken = { end: number; raw: string };
 type Fence = { marker: "`" | "~"; length: number; rest: string };
 
@@ -251,13 +251,7 @@ function referenceDestinations(text: string): Destination[] {
               valid = tail === lineEnd;
             }
           }
-          if (valid) {
-            out.push({
-              offset: bodyStart,
-              raw: token.raw,
-              label: text.slice(cursor + 1, labelEnd),
-            });
-          }
+          if (valid) out.push({ offset: bodyStart, raw: token.raw, reference: true });
         }
       }
     }
@@ -333,12 +327,12 @@ function isUntrackedTarget(target: string, trackedIdentities: Set<string>): bool
 }
 
 export type RelativeLink =
-  | { raw: string; target: string; label?: string }
+  | { raw: string; target: string; reference?: true }
   | { raw: string; broken: true };
 
 export function relativeLinks(file: string, text: string): RelativeLink[] {
   const out: RelativeLink[] = [];
-  for (const { raw, label } of destinations(text)) {
+  for (const { raw, reference } of destinations(text)) {
     const unescaped = unescapeMarkdown(raw);
     if (/^[a-z][a-z0-9+.-]*:/i.test(unescaped) || unescaped.startsWith("//")) continue;
     const encodedPath = pathPart(raw);
@@ -353,7 +347,7 @@ export function relativeLinks(file: string, text: string): RelativeLink[] {
     if (href.startsWith("/")) continue;
     const target = posix.normalize(posix.join(posix.dirname(file), href)).replace(/\/+$/, "");
     if (target === ".." || target.startsWith("../")) out.push({ raw, broken: true });
-    else out.push(label === undefined ? { raw, target } : { raw, target, label });
+    else out.push(reference ? { raw, target, reference } : { raw, target });
   }
   return out;
 }
