@@ -131,6 +131,12 @@ to true only after the pin and lockfile match.
     branch.
   - `registry path <category/name> [--mode <mode>]` prints one validated
     absolute checkout path for consumer scripts.
+  - `registry.pointers.dir` enables `registry pointers`: it writes a
+    `README.md` index and one `<category>.md` per registry category, one line
+    per entry. Link the index from `AGENTS.md` so agents load only the
+    category they need. Category names must be safe file names. A rerun
+    deletes stale category files that carry the generated marker and keeps
+    every other file.
 - **Ownership contract**: for peered workspaces split from one ancestor,
   `workspace.contract.json` names the repository, its peer, the shared
   ancestor commit, and required and forbidden owner paths. `contract check`
@@ -174,6 +180,7 @@ to true only after the pin and lockfile match.
       "maxEntries": 25,
       "catalog": { "field": "catalog", "modes": ["managed"] },
     },
+    "pointers": { "dir": "docs/projects" }, // needs registry.project
   },
   "dailyLogs": { "root": "memory", "contexts": "memory/contexts" },
   "memory": { "strategy": "llm-wiki" },
@@ -229,8 +236,12 @@ to true only after the pin and lockfile match.
 - `wiki backfill --check` prints each pending `would write` or `would delete`
   and exits 1 when any exist. `--dry-run` prints the same plan and exits 0.
 - `verify` validates `workspace.json`, runs the configured `doctor` checks,
-  `registry validate` when `registry.project` exists, and
-  `wiki backfill --check` when `wiki` exists. It never runs `wiki stale`.
+  `registry validate` when `registry.project` exists,
+  `registry pointers --check` when `registry.pointers` exists and the
+  registry is valid, and `wiki backfill --check` when `wiki` exists. It never
+  runs `wiki stale`.
+- `registry pointers --check` prints each pending `would write` or
+  `would delete` to stderr and exits 1 when any exist.
 - `registry validate` and `registry status` only read Git metadata.
   `registry clone` runs `gh repo clone`; `registry pull` runs
   `git pull --ff-only`.
@@ -252,15 +263,17 @@ Add that workflow's path to `required` so `doctor` keeps it present.
 - A re-run keeps the existing memory configuration. Conflicting memory
   options or an unreadable config fail before scaffolding.
 
-- `work`: AGENTS.md + CLAUDE.md symlink + package.json + docs/README.md + workspace.json.
-- `personal`: work + README, `.env.example`, project-registry stub and
-  lifecycle scripts, hook installer, memory/wiki skeleton and generated
-  catalogs, and a `verify` pre-commit hook.
+- `work`: a launch-directory home repo with no personal files. AGENTS.md +
+  CLAUDE.md symlink + package.json + docs/README.md + workspace.json, an empty
+  `projects.json` with no owner allowlist, its lifecycle scripts, and
+  generated pointers in `docs/projects/`.
+- `personal`: work + README, `.env.example`, handoff policy, hook installer,
+  and a `verify` pre-commit hook.
 - `runtime`: personal + HEARTBEAT.md and IDENTITY.md placeholders for
   always-on runtime identities.
 
-Personal and runtime profiles default to `llm-wiki`. The `work` profile
-declares no memory strategy.
+No profile declares memory by default. `--memory llm-wiki` adds the
+memory/wiki skeleton and generated catalogs to any profile.
 
 A fresh scaffold passes `verify`. Configure the ownership contract once an
 origin remote and a peer exist.

@@ -122,6 +122,8 @@ try {
       "init",
       "--profile",
       "personal",
+      "--memory",
+      "llm-wiki",
       "--dir",
       fixtureDir,
     ],
@@ -141,6 +143,7 @@ try {
   assert.doesNotMatch(hook, /npm run/);
   run(process.execPath, [installedCli, "verify"], fixtureDir);
   run(process.execPath, [installedCli, "registry", "status"], fixtureDir);
+  run(process.execPath, [installedCli, "registry", "pointers", "--check"], fixtureDir);
   run("git", ["init", "-q"], fixtureDir);
   run(process.execPath, [installedCli, "hooks", "install"], fixtureDir);
   assert.equal(run("git", ["config", "--get", "core.hooksPath"], fixtureDir).trim(), ".githooks");

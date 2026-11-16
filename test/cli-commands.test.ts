@@ -38,7 +38,7 @@ function kitCombined(cwd: string, ...args: string[]) {
 
 function scaffold(profile: "personal" | "work" = "personal"): string {
   const dir = tempDir(`cli-${profile}-`);
-  initWorkspace(dir, profile);
+  initWorkspace(dir, profile, profile === "personal" ? { strategy: "llm-wiki" } : undefined);
   execSync("git init -q", { cwd: dir });
   return dir;
 }
