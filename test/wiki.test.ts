@@ -88,6 +88,8 @@ test("wiki check needs an index, honors wiki.root, and skips generated pointers"
   const missing = kit(dir, "wiki", "check");
   assert.equal(missing.status, 1);
   assert.equal(missing.stderr, "missing docs/index.md\n");
+  mkdirSync(join(dir, "docs", "index.md"));
+  assert.equal(kit(dir, "wiki", "check").stderr, "missing docs/index.md\n");
 
   const custom = workspace({ wiki: { root: "notes" } });
   assert.equal(kit(custom, "wiki", "check").stderr, "missing notes/index.md\n");
@@ -130,7 +132,7 @@ test("wiki check reads real log headings, used references, and real link targets
 
   writeFileSync(
     join(dir, "docs", "index.md"),
-    "# Index\n\n- [Alpha][a]\n- [beta]\n\n[a]: alpha.md\n[beta]: topics/beta.md\n",
+    "# Index\n\n- [Alpha][a]\n- [beta][]\n\n[a]: alpha.md\n[beta]: topics/beta.md\n",
   );
   assert.equal(kit(dir, "wiki", "check").status, 0, kit(dir, "wiki", "check").stderr);
 

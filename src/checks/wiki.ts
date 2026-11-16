@@ -25,7 +25,9 @@ function referenceUsed(text: string, label: string): boolean {
     .filter((line) => !/^ {0,3}\[[^\]]+\]:/.test(line))
     .join("\n");
   const name = escapeRegExp(label.trim()).replace(/\s+/g, "\\s+");
-  return new RegExp(`\\]\\[${name}\\]|\\[${name}\\](?!\\s*[:([])`, "i").test(body);
+  return new RegExp(`\\]\\[${name}\\]|\\[${name}\\]\\[\\]|\\[${name}\\](?!\\s*[:([])`, "i").test(
+    body,
+  );
 }
 
 function inside(path: string): boolean {
@@ -75,7 +77,13 @@ function logErrors(log: string): string[] {
 export function wikiErrors(wiki: WikiConfig, exclude: string[] = []): string[] {
   const index = posix.join(wiki.root, "index.md");
   const log = posix.join(wiki.root, "log.md");
-  if (!exists(index)) return [`missing ${index}`];
+  let indexStat;
+  try {
+    indexStat = workspaceLstat(".", index);
+  } catch {
+    indexStat = undefined;
+  }
+  if (!indexStat?.isFile()) return [`missing ${index}`];
   const pages = walkWorkspaceMarkdown(".", wiki.root).filter(
     (page) => !exclude.some((dir) => page.startsWith(`${dir}/`)),
   );
