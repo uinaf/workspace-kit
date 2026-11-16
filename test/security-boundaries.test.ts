@@ -28,7 +28,7 @@ function kit(cwd: string, ...args: string[]) {
 
 function scaffold(profile: "personal" | "work" = "work"): string {
   const dir = tempDir("workspace-boundary-");
-  initWorkspace(dir, profile);
+  initWorkspace(dir, profile, profile === "personal" ? { strategy: "llm-wiki" } : undefined);
   return dir;
 }
 

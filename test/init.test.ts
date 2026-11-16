@@ -22,82 +22,92 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = join(root, "src", "cli.ts");
 
 for (const profile of ["personal", "runtime", "work"] as const) {
-  test(`init --profile ${profile} scaffolds a verify-green workspace`, () => {
-    const dir = tempDir(`init-${profile}-`);
-    const result = initWorkspace(dir, profile);
-    assert.ok(result.created.includes("AGENTS.md"));
-    assert.ok(lstatSync(join(dir, "CLAUDE.md")).isSymbolicLink());
-    assert.equal(readlinkSync(join(dir, "CLAUDE.md")), "AGENTS.md");
+  for (const memory of [undefined, { strategy: "llm-wiki" } as const]) {
+    test(`init --profile ${profile} ${memory ? "--memory llm-wiki " : ""}scaffolds a verify-green workspace`, () => {
+      const dir = tempDir(`init-${profile}-`);
+      const result = initWorkspace(dir, profile, memory);
+      assert.equal(existsSync(join(dir, "memory", "wiki", "index.md")), memory !== undefined);
+      assert.match(
+        readFileSync(join(dir, "docs", "projects", "README.md"), "utf8"),
+        /No registered projects/,
+      );
+      assert.ok(result.created.includes("docs/projects/README.md"));
+      assert.ok(result.created.includes("AGENTS.md"));
+      assert.ok(lstatSync(join(dir, "CLAUDE.md")).isSymbolicLink());
+      assert.equal(readlinkSync(join(dir, "CLAUDE.md")), "AGENTS.md");
 
-    // Scaffolded AGENTS.md is a structural skeleton, never behavioral prose.
-    const agents = readFileSync(join(dir, "AGENTS.md"), "utf8");
-    assert.match(agents, /TODO/);
-    assert.match(agents, /## Skill Ownership/);
-    assert.match(agents, /pnpm verify/);
-    const packageJson = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
-      scripts: Record<string, string>;
-      devDependencies: Record<string, string>;
-      packageManager: string;
-    };
-    assert.equal(packageJson.devDependencies["@uinaf/workspace-kit"], kitVersion());
-    assert.equal(packageJson.scripts.doctor, "workspace-kit doctor");
-    assert.equal(packageJson.scripts.test, "pnpm verify");
-    assert.equal(packageJson.scripts.verify, "workspace-kit verify");
-    assert.equal(packageJson.packageManager, "pnpm@12.0.0");
-    if (profile === "personal" || profile === "runtime") {
-      const hook = readFileSync(join(dir, ".githooks", "pre-commit"), "utf8");
-      assert.match(hook, /pnpm verify/);
-      assert.doesNotMatch(hook, /npx/);
-      assert.doesNotMatch(hook, /npm run/);
+      // Scaffolded AGENTS.md is a structural skeleton, never behavioral prose.
+      const agents = readFileSync(join(dir, "AGENTS.md"), "utf8");
+      assert.match(agents, /TODO/);
+      assert.match(agents, /## Skill Ownership/);
+      assert.match(agents, /pnpm verify/);
+      const packageJson = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
+        scripts: Record<string, string>;
+        devDependencies: Record<string, string>;
+        packageManager: string;
+      };
+      assert.equal(packageJson.devDependencies["@uinaf/workspace-kit"], kitVersion());
+      assert.equal(packageJson.scripts.doctor, "workspace-kit doctor");
+      assert.equal(packageJson.scripts.test, "pnpm verify");
+      assert.equal(packageJson.scripts.verify, "workspace-kit verify");
+      assert.equal(packageJson.packageManager, "pnpm@12.0.0");
       assert.equal(packageJson.scripts["registry:check"], "workspace-kit registry validate");
       assert.equal(packageJson.scripts["registry:clone"], "workspace-kit registry clone");
       assert.equal(packageJson.scripts["registry:status"], "workspace-kit registry status");
       assert.equal(packageJson.scripts["registry:pull"], "workspace-kit registry pull");
-      assert.equal(packageJson.scripts["hooks:install"], "workspace-kit hooks install");
+      assert.equal(packageJson.scripts["registry:pointers"], "workspace-kit registry pointers");
+      if (profile === "personal" || profile === "runtime") {
+        const hook = readFileSync(join(dir, ".githooks", "pre-commit"), "utf8");
+        assert.match(hook, /pnpm verify/);
+        assert.doesNotMatch(hook, /npx/);
+        assert.doesNotMatch(hook, /npm run/);
+        assert.equal(packageJson.scripts["hooks:install"], "workspace-kit hooks install");
 
-      const config = JSON.parse(readFileSync(join(dir, "workspace.json"), "utf8")) as {
-        handoff?: { prefixes?: unknown };
-      };
-      const prefixes = config.handoff?.prefixes;
-      assert.ok(Array.isArray(prefixes));
-      assert.ok(prefixes.includes("skills/"));
-      if (profile === "runtime") {
-        assert.ok(lstatSync(join(dir, "skills")).isDirectory());
-        assert.ok(lstatSync(join(dir, ".agents", "skills")).isDirectory());
-        assert.ok(lstatSync(join(dir, ".claude", "skills")).isSymbolicLink());
-        assert.equal(readlinkSync(join(dir, ".claude", "skills")), "../.agents/skills");
-        assert.deepEqual(JSON.parse(readFileSync(join(dir, "skills", "skills.json"), "utf8")), {
-          skills: [],
-        });
+        const config = JSON.parse(readFileSync(join(dir, "workspace.json"), "utf8")) as {
+          handoff?: { prefixes?: unknown };
+        };
+        const prefixes = config.handoff?.prefixes;
+        assert.ok(Array.isArray(prefixes));
+        assert.ok(prefixes.includes("skills/"));
+        assert.ok(prefixes.includes("docs/projects/"));
+        if (profile === "runtime") {
+          assert.ok(lstatSync(join(dir, "skills")).isDirectory());
+          assert.ok(lstatSync(join(dir, ".agents", "skills")).isDirectory());
+          assert.ok(lstatSync(join(dir, ".claude", "skills")).isSymbolicLink());
+          assert.equal(readlinkSync(join(dir, ".claude", "skills")), "../.agents/skills");
+          assert.deepEqual(JSON.parse(readFileSync(join(dir, "skills", "skills.json"), "utf8")), {
+            skills: [],
+          });
+        }
       }
-    }
 
-    execSync("git init -q", { cwd: dir });
-    const verify = spawnSync(process.execPath, [cli, "verify"], {
-      cwd: dir,
-      encoding: "utf8",
-    });
-    assert.equal(
-      verify.status,
-      0,
-      `verify must pass on a fresh ${profile} scaffold:\n${verify.stderr}`,
-    );
-    assert.match(verify.stdout, /verify ok/);
-
-    if (profile === "personal" || profile === "runtime") {
-      const bin = join(dir, "node_modules", ".bin");
-      mkdirSync(bin, { recursive: true });
-      const shim = join(bin, "workspace-kit");
-      writeFileSync(shim, `#!/bin/sh\nexec "${process.execPath}" "${cli}" "$@"\n`);
-      chmodSync(shim, 0o755);
-      const hook = spawnSync(join(dir, ".githooks", "pre-commit"), [], {
+      execSync("git init -q", { cwd: dir });
+      const verify = spawnSync(process.execPath, [cli, "verify"], {
         cwd: dir,
         encoding: "utf8",
-        env: { ...process.env, npm_config_offline: "true" },
       });
-      assert.equal(hook.status, 0, `${hook.stdout}${hook.stderr}`);
-    }
-  });
+      assert.equal(
+        verify.status,
+        0,
+        `verify must pass on a fresh ${profile} scaffold:\n${verify.stderr}`,
+      );
+      assert.match(verify.stdout, /verify ok/);
+
+      if (profile === "personal" || profile === "runtime") {
+        const bin = join(dir, "node_modules", ".bin");
+        mkdirSync(bin, { recursive: true });
+        const shim = join(bin, "workspace-kit");
+        writeFileSync(shim, `#!/bin/sh\nexec "${process.execPath}" "${cli}" "$@"\n`);
+        chmodSync(shim, 0o755);
+        const hook = spawnSync(join(dir, ".githooks", "pre-commit"), [], {
+          cwd: dir,
+          encoding: "utf8",
+          env: { ...process.env, npm_config_offline: "true" },
+        });
+        assert.equal(hook.status, 0, `${hook.stdout}${hook.stderr}`);
+      }
+    });
+  }
 
   test(`init --profile ${profile} never overwrites existing files`, () => {
     const dir = tempDir(`reinit-${profile}-`);
@@ -163,22 +173,13 @@ test("init explains malformed existing package metadata", () => {
   assert.throws(() => initWorkspace(dir, "work"), /package.json is not usable by init/);
 });
 
-test("init validates explicit memory selections before writing", () => {
-  const workWiki = scratchDirectory("init-work-wiki-");
-  assert.throws(
-    () => initWorkspace(workWiki, "work", { strategy: "llm-wiki" }),
-    /does not scaffold the llm-wiki memory layout/,
-  );
-  assert.equal(existsSync(join(workWiki, "AGENTS.md")), false);
-});
-
 function scratchDirectory(prefix: string): string {
   return tempDir(prefix);
 }
 
 test("init preserves legacy or disabled memory and refuses malformed existing configuration", () => {
   const legacy = scratchDirectory("init-legacy-memory-");
-  initWorkspace(legacy, "personal");
+  initWorkspace(legacy, "personal", { strategy: "llm-wiki" });
   const config = JSON.parse(readFileSync(join(legacy, "workspace.json"), "utf8"));
   delete config.memory;
   writeFileSync(join(legacy, "workspace.json"), JSON.stringify(config));

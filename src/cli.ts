@@ -28,6 +28,7 @@ import { limitWarnings } from "./checks/limits.ts";
 import { projectRegistryErrors } from "./checks/registry.ts";
 import { projectRegistryEntries } from "./checks/registry.ts";
 import { initWorkspace } from "./init.ts";
+import { registryPointers } from "./registryPointers.ts";
 import { installHooks } from "./hooks.ts";
 import {
   cloneProjects,
@@ -62,6 +63,7 @@ commands:
   registry validate        validate project-registry policy and local checkouts
   registry clone | status | pull  operate configured project checkouts
   registry path <category/name> [--mode <mode>]  resolve a configured checkout
+  registry pointers [--check]  regenerate or verify per-category project pointers
   hooks install            configure this checkout's tracked Git hooks
   skills check | sync      verify or install configured workspace-local skills
   config validate          validate ${CONFIG_FILE} itself
@@ -344,6 +346,26 @@ function verify(state: LoadedConfig, json: boolean): never {
     }
   }
 
+  if (state.config.registry?.pointers && checks.registry === "ok") {
+    try {
+      const result = registryPointers(".", state.config.registry, { check: true });
+      checks.registryPointers = result.planned.length === 0 ? "ok" : "fail";
+      if (result.planned.length === 0) {
+        events.push({ stream: "stdout", text: "registry-pointers ok" });
+      } else {
+        const added = appendUnique(errors, result.planned);
+        if (added.length > 0) events.push({ stream: "stderr", text: added.join("\n") });
+        failures.push("registry pointers check failed (exit 1)");
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      checks.registryPointers = "fail";
+      const added = appendUnique(errors, [message]);
+      if (added.length > 0) events.push({ stream: "stderr", text: added.join("\n") });
+      failures.push("registry pointers check failed (exit 1)");
+    }
+  }
+
   if (state.config.wiki) {
     try {
       const result = wikiBackfill({ root: state.config.wiki.root, dryRun: true });
@@ -613,6 +635,26 @@ function main(): void {
     }
     if (mode === "validate" && args.length === 0) {
       console.log("registry ok");
+      process.exit(0);
+    }
+    if (mode === "pointers" && args.length <= 1) {
+      const check = args[0] === "--check";
+      if (args.length === 1 && !check) usageExit();
+      let result;
+      try {
+        result = registryPointers(".", registry, { check });
+      } catch (error) {
+        failWith(error instanceof Error ? error.message : String(error));
+      }
+      for (const line of result.planned) {
+        if (check) console.error(line);
+        else
+          console.log(
+            line.replace(/^would write /, "wrote ").replace(/^would delete /, "deleted "),
+          );
+      }
+      if (check && result.planned.length > 0) process.exit(1);
+      console.log("registry-pointers ok");
       process.exit(0);
     }
     const entries = projectRegistryEntries(".", registry);

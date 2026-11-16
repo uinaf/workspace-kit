@@ -5,6 +5,7 @@ import { CONSUMER_PACKAGE_MANAGER } from "./checks/packageManager.ts";
 import { parseWorkspaceConfig, type MemoryConfig } from "./config.ts";
 import { kitVersion } from "./version.ts";
 import { wikiBackfill } from "./checks/wikiBackfill.ts";
+import { registryPointers } from "./registryPointers.ts";
 import {
   createWorkspaceLink,
   readWorkspaceText,
@@ -28,9 +29,14 @@ TODO: what this workspace is, who owns it, and what belongs here.
 
 TODO: what an agent should read first, and when.
 
+## Projects
+
+Repository pointers: [docs/projects/README.md](docs/projects/README.md).
+Edit \`projects.json\`, then run \`pnpm registry:pointers\`.
+
 ## Memory
 
-TODO: define how daily evidence is promoted into the repository-maintained wiki.
+TODO: where durable knowledge lives and how agents update it.
 
 ## Working Agreement
 
@@ -55,12 +61,13 @@ function packageDefinition(profile: Profile) {
     doctor: "workspace-kit doctor",
     test: "pnpm verify",
     verify: "workspace-kit verify",
+    "registry:check": "workspace-kit registry validate",
+    "registry:clone": "workspace-kit registry clone",
+    "registry:status": "workspace-kit registry status",
+    "registry:pull": "workspace-kit registry pull",
+    "registry:pointers": "workspace-kit registry pointers",
   };
   if (profile === "personal" || profile === "runtime") {
-    scripts["registry:check"] = "workspace-kit registry validate";
-    scripts["registry:clone"] = "workspace-kit registry clone";
-    scripts["registry:status"] = "workspace-kit registry status";
-    scripts["registry:pull"] = "workspace-kit registry pull";
     scripts["hooks:install"] = "workspace-kit hooks install";
   }
   return {
@@ -139,9 +146,6 @@ export function initWorkspace(
       `${dir} is not a usable directory: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
-  if (profile === "work" && requestedMemory?.strategy === "llm-wiki") {
-    throw new Error("init --profile work does not scaffold the llm-wiki memory layout");
-  }
   const root = realpathSync(dir);
   assertCompatiblePackage(root, profile);
   const existingConfig = workspaceLstat(root, "workspace.json")
@@ -161,12 +165,7 @@ export function initWorkspace(
       "requested memory configuration conflicts with workspace.json; update the existing workspace explicitly",
     );
   }
-  const memory = existingConfig
-    ? existingMemory
-    : (requestedMemory ??
-      (profile === "personal" || profile === "runtime"
-        ? ({ strategy: "llm-wiki" } as const)
-        : undefined));
+  const memory = existingConfig ? existingMemory : requestedMemory;
   const seedWikiCatalog =
     memory?.strategy === "llm-wiki" &&
     !workspaceLstat(root, "workspace.json") &&
@@ -213,32 +212,54 @@ export function initWorkspace(
     packageManager: { enforce: true },
   };
   if (memory) config.memory = memory;
+  const seedPointers =
+    !workspaceLstat(root, "workspace.json") && !workspaceLstat(root, "docs/projects");
+
+  put("projects.json", "{}\n");
+  required.push("projects.json");
+  const registry = {
+    file: "projects.json",
+    entry: {
+      required: ["name", "repo", "path", "owns", "mode"],
+      optional: ["branch", "catalog"],
+    },
+    project: {
+      pathPrefix: "~/projects/",
+      modes: ["managed", "route-only"],
+      catalog: { field: "catalog", modes: ["managed"] },
+    },
+    pointers: { dir: "docs/projects" },
+  };
+  config.registry = registry;
+
+  if (memory?.strategy === "llm-wiki") {
+    put(
+      "memory/wiki/index.md",
+      wikiPage(
+        "Wiki index",
+        "wiki-index",
+        "# Wiki index\n\nTODO: link topic pages as they appear.\n",
+        today,
+      ),
+    );
+    put(
+      "memory/wiki/schema.md",
+      wikiPage(
+        "Wiki schema",
+        "wiki-schema",
+        "# Wiki schema\n\nTODO: describe the frontmatter and page conventions this wiki follows.\n",
+        today,
+      ),
+    );
+    put("memory/wiki/log.md", wikiPage("Wiki log", "wiki-log", "# Wiki log\n", today));
+    required.push("memory/wiki/index.md", "memory/wiki/schema.md", "memory/wiki/log.md");
+    config.dailyLogs = { root: "memory", contexts: "memory/contexts" };
+    config.wiki = { root: "memory/wiki" };
+  }
 
   if (profile === "personal" || profile === "runtime") {
     put("README.md", "# Workspace\n\nTODO: one paragraph on what this repository is.\n");
     put(".env.example", "# Names only — never values.\n");
-    put("projects.json", "{}\n");
-    if (memory?.strategy === "llm-wiki") {
-      put(
-        "memory/wiki/index.md",
-        wikiPage(
-          "Wiki index",
-          "wiki-index",
-          "# Wiki index\n\nTODO: link topic pages as they appear.\n",
-          today,
-        ),
-      );
-      put(
-        "memory/wiki/schema.md",
-        wikiPage(
-          "Wiki schema",
-          "wiki-schema",
-          "# Wiki schema\n\nTODO: describe the frontmatter and page conventions this wiki follows.\n",
-          today,
-        ),
-      );
-      put("memory/wiki/log.md", wikiPage("Wiki log", "wiki-log", "# Wiki log\n", today));
-    }
     put(
       ".githooks/pre-commit",
       `#!/bin/sh
@@ -252,26 +273,7 @@ pnpm verify
 `,
       0o755,
     );
-    required.push("README.md", ".env.example", "projects.json");
-    if (memory?.strategy === "llm-wiki") {
-      required.push("memory/wiki/index.md", "memory/wiki/schema.md", "memory/wiki/log.md");
-    }
-    config.registry = {
-      file: "projects.json",
-      entry: {
-        required: ["name", "repo", "path", "owns", "mode"],
-        optional: ["branch", "catalog"],
-      },
-      project: {
-        pathPrefix: "~/projects/",
-        modes: ["managed", "route-only"],
-        catalog: { field: "catalog", modes: ["managed"] },
-      },
-    };
-    if (memory?.strategy === "llm-wiki") {
-      config.dailyLogs = { root: "memory", contexts: "memory/contexts" };
-      config.wiki = { root: "memory/wiki" };
-    }
+    required.push("README.md", ".env.example");
     config.handoff = {
       paths: [
         "AGENTS.md",
@@ -288,6 +290,7 @@ pnpm verify
       prefixes: [
         ".agents/skills/",
         "skills/",
+        "docs/projects/",
         "docs/reference/",
         "docs/runbooks/",
         "memory/",
@@ -318,6 +321,11 @@ pnpm verify
   }
 
   put("workspace.json", `${JSON.stringify(config, null, 2)}\n`);
+  const parsedRegistry = parseWorkspaceConfig(config).registry;
+  if (seedPointers && parsedRegistry && created.includes("workspace.json")) {
+    const plan = registryPointers(root, parsedRegistry, { check: false });
+    created.push(...plan.planned.map((line) => line.replace(/^would write /, "")));
+  }
   if (seedWikiCatalog && created.includes("workspace.json")) {
     const options = { root: "memory/wiki", repoRoot: root };
     const plan = wikiBackfill({ ...options, dryRun: true });

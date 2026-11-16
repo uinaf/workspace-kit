@@ -19,6 +19,7 @@ export type RegistryConfig = {
   file: string;
   entry: { required: string[]; optional: string[] };
   project?: ProjectRegistryConfig;
+  pointers?: { dir: string };
 };
 export type DailyLogsConfig = { root: string; contexts: string };
 export type MemoryConfig = { strategy: "llm-wiki" };
@@ -137,6 +138,7 @@ const CONFIG_SHAPE: ConfigShape = {
       maxEntries: true,
       catalog: { field: true, modes: true },
     },
+    pointers: { dir: true },
   },
   memory: { strategy: true },
   dailyLogs: { root: true, contexts: true },
@@ -334,6 +336,16 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
         }
         registry.project.catalog = { field, modes: catalogModes };
       }
+    }
+    if ("pointers" in value.registry) {
+      if (!isRecord(value.registry.pointers)) fail("registry.pointers must be an object");
+      if (!registry.project) fail("registry.pointers requires registry.project");
+      registry.pointers = {
+        dir: normalizeWorkspacePath(
+          text(value.registry.pointers.dir, "registry.pointers.dir"),
+          "registry.pointers.dir",
+        ),
+      };
     }
     out.registry = registry;
   }
