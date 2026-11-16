@@ -69,6 +69,7 @@ for (const profile of ["personal", "runtime", "work"] as const) {
         const prefixes = config.handoff?.prefixes;
         assert.ok(Array.isArray(prefixes));
         assert.ok(prefixes.includes("skills/"));
+        assert.ok(prefixes.includes("docs/projects/"));
         if (profile === "runtime") {
           assert.ok(lstatSync(join(dir, "skills")).isDirectory());
           assert.ok(lstatSync(join(dir, ".agents", "skills")).isDirectory());

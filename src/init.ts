@@ -290,6 +290,7 @@ pnpm verify
       prefixes: [
         ".agents/skills/",
         "skills/",
+        "docs/projects/",
         "docs/reference/",
         "docs/runbooks/",
         "memory/",

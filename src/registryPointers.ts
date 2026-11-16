@@ -1,5 +1,5 @@
 import { posix } from "node:path";
-import type { RegistryConfig } from "./config.ts";
+import { portablePathIdentity, type RegistryConfig } from "./config.ts";
 import {
   readWorkspaceDirectory,
   readWorkspaceText,
@@ -36,10 +36,13 @@ function plannedFiles(file: string, registry: unknown): Map<string, string> {
   if (!isRecord(registry)) throw new Error(`${file} should be an object of category arrays`);
   const files = new Map<string, string>();
   const index: string[] = [];
+  const identities = new Set([portablePathIdentity("README.md")]);
   for (const [category, value] of Object.entries(registry)) {
-    if (!SAFE_CATEGORY.test(category) || category.toLowerCase() === "readme") {
+    const identity = portablePathIdentity(`${category}.md`);
+    if (!SAFE_CATEGORY.test(category) || identities.has(identity)) {
       throw new Error(`${file} category ${category} cannot name a pointer file`);
     }
+    identities.add(identity);
     const entries = Array.isArray(value) ? value.filter(isRecord) : [];
     const names = entries.map((entry) => String(entry.name));
     index.push(`- [${category}](${category}.md): ${names.join(", ") || "no projects"}`);

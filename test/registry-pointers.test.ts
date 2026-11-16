@@ -112,6 +112,13 @@ test("registry pointers rejects unsafe categories and misconfiguration", () => {
   const readme = workspace({ README: [] });
   assert.match(kit(readme, "registry", "pointers").stderr, /cannot name a pointer file/);
 
+  const folded = workspace({ tools: [], Tools: [] });
+  assert.match(
+    kit(folded, "registry", "pointers").stderr,
+    /category Tools cannot name a pointer file/,
+  );
+  assert.equal(existsSync(join(folded, "docs")), false);
+
   const root = workspace(projects, { dir: "." });
   assert.match(
     kit(root, "registry", "pointers").stderr,
