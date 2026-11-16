@@ -84,8 +84,8 @@ export function wikiErrors(wiki: WikiConfig, exclude: string[] = []): string[] {
     indexStat = undefined;
   }
   if (!indexStat?.isFile()) return [`missing ${index}`];
-  const pages = walkWorkspaceMarkdown(".", wiki.root).filter(
-    (page) => !exclude.some((dir) => page.startsWith(`${dir}/`)),
+  const pages = walkWorkspaceMarkdown(".", wiki.root, "error", (path) =>
+    exclude.some((dir) => path === dir || path.startsWith(`${dir}/`)),
   );
 
   const errors: string[] = [];

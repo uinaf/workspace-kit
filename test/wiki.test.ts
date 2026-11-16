@@ -105,6 +105,7 @@ test("wiki check needs an index, honors wiki.root, and skips generated pointers"
   });
   mkdirSync(join(pointers, "docs", "projects"));
   writeFileSync(join(pointers, "docs", "projects", "README.md"), "# Projects\n");
+  symlinkSync("../../AGENTS.md", join(pointers, "docs", "projects", "agents-link.md"));
   assert.equal(kit(pointers, "wiki", "check").status, 0);
 });
 

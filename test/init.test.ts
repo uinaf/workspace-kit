@@ -72,6 +72,7 @@ for (const profile of ["personal", "runtime", "work"] as const) {
         assert.ok(Array.isArray(prefixes));
         assert.ok(prefixes.includes("skills/"));
         assert.ok(prefixes.includes("docs/projects/"));
+        assert.equal(prefixes.includes("docs/"), wiki);
         if (profile === "runtime") {
           assert.ok(lstatSync(join(dir, "skills")).isDirectory());
           assert.ok(lstatSync(join(dir, ".agents", "skills")).isDirectory());

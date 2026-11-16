@@ -270,6 +270,7 @@ pnpm verify
         "docs/runbooks/",
         "memory/",
         "user/",
+        ...(wiki ? ["docs/"] : []),
       ],
     };
     // contract: deliberately absent until an origin remote and a peer exist.
