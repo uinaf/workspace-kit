@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "vite-plus/test";
@@ -113,4 +113,28 @@ test("a workspace without a wiki section gets no wiki check", () => {
   assert.equal(doctor.status, 0, doctor.stdout);
   assert.equal(JSON.parse(doctor.stdout).checks.wiki, undefined);
   assert.equal(kit(dir, "wiki", "check").status, 1);
+});
+
+test("wiki check reads real log headings, used references, and real link targets", () => {
+  const dir = workspace();
+  writeFileSync(
+    join(dir, "docs", "log.md"),
+    "# Log\n\n## [2026-01-01] `config.json` updated\n\n```md\n## not a heading\n```\n",
+  );
+  writeFileSync(
+    join(dir, "docs", "index.md"),
+    "# Index\n\n- [Alpha][a]\n\n[a]: alpha.md\n[b]: topics/beta.md\n",
+  );
+  const unused = kit(dir, "wiki", "check");
+  assert.equal(unused.stderr, "docs/index.md: missing entry for docs/topics/beta.md\n");
+
+  writeFileSync(
+    join(dir, "docs", "index.md"),
+    "# Index\n\n- [Alpha][a]\n- [beta]\n\n[a]: alpha.md\n[beta]: topics/beta.md\n",
+  );
+  assert.equal(kit(dir, "wiki", "check").status, 0, kit(dir, "wiki", "check").stderr);
+
+  symlinkSync("nonexistent.md", join(dir, "dangling.md"));
+  writeFileSync(join(dir, "docs", "alpha.md"), "# Alpha\n\n[Source](../dangling.md)\n");
+  assert.equal(kit(dir, "wiki", "check").stderr, "docs/alpha.md: broken link (../dangling.md)\n");
 });

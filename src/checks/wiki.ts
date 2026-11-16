@@ -1,6 +1,6 @@
 import { posix } from "node:path";
 import type { WikiConfig } from "../config.ts";
-import { maskCode, relativeLinks, type RelativeLink } from "./docsLinks.ts";
+import { maskCode, maskFencedBlocks, relativeLinks, type RelativeLink } from "./docsLinks.ts";
 import { readWorkspaceText, walkWorkspaceMarkdown, workspaceLstat } from "../lib/workspaceFs.ts";
 
 const WIKILINK = /\[\[([^\]|#\n]+)(?:#[^\]|\n]*)?(?:\|[^\]\n]*)?\]\]/g;
@@ -8,10 +8,24 @@ const LOG_HEADING = /^## \[(\d{4}-\d{2}-\d{2})\] \S/;
 
 function exists(path: string): boolean {
   try {
-    return workspaceLstat(".", path) !== undefined;
+    const stat = workspaceLstat(".", path);
+    return stat !== undefined && !stat.isSymbolicLink();
   } catch {
     return false;
   }
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function referenceUsed(text: string, label: string): boolean {
+  const body = maskCode(text)
+    .split(/\r?\n/)
+    .filter((line) => !/^ {0,3}\[[^\]]+\]:/.test(line))
+    .join("\n");
+  const name = escapeRegExp(label.trim()).replace(/\s+/g, "\\s+");
+  return new RegExp(`\\]\\[${name}\\]|\\[${name}\\](?!\\s*[:([])`, "i").test(body);
 }
 
 function inside(path: string): boolean {
@@ -41,7 +55,7 @@ function validDate(date: string): boolean {
 function logErrors(log: string): string[] {
   const errors: string[] = [];
   let previous: string | undefined;
-  maskCode(readWorkspaceText(".", log))
+  maskFencedBlocks(readWorkspaceText(".", log))
     .split(/\r?\n/)
     .forEach((line, index) => {
       if (!line.startsWith("## ")) return;
@@ -73,7 +87,10 @@ export function wikiErrors(wiki: WikiConfig, exclude: string[] = []): string[] {
     for (const link of [...relativeLinks(page, text), ...wikilinks(page, text, wiki.root)]) {
       if ("broken" in link || !exists(link.target)) {
         errors.push(`${page}: broken link (${link.raw})`);
-      } else if (page === index) {
+      } else if (
+        page === index &&
+        (!("label" in link) || !link.label || referenceUsed(text, link.label))
+      ) {
         indexed.add(link.target);
       }
     }

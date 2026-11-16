@@ -7,7 +7,7 @@ import { posix } from "node:path";
 import { portablePathIdentity, type DocsLinksConfig } from "../config.ts";
 import { readWorkspaceText, workspaceLstat } from "../lib/workspaceFs.ts";
 
-type Destination = { offset: number; raw: string };
+type Destination = { offset: number; raw: string; label?: string };
 type DestinationToken = { end: number; raw: string };
 type Fence = { marker: "`" | "~"; length: number; rest: string };
 
@@ -42,7 +42,7 @@ function blank(chars: string[], start: number, end: number): void {
   }
 }
 
-function maskFencedBlocks(text: string): string {
+export function maskFencedBlocks(text: string): string {
   const chars = text.split("");
   let open: Omit<Fence, "rest"> | undefined;
   let offset = 0;
@@ -251,7 +251,13 @@ function referenceDestinations(text: string): Destination[] {
               valid = tail === lineEnd;
             }
           }
-          if (valid) out.push({ offset: bodyStart, raw: token.raw });
+          if (valid) {
+            out.push({
+              offset: bodyStart,
+              raw: token.raw,
+              label: text.slice(cursor + 1, labelEnd),
+            });
+          }
         }
       }
     }
@@ -326,11 +332,13 @@ function isUntrackedTarget(target: string, trackedIdentities: Set<string>): bool
   }
 }
 
-export type RelativeLink = { raw: string; target: string } | { raw: string; broken: true };
+export type RelativeLink =
+  | { raw: string; target: string; label?: string }
+  | { raw: string; broken: true };
 
 export function relativeLinks(file: string, text: string): RelativeLink[] {
   const out: RelativeLink[] = [];
-  for (const { raw } of destinations(text)) {
+  for (const { raw, label } of destinations(text)) {
     const unescaped = unescapeMarkdown(raw);
     if (/^[a-z][a-z0-9+.-]*:/i.test(unescaped) || unescaped.startsWith("//")) continue;
     const encodedPath = pathPart(raw);
@@ -345,7 +353,7 @@ export function relativeLinks(file: string, text: string): RelativeLink[] {
     if (href.startsWith("/")) continue;
     const target = posix.normalize(posix.join(posix.dirname(file), href)).replace(/\/+$/, "");
     if (target === ".." || target.startsWith("../")) out.push({ raw, broken: true });
-    else out.push({ raw, target });
+    else out.push(label === undefined ? { raw, target } : { raw, target, label });
   }
   return out;
 }
