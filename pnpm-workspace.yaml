@@ -2,7 +2,7 @@ packages:
   - "."
 
 overrides:
-  brace-expansion@>=4.0.0 <5.0.9: 5.0.13
+  brace-expansion@>=4.0.0 <5.0.9: 5.1.0
   postcss@<=8.5.22: 8.5.33
   vite@*: "catalog:"
   vitest@*: "catalog:"
