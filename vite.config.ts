@@ -56,7 +56,6 @@ export default defineConfig({
       "typescript/no-unsafe-call": "off",
       "typescript/no-unsafe-member-access": "off",
       "typescript/no-unsafe-type-assertion": "off",
-      "unicorn/consistent-function-scoping": "off",
       "vite-plus/prefer-vite-plus-imports": "error",
     },
   },
