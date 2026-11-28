@@ -19,7 +19,7 @@ export function globToRegExp(pattern: string): RegExp {
       }
     } else if (char === "?") {
       out += "[^/]";
-    } else if ("\\^$.|+()[]{}".includes(char)) {
+    } else if (String.raw`\^$.|+()[]{}`.includes(char)) {
       out += `\\${char}`;
     } else {
       out += char;

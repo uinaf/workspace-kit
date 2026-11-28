@@ -224,10 +224,12 @@ test("docs links resolves Git paths with POSIX semantics and exact traversal che
 test("docs links rejects non-portable tracked Markdown paths", () => {
   const dir = repository();
   put(dir, "docs/literal.md", "# Portable spelling\n");
-  put(dir, "docs\\literal.md", "[silently missed before](missing.md)\n");
+  put(dir, String.raw`docs\literal.md`, "[silently missed before](missing.md)\n");
   track(dir);
 
-  assert.deepEqual(check(dir), ["docs\\literal.md: tracked Markdown path is not portable"]);
+  assert.deepEqual(check(dir), [
+    String.raw`docs\literal.md: tracked Markdown path is not portable`,
+  ]);
 });
 
 test("docs link exclusions match only the configured path boundary", () => {

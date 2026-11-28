@@ -180,7 +180,7 @@ function pullWithRealProcess() {
 }
 
 test("registry pull relays git output larger than the default child-process buffer", () => {
-  installFakeGit("head -c 2097152 /dev/zero | tr '\\0' x; echo");
+  installFakeGit(String.raw`head -c 2097152 /dev/zero | tr '\0' x; echo`);
 
   const result = pullWithRealProcess();
 

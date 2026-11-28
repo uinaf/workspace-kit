@@ -10,13 +10,13 @@ test("workspace paths use portable repository-relative semantics", () => {
   assert.equal(normalizeWorkspacePath("./memory//wiki/"), "memory/wiki");
   for (const path of [
     "../x",
-    "..\\x",
+    String.raw`..\x`,
     "/x",
-    "\\x",
-    "C:\\x",
+    String.raw`\x`,
+    String.raw`C:\x`,
     "C:/x",
     "C:x",
-    "\\\\server\\share",
+    String.raw`\\server\share`,
     "//server/share",
     "bad\0path",
   ]) {
@@ -34,7 +34,10 @@ test("link targets may traverse only within the workspace", () => {
     () => normalizeLinkTarget("sub/CLAUDE.md", "../../outside"),
     /inside the workspace/,
   );
-  assert.throws(() => normalizeLinkTarget("CLAUDE.md", "C:\\outside"), /inside the workspace/);
+  assert.throws(
+    () => normalizeLinkTarget("CLAUDE.md", String.raw`C:\outside`),
+    /inside the workspace/,
+  );
   for (const target of [".. /outside", "safe./file", "safe /file", "safe/.../file"]) {
     assert.throws(
       () => normalizeLinkTarget("nested/CLAUDE.md", target),

@@ -12,8 +12,8 @@ import { resolveKitVersion } from "../src/version.ts";
 test("config reports nested unknown keys and canonicalizes repository paths", () => {
   const raw = {
     required: ["./AGENTS.md"],
-    forbidden: ["private\\secrets.md"],
-    links: [{ path: "./nested//CLAUDE.md", target: "..\\AGENTS.md", targt: "typo" }],
+    forbidden: [String.raw`private\secrets.md`],
+    links: [{ path: "./nested//CLAUDE.md", target: String.raw`..\AGENTS.md`, targt: "typo" }],
     registry: {
       file: "./projects.json",
       entry: { required: ["name"], optional: [] },
@@ -26,9 +26,9 @@ test("config reports nested unknown keys and canonicalizes repository paths", ()
         maxEntries: 1,
       },
     },
-    dailyLogs: { root: "./memory", contexts: "memory\\contexts" },
+    dailyLogs: { root: "./memory", contexts: String.raw`memory\contexts` },
     wiki: { root: "./memory//wiki", indexCoverge: true },
-    contract: { file: ".\\workspace.contract.json" },
+    contract: { file: String.raw`.\workspace.contract.json` },
     handoff: { paths: [], prefixes: ["memory/"], prefxies: [] },
     skills: { typo: true },
     packageManager: { enforce: false, enforc: true },
@@ -170,7 +170,7 @@ test("config rejects repository paths and link targets that escape the workspace
     /links\[0\]\.target must stay inside the workspace/,
   );
   assert.throws(
-    () => parseWorkspaceConfig({ contract: { file: "C:\\outside.json" } }),
+    () => parseWorkspaceConfig({ contract: { file: String.raw`C:\outside.json` } }),
     /contract\.file must stay inside the workspace/,
   );
   assert.throws(
@@ -241,13 +241,13 @@ test("handoff screening canonicalizes portable paths and matches prefix roots", 
     "agents.md",
     "memory",
     "MEMORY",
-    "memory\\notes.md",
-    "MEMORY\\notes.md",
-    "C:private\\file.md",
-    "C:\\private\\file.md",
-    "\\\\server\\share\\file.md",
-    "x\\.env.local",
-    "x\\.ENV.LOCAL",
+    String.raw`memory\notes.md`,
+    String.raw`MEMORY\notes.md`,
+    String.raw`C:private\file.md`,
+    String.raw`C:\private\file.md`,
+    String.raw`\\server\share\file.md`,
+    String.raw`x\.env.local`,
+    String.raw`x\.ENV.LOCAL`,
     ".",
   ]) {
     assert.equal(isPrivateHandoffPath(path, handoff), true, path);
