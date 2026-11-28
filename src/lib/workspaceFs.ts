@@ -299,9 +299,7 @@ export function ensureWorkspaceDirectory(root: string, path: string): void {
 function closeAfterFailure(descriptor: number): void {
   try {
     closeSync(descriptor);
-  } catch {
-    return;
-  }
+  } catch {}
 }
 
 export function writeWorkspaceText(
