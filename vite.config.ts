@@ -45,7 +45,6 @@ export default defineConfig({
       curly: "off",
       "no-console": "off",
       "preserve-caught-error": "off",
-      "quality/no-conditional-empty-object-spread": "off",
       "quality/no-known-value-widening": "off",
       "quality/no-unknown-returns": "off",
       "quality/no-unsafe-dictionary-type": "off",

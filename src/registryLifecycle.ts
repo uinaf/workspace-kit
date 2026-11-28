@@ -50,12 +50,15 @@ function defaultRun(command: string, args: Array<string>): CommandResult {
     stderr += `${stderr && !stderr.endsWith("\n") ? "\n" : ""}${invocation} ${cause}\n`;
   }
 
-  return {
+  const outcome: CommandResult = {
     status: result.status ?? 1,
     stdout: result.stdout ?? "",
     stderr,
-    ...(errorCode ? { errorCode } : {}),
   };
+
+  if (errorCode) outcome.errorCode = errorCode;
+
+  return outcome;
 }
 
 function context(options: RegistryLifecycleOptions) {

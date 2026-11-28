@@ -111,16 +111,21 @@ function parseEntries(value: unknown, project: ProjectRegistryConfig): Array<Pro
       if (!isRecord(value)) continue;
       const name = value.name as string;
       const catalogField = project.catalog?.field;
-      entries.push({
+
+      const entry: ProjectEntry = {
         label: `${category}/${name}`,
         repo: value.repo as string,
         path: value.path as string,
         mode: value.mode as string,
-        ...(typeof value.branch === "string" ? { branch: value.branch } : {}),
-        ...(catalogField !== undefined && typeof value[catalogField] === "string"
-          ? { catalog: value[catalogField] }
-          : {}),
-      });
+      };
+
+      if (typeof value.branch === "string") entry.branch = value.branch;
+
+      if (catalogField !== undefined && typeof value[catalogField] === "string") {
+        entry.catalog = value[catalogField];
+      }
+
+      entries.push(entry);
     }
   }
 

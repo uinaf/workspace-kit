@@ -17,10 +17,15 @@ export function utcToday(): string {
 }
 
 export function makeEnv(): Record<string, string> {
-  return {
+  const base: Record<string, string> = {
     PATH: process.env.PATH ?? "",
     HOME: process.env.HOME ?? "",
-    ...(process.env.TMPDIR ? { TMPDIR: process.env.TMPDIR } : {}),
+  };
+
+  if (process.env.TMPDIR) base.TMPDIR = process.env.TMPDIR;
+
+  return {
+    ...base,
     TZ: "UTC",
     LANG: "C",
     LC_ALL: "C",
