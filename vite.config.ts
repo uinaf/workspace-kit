@@ -44,7 +44,6 @@ export default defineConfig({
       "anti-slop/require-safety-comment-for-type-assertion": "off",
       curly: "off",
       "no-console": "off",
-      "preserve-caught-error": "off",
       "quality/no-known-value-widening": "off",
       "quality/no-unknown-returns": "off",
       "quality/no-unsafe-dictionary-type": "off",

@@ -112,7 +112,7 @@ function readRemoteSkills(repoRoot: string, config: SkillsConfig): Array<RemoteS
   try {
     parsed = JSON.parse(readWorkspaceText(repoRoot, config.manifest, "skills manifest"));
   } catch (error) {
-    throw new Error(errorText(error));
+    throw new Error(errorText(error), { cause: error });
   }
 
   if (!isRecord(parsed) || !Array.isArray(parsed.skills)) {

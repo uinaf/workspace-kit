@@ -138,6 +138,7 @@ function assertSafeParents(root: string, relative: string): void {
     } catch (error) {
       throw new Error(
         `${currentRelative}: could not inspect workspace path (${errorCode(error) ?? "error"})`,
+        { cause: error },
       );
     }
 
@@ -162,6 +163,7 @@ export function workspaceLstat(root: string, path: string, label = "path"): Stat
   } catch (error) {
     throw new Error(
       `${relative}: could not inspect workspace path (${errorCode(error) ?? "error"})`,
+      { cause: error },
     );
   }
 }
@@ -182,7 +184,9 @@ export function readWorkspaceText(root: string, path: string, label = "path"): s
 
     return readFileSync(descriptor, "utf8");
   } catch (error) {
-    throw new Error(`${relative}: could not read file (${errorCode(error) ?? "error"})`);
+    throw new Error(`${relative}: could not read file (${errorCode(error) ?? "error"})`, {
+      cause: error,
+    });
   } finally {
     if (descriptor !== undefined) closeSync(descriptor);
   }
@@ -208,7 +212,9 @@ export function readWorkspaceDirectory(
   try {
     return readdirSync(resolve(root, relative), { withFileTypes: true });
   } catch (error) {
-    throw new Error(`${relative}: could not read directory (${errorCode(error) ?? "error"})`);
+    throw new Error(`${relative}: could not read directory (${errorCode(error) ?? "error"})`, {
+      cause: error,
+    });
   }
 }
 
@@ -265,6 +271,7 @@ export function ensureWorkspaceDirectory(root: string, path: string): void {
     } catch (error) {
       throw new Error(
         `${currentRelative}: could not inspect workspace path (${errorCode(error) ?? "error"})`,
+        { cause: error },
       );
     }
 
@@ -274,6 +281,7 @@ export function ensureWorkspaceDirectory(root: string, path: string): void {
       } catch (error) {
         throw new Error(
           `${currentRelative}: could not create directory (${errorCode(error) ?? "error"})`,
+          { cause: error },
         );
       }
 
@@ -325,7 +333,9 @@ export function writeWorkspaceText(
 
       if (options.mode !== undefined) fchmodSync(descriptor, mode);
     } catch (error) {
-      throw new Error(`${relative}: could not write file (${errorCode(error) ?? "error"})`);
+      throw new Error(`${relative}: could not write file (${errorCode(error) ?? "error"})`, {
+        cause: error,
+      });
     } finally {
       if (descriptor !== undefined) closeSync(descriptor);
     }
@@ -338,7 +348,9 @@ export function writeWorkspaceText(
       const permissionProbe = openSync(absolute, constants.O_WRONLY | constants.O_NOFOLLOW);
       closeSync(permissionProbe);
     } catch (error) {
-      throw new Error(`${relative}: could not replace file (${errorCode(error) ?? "error"})`);
+      throw new Error(`${relative}: could not replace file (${errorCode(error) ?? "error"})`, {
+        cause: error,
+      });
     }
   }
 
@@ -377,6 +389,7 @@ export function writeWorkspaceText(
 
     throw new Error(
       `${relative}: could not replace file (${errorCode(error) ?? "error"})${cleanup}`,
+      { cause: error },
     );
   }
 }
@@ -394,7 +407,9 @@ export function unlinkWorkspaceFile(root: string, path: string): void {
   try {
     unlinkSync(resolve(root, relative));
   } catch (error) {
-    throw new Error(`${relative}: could not delete file (${errorCode(error) ?? "error"})`);
+    throw new Error(`${relative}: could not delete file (${errorCode(error) ?? "error"})`, {
+      cause: error,
+    });
   }
 }
 
@@ -411,7 +426,9 @@ export function removeWorkspaceDirectory(root: string, path: string): void {
   try {
     rmSync(resolve(root, relative), { recursive: true });
   } catch (error) {
-    throw new Error(`${relative}: could not delete directory (${errorCode(error) ?? "error"})`);
+    throw new Error(`${relative}: could not delete directory (${errorCode(error) ?? "error"})`, {
+      cause: error,
+    });
   }
 }
 
@@ -426,7 +443,9 @@ export function readWorkspaceLink(root: string, path: string): string {
   try {
     return readlinkSync(resolve(root, relative));
   } catch (error) {
-    throw new Error(`${relative}: could not read symbolic link (${errorCode(error) ?? "error"})`);
+    throw new Error(`${relative}: could not read symbolic link (${errorCode(error) ?? "error"})`, {
+      cause: error,
+    });
   }
 }
 
@@ -440,7 +459,10 @@ export function createWorkspaceLink(root: string, path: string, target: string):
   try {
     symlinkSync(normalizedTarget, resolve(root, relative));
   } catch (error) {
-    throw new Error(`${relative}: could not create symbolic link (${errorCode(error) ?? "error"})`);
+    throw new Error(
+      `${relative}: could not create symbolic link (${errorCode(error) ?? "error"})`,
+      { cause: error },
+    );
   }
 }
 
@@ -453,6 +475,9 @@ export function unlinkWorkspaceLink(root: string, path: string): void {
   try {
     unlinkSync(resolve(root, relative));
   } catch (error) {
-    throw new Error(`${relative}: could not remove symbolic link (${errorCode(error) ?? "error"})`);
+    throw new Error(
+      `${relative}: could not remove symbolic link (${errorCode(error) ?? "error"})`,
+      { cause: error },
+    );
   }
 }

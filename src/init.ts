@@ -117,7 +117,7 @@ function assertCompatiblePackage(root: string, profile: Profile): void {
   try {
     existing = JSON.parse(readWorkspaceText(root, "package.json"));
   } catch (error) {
-    throw new Error(`package.json is not usable by init: ${String(error)}`);
+    throw new Error(`package.json is not usable by init: ${String(error)}`, { cause: error });
   }
 
   const expected = packageDefinition(profile);
@@ -159,6 +159,7 @@ export function initWorkspace(
   } catch (error) {
     throw new Error(
       `${dir} is not a usable directory: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
     );
   }
 
