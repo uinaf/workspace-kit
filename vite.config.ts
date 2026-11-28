@@ -62,7 +62,6 @@ export default defineConfig({
       "uinaf/no-comments": "off",
       "unicorn/consistent-function-scoping": "off",
       "unicorn/prefer-import-meta-properties": "off",
-      "unicorn/prefer-single-call": "off",
       "vite-plus/prefer-vite-plus-imports": "error",
     },
   },

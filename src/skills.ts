@@ -366,8 +366,10 @@ export function workspaceSkillErrors(repoRoot: string, config: SkillsConfig): st
   } catch (error) {
     errors.push(errorText(error));
   }
-  errors.push(...lockErrors(repoRoot, skills.remote));
-  errors.push(...managedLockErrors(repoRoot, skills.remote));
+  errors.push(
+    ...lockErrors(repoRoot, skills.remote),
+    ...managedLockErrors(repoRoot, skills.remote),
+  );
   return errors;
 }
 
@@ -462,8 +464,8 @@ export function syncWorkspaceSkills(
       const detail = result.error?.message ? `: ${result.error.message}` : "";
       failures.push(
         `${skill.name} (${skill.source}) removal failed with exit ${result.status ?? 127}${detail}`,
+        ...workspaceSkillErrors(repoRoot, config),
       );
-      failures.push(...workspaceSkillErrors(repoRoot, config));
       return failures;
     }
     try {
@@ -471,8 +473,7 @@ export function syncWorkspaceSkills(
       managed.delete(skill.name);
       writeManagedSkillLock(repoRoot, managed);
     } catch (error) {
-      failures.push(errorText(error));
-      failures.push(...workspaceSkillErrors(repoRoot, config));
+      failures.push(errorText(error), ...workspaceSkillErrors(repoRoot, config));
       return failures;
     }
   }
@@ -485,8 +486,7 @@ export function syncWorkspaceSkills(
       }
     }
   } catch (error) {
-    failures.push(errorText(error));
-    failures.push(...workspaceSkillErrors(repoRoot, config));
+    failures.push(errorText(error), ...workspaceSkillErrors(repoRoot, config));
     return failures;
   }
 
