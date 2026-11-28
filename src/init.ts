@@ -179,6 +179,7 @@ export function initWorkspace(
   const wiki = existingConfig ? existingConfig.wiki !== undefined : options.wiki === true;
 
   const put = (rel: string, content: string, mode?: number): void => {
+    // SAFETY: lstat: a dangling symlink counts as occupied, or the write would follow it to an attacker-chosen path.
     if (workspaceLstat(root, rel)) {
       skipped.push(rel);
 

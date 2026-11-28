@@ -21,6 +21,7 @@ export type RegistryLifecycleOptions = {
   stderr?: (text: string) => void;
 };
 
+// SAFETY: spawnSync's 1 MiB default kills git mid-diffstat on large fast-forwards, with no status.
 const MAX_OUTPUT_BYTES = 256 * 1024 * 1024;
 
 function defaultRun(command: string, args: Array<string>): CommandResult {

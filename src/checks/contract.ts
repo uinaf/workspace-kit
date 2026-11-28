@@ -1,3 +1,4 @@
+// SAFETY: message strings and evaluation order are parity-locked to parity/goldens; regenerate the oracle on change.
 import { spawnSync } from "node:child_process";
 import { posix, resolve, win32 } from "node:path";
 import type { HandoffConfig } from "../config.ts";
@@ -162,6 +163,7 @@ export function peerErrors(
 }
 
 export function isPrivateHandoffPath(path: string, handoff: HandoffConfig): boolean {
+  // SAFETY: raw-path checks run first, so traversal is blocked whatever it would normalize to.
   const portable = path.replaceAll("\\", "/");
 
   if (
@@ -175,6 +177,7 @@ export function isPrivateHandoffPath(path: string, handoff: HandoffConfig): bool
     return true;
   }
 
+  // SAFETY: candidates and configured rules normalize alike, so spelling cannot sidestep the denylist.
   const normalized = normalizePath(path);
 
   if (!normalized) return true;
@@ -198,5 +201,6 @@ function normalizePath(path: string): string {
     .split("/")
     .filter((segment) => segment !== "" && segment !== ".");
 
+  // SAFETY: case aliases match, so a path approved on a case-sensitive host cannot name protected content elsewhere.
   return segments.join("/").toLowerCase();
 }

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SAFETY: exit 1 on check errors, 2 on usage errors; default output is parity-locked to parity/goldens.
 import { spawnSync } from "node:child_process";
 import { chdir } from "node:process";
 import {
