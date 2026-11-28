@@ -4,7 +4,8 @@ import { existsSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:
 import { dirname, join } from "node:path";
 import { test } from "vite-plus/test";
 import { docsLinkErrors } from "../src/checks/docsLinks.ts";
-import { parseWorkspaceConfig, type DocsLinksConfig } from "../src/config.ts";
+import { parseWorkspaceConfig } from "../src/config.ts";
+import type { DocsLinksConfig } from "../src/config.ts";
 import { tempDir } from "./temp-dir.ts";
 
 const config: DocsLinksConfig = { enabled: true, exclude: [] };

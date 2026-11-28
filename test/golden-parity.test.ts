@@ -15,10 +15,8 @@ import {
   normalize,
   runScenarios,
   utcToday,
-  type Runner,
-  type RunResult,
-  type Sink,
 } from "../parity/scenarios.ts";
+import type { Runner, RunResult, Sink } from "../parity/scenarios.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const parityDir = join(root, "parity");

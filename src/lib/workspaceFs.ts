@@ -13,9 +13,8 @@ import {
   symlinkSync,
   unlinkSync,
   writeFileSync,
-  type Dirent,
-  type Stats,
 } from "node:fs";
+import type { Dirent, Stats } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { join, posix, resolve } from "node:path";
 

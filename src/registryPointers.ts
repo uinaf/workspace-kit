@@ -1,5 +1,6 @@
 import { posix } from "node:path";
-import { portablePathIdentity, type RegistryConfig } from "./config.ts";
+import { portablePathIdentity } from "./config.ts";
+import type { RegistryConfig } from "./config.ts";
 import {
   readWorkspaceDirectory,
   readWorkspaceText,

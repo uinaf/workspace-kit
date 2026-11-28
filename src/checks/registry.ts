@@ -1,12 +1,10 @@
 import { spawnSync } from "node:child_process";
-import { lstatSync, realpathSync, type Stats } from "node:fs";
+import { lstatSync, realpathSync } from "node:fs";
+import type { Stats } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import {
-  portablePathIdentity,
-  type ProjectRegistryConfig,
-  type RegistryConfig,
-} from "../config.ts";
+import { portablePathIdentity } from "../config.ts";
+import type { ProjectRegistryConfig, RegistryConfig } from "../config.ts";
 import { isGitRepositoryPath, parseGitRemote } from "../lib/gitRemote.ts";
 import { gitEnvironmentForRepository } from "../lib/gitProcess.ts";
 import { readWorkspaceText, workspaceLstat } from "../lib/workspaceFs.ts";

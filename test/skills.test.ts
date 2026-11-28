@@ -12,12 +12,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "vite-plus/test";
 import type { SkillsConfig } from "../src/config.ts";
-import {
-  SKILLS_CLI_VERSION,
-  syncWorkspaceSkills,
-  workspaceSkillErrors,
-  type SkillsRunner,
-} from "../src/skills.ts";
+import { SKILLS_CLI_VERSION, syncWorkspaceSkills, workspaceSkillErrors } from "../src/skills.ts";
+import type { SkillsRunner } from "../src/skills.ts";
 import { tempDir } from "./temp-dir.ts";
 
 const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "..");

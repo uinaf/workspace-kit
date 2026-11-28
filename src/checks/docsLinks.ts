@@ -4,7 +4,8 @@
 // backtick/tilde fenced blocks.
 import { spawnSync } from "node:child_process";
 import { posix } from "node:path";
-import { portablePathIdentity, type DocsLinksConfig } from "../config.ts";
+import { portablePathIdentity } from "../config.ts";
+import type { DocsLinksConfig } from "../config.ts";
 import { readWorkspaceText, workspaceLstat } from "../lib/workspaceFs.ts";
 
 type Destination = { offset: number; raw: string; reference?: true };

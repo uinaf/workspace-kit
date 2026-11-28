@@ -1,6 +1,7 @@
 import { posix } from "node:path";
 import type { WikiConfig } from "../config.ts";
-import { maskCode, maskFencedBlocks, relativeLinks, type RelativeLink } from "./docsLinks.ts";
+import { maskCode, maskFencedBlocks, relativeLinks } from "./docsLinks.ts";
+import type { RelativeLink } from "./docsLinks.ts";
 import { readWorkspaceText, walkWorkspaceMarkdown, workspaceLstat } from "../lib/workspaceFs.ts";
 
 const WIKILINK = /\[\[([^\]|#\n]+)(?:#[^\]|\n]*)?(?:\|[^\]\n]*)?\]\]/g;

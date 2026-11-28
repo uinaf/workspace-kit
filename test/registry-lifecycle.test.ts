@@ -8,8 +8,8 @@ import {
   pullProjects,
   resolveProjectPath,
   statusProjects,
-  type RegistryLifecycleOptions,
 } from "../src/registryLifecycle.ts";
+import type { RegistryLifecycleOptions } from "../src/registryLifecycle.ts";
 import { tempDir } from "./temp-dir.ts";
 
 type Result = { status: number; stdout: string; stderr: string; errorCode?: string };

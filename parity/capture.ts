@@ -6,15 +6,8 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import {
-  makeEnv,
-  normalize,
-  runScenarios,
-  utcToday,
-  type Runner,
-  type RunResult,
-  type Sink,
-} from "./scenarios.ts";
+import { makeEnv, normalize, runScenarios, utcToday } from "./scenarios.ts";
+import type { Runner, RunResult, Sink } from "./scenarios.ts";
 
 const parityDir = dirname(fileURLToPath(import.meta.url));
 const fixtureSrc = join(parityDir, "fixtures", "green-personal");

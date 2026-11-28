@@ -10,8 +10,8 @@ import {
   parseWorkspaceConfig,
   readRawConfig,
   unknownConfigKeys,
-  type WorkspaceConfig,
 } from "./config.ts";
+import type { WorkspaceConfig } from "./config.ts";
 import { structureErrors } from "./checks/structure.ts";
 import { wikiErrors } from "./checks/wiki.ts";
 import {
