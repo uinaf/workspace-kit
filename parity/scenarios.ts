@@ -7,8 +7,10 @@ import { execSync } from "node:child_process";
 import { join } from "node:path";
 
 export type RunResult = { stdout: string; stderr: string; status: number | null };
+
 // Commands use the kit's semantic argv; the legacy runner translates.
 export type Runner = (command: Array<string>, cwd: string) => RunResult;
+
 export type Sink = {
   emit(name: string, result: RunResult, dir: string): void;
 };
@@ -43,6 +45,7 @@ export function makeEnv(): Record<string, string> {
 
 export function sh(cwd: string, command: string, date?: string): string {
   const env = date ? { ...makeEnv(), GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date } : makeEnv();
+
   return execSync(command, { cwd, env, encoding: "utf8" });
 }
 
@@ -123,6 +126,7 @@ export function buildBase(opts: BuildOptions, name: string): string {
   );
   sh(dir, "git add workspace.contract.json");
   sh(dir, 'git commit -qm "contract"', "2026-01-02T00:00:00Z");
+
   return dir;
 }
 
@@ -150,6 +154,7 @@ const HANDOFF_BLOCKED_ARGS = [
 
 export function runScenarios(opts: BuildOptions & { runner: Runner; sink: Sink }): void {
   const { runner, sink } = opts;
+
   const run = (name: string, dir: string, command: Array<string>) =>
     sink.emit(name, runner(command, dir), dir);
 

@@ -13,6 +13,7 @@ const config: DocsLinksConfig = { enabled: true, exclude: [] };
 function repository(): string {
   const dir = tempDir("docs-links-");
   execFileSync("git", ["init", "-q"], { cwd: dir });
+
   return dir;
 }
 
@@ -28,6 +29,7 @@ function track(dir: string): void {
 function check(dir: string, checkConfig = config): Array<string> {
   const previous = process.cwd();
   process.chdir(dir);
+
   try {
     return docsLinkErrors(checkConfig);
   } finally {
@@ -241,6 +243,7 @@ test("docs link exclusions match only the configured path boundary", () => {
   const parsed = parseWorkspaceConfig({
     docsLinks: { enabled: true, exclude: ["docs/generated/"] },
   });
+
   assert.ok(parsed.docsLinks);
   assert.deepEqual(check(dir, parsed.docsLinks), [
     "docs/generated-old.md: broken link (missing.md)",

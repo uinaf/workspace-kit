@@ -31,6 +31,7 @@ function defaultRun(command: string, args: Array<string>): CommandResult {
     env: command === "git" ? gitEnvironmentForRepository() : process.env,
     maxBuffer: MAX_OUTPUT_BYTES,
   });
+
   const errorCode =
     result.error &&
     typeof result.error === "object" &&
@@ -38,14 +39,19 @@ function defaultRun(command: string, args: Array<string>): CommandResult {
     typeof result.error.code === "string"
       ? result.error.code
       : undefined;
+
   let stderr = result.stderr ?? "";
+
   if (result.status === null) {
     const invocation = [command, ...args].join(" ");
+
     const cause = result.error
       ? `failed: ${result.error.message}`
       : `terminated by ${result.signal ?? "an unknown signal"}`;
+
     stderr += `${stderr && !stderr.endsWith("\n") ? "\n" : ""}${invocation} ${cause}\n`;
   }
+
   return {
     status: result.status ?? 1,
     stdout: result.stdout ?? "",
@@ -69,6 +75,7 @@ function projectPath(home: string, entry: ProjectEntry): string {
 
 function isGitWorktree(run: RunCommand, path: string): boolean {
   const result = run("git", ["-C", path, "rev-parse", "--is-inside-work-tree"]);
+
   return result.status === 0 && result.stdout.trim() === "true";
 }
 
@@ -78,6 +85,7 @@ function relay(
   stderr: (text: string) => void,
 ) {
   if (result.stdout) stdout(result.stdout);
+
   if (result.stderr) stderr(result.stderr);
 }
 
@@ -86,28 +94,39 @@ export function cloneProjects(
   options: RegistryLifecycleOptions = {},
 ): number {
   const { home, run, stdout, stderr } = context(options);
+
   for (const entry of entries.filter(({ mode }) => mode === "managed")) {
     const path = projectPath(home, entry);
+
     if (isGitWorktree(run, path)) {
       stdout(`Skipping ${entry.label} (${path} already cloned)\n`);
       continue;
     }
+
     if (existsSync(path)) {
       stderr(`Refusing to clone into existing non-git path: ${path}\n`);
+
       return 1;
     }
+
     mkdirSync(dirname(path), { recursive: true });
     stdout(`Cloning ${entry.label}: ${entry.repo} -> ${path}\n`);
     const args = ["repo", "clone", entry.repo, path];
+
     if (entry.branch) args.push("--", "--branch", entry.branch);
     const result = run("gh", args);
+
     if (result.errorCode === "ENOENT") {
       stderr("Missing dependency: gh\n");
+
       return 1;
     }
+
     relay(result, stdout, stderr);
+
     if (result.status !== 0) return result.status;
   }
+
   return 0;
 }
 
@@ -116,17 +135,21 @@ export function statusProjects(
   options: RegistryLifecycleOptions = {},
 ): number {
   const { home, run, stdout, stderr } = context(options);
+
   for (const entry of entries) {
     const path = projectPath(home, entry);
+
     if (isGitWorktree(run, path)) {
       stdout(`\u001b[1m== ${entry.label} [${entry.mode}] (${path}) ==\u001b[0m\n`);
       const result = run("git", ["-C", path, "status", "-sb"]);
       relay(result, stdout, stderr);
+
       if (result.status !== 0) return result.status;
     } else if (entry.mode === "managed") {
       stdout(`\u001b[33m== ${entry.label} [${entry.mode}] (${path} missing) ==\u001b[0m\n`);
     }
   }
+
   return 0;
 }
 
@@ -135,26 +158,37 @@ export function pullProjects(
   options: RegistryLifecycleOptions = {},
 ): number {
   const { home, run, stdout, stderr } = context(options);
+
   for (const entry of entries.filter(({ mode }) => mode === "managed")) {
     const path = projectPath(home, entry);
+
     if (!isGitWorktree(run, path)) {
       stdout(`\u001b[33m== ${entry.label} (${path} missing, skipping) ==\u001b[0m\n`);
       continue;
     }
+
     stdout(`\u001b[1m== pulling ${entry.label} (${path}) ==\u001b[0m\n`);
+
     if (entry.branch) {
       const branch = run("git", ["-C", path, "branch", "--show-current"]);
+
       if (branch.stderr) stderr(branch.stderr);
+
       if (branch.status !== 0) return branch.status;
+
       if (branch.stdout.trim() !== entry.branch) {
         stderr(`Refusing to pull ${path}: expected branch ${entry.branch}\n`);
+
         return 1;
       }
     }
+
     const result = run("git", ["-C", path, "pull", "--ff-only"]);
     relay(result, stdout, stderr);
+
     if (result.status !== 0) return result.status;
   }
+
   return 0;
 }
 
@@ -167,9 +201,11 @@ export function resolveProjectPath(
   const matches = entries.filter(
     (entry) => entry.label === label && (!requiredMode || entry.mode === requiredMode),
   );
+
   if (matches.length !== 1) {
     const qualifier = requiredMode ? ` with mode ${requiredMode}` : "";
     throw new Error(`expected exactly one project ${label}${qualifier}`);
   }
+
   return projectPath(context(options).home, matches[0]!);
 }

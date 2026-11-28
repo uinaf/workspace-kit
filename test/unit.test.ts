@@ -37,6 +37,7 @@ test("handoff invariants are not configurable", () => {
   ]) {
     assert.equal(isPrivateHandoffPath(path, HANDOFF), true, path);
   }
+
   assert.equal(isPrivateHandoffPath("scripts/ok.ts", HANDOFF), false);
 });
 
@@ -90,8 +91,10 @@ test("non-reciprocal peers error; different ancestors skip the history check", (
         GIT_COMMITTER_DATE: "2026-01-01T00:00:00Z",
       },
     });
+
     return dir;
   };
+
   const ancestorA = "a".repeat(40);
   const ancestorB = "b".repeat(40);
   const current = make("o/current", "o/peer", ancestorA);

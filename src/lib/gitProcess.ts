@@ -19,9 +19,12 @@ const REPOSITORY_LOCAL_ENVIRONMENT = [
 
 export function gitEnvironmentForRepository(): NodeJS.ProcessEnv {
   const environment = { ...process.env };
+
   for (const key of REPOSITORY_LOCAL_ENVIRONMENT) delete environment[key];
+
   for (const key of Object.keys(environment)) {
     if (/^GIT_CONFIG_(?:KEY|VALUE)_\d+$/.test(key)) delete environment[key];
   }
+
   return environment;
 }

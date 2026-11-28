@@ -91,11 +91,13 @@ function doctorFailure(message: string, json: boolean): never {
     );
     process.exit(1);
   }
+
   failWith(message);
 }
 
 function chdirToRepoRoot(): void {
   const result = spawnSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" });
+
   if (result.status === 0) chdir(result.stdout.trim());
 }
 
@@ -104,18 +106,21 @@ type LoadedConfig = { config: WorkspaceConfig; unknownKeys: Array<string> };
 function loadConfigStateOrFail(json = false): LoadedConfig {
   let raw: unknown;
   let config: WorkspaceConfig;
+
   try {
     raw = readRawConfig();
     config = parseWorkspaceConfig(raw);
   } catch (error) {
     doctorFailure(error instanceof Error ? error.message : String(error), json);
   }
+
   if (config.minVersion && compareVersions(kitVersion(), config.minVersion) < 0) {
     doctorFailure(
       `${CONFIG_FILE} requires workspace-kit >= ${config.minVersion} (running ${kitVersion()})`,
       json,
     );
   }
+
   return { config, unknownKeys: unknownConfigKeys(raw) };
 }
 
@@ -127,6 +132,7 @@ function requireSection<T>(value: T | undefined, section: string): T {
   if (value === undefined) {
     failWith(`${CONFIG_FILE} has no ${section} section`);
   }
+
   return value;
 }
 
@@ -138,14 +144,19 @@ function runContractCheck(file: string): number {
   try {
     const contract = loadContract(".", file);
     const errors = workspaceErrors(".", file);
+
     if (errors.length > 0) {
       console.error(errors.join("\n"));
+
       return 1;
     }
+
     console.log(`workspace boundary ok (${contract.repository})`);
+
     return 0;
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
+
     return 1;
   }
 }
@@ -176,12 +187,14 @@ function emitOutputEvents(events: ReadonlyArray<OutputEvent>): void {
 function appendUnique(target: Array<string>, values: ReadonlyArray<string>): Array<string> {
   const seen = new Set(target);
   const added: Array<string> = [];
+
   for (const value of values) {
     if (seen.has(value)) continue;
     seen.add(value);
     target.push(value);
     added.push(value);
   }
+
   return added;
 }
 
@@ -197,13 +210,16 @@ function doctorReport(config: WorkspaceConfig): DoctorReport {
   checks.structure = structural.length === 0 ? "ok" : "fail";
 
   const stdout = (line: string) => events.push({ stream: "stdout", text: line });
+
   const stderr = (lines: Array<string>) => {
     detail.push(...lines);
+
     if (lines.length > 0) events.push({ stream: "stderr", text: lines.join("\n") });
   };
 
   if (config.wiki) {
     const errors = wikiErrors(config.wiki, wikiExclusions(config));
+
     if (errors.length > 0) {
       stderr(errors);
       bad.push("wiki check failed (exit 1)");
@@ -218,6 +234,7 @@ function doctorReport(config: WorkspaceConfig): DoctorReport {
     try {
       const contract = loadContract(".", config.contract.file);
       const errors = workspaceErrors(".", config.contract.file);
+
       if (errors.length > 0) {
         stderr(errors);
         bad.push("workspace contract failed (exit 1)");
@@ -235,6 +252,7 @@ function doctorReport(config: WorkspaceConfig): DoctorReport {
 
   if (config.docsLinks?.enabled) {
     const errors = docsLinkErrors(config.docsLinks);
+
     if (errors.length > 0) {
       stderr(errors);
       bad.push("docs links failed (exit 1)");
@@ -247,6 +265,7 @@ function doctorReport(config: WorkspaceConfig): DoctorReport {
 
   if (config.skills) {
     const errors = workspaceSkillErrors(".", config.skills);
+
     if (errors.length > 0) {
       stderr(errors);
       bad.push("skills check failed (exit 1)");
@@ -259,6 +278,7 @@ function doctorReport(config: WorkspaceConfig): DoctorReport {
 
   if (config.packageManager?.enforce) {
     const errors = packageManagerErrors(config.packageManager);
+
     if (errors.length > 0) {
       stderr(errors);
       bad.push("package-manager failed (exit 1)");
@@ -280,6 +300,7 @@ function doctor(config: WorkspaceConfig, json: boolean): never {
 
   if (!json) emitOutputEvents(report.events);
   const warnings = report.warnings;
+
   if (warnings.length > 0 && !json) console.error(warnings.join("\n"));
 
   if (json) {
@@ -300,6 +321,7 @@ function doctor(config: WorkspaceConfig, json: boolean): never {
     console.error(report.bad.join("\n"));
     process.exit(1);
   }
+
   console.log("doctor ok");
   process.exit(0);
 }
@@ -310,6 +332,7 @@ function verify(state: LoadedConfig, json: boolean): never {
   const events: Array<OutputEvent> = [{ stream: "stdout", text: "config ok" }, ...report.events];
   const errors = [...report.detail];
   const failures = [...report.bad];
+
   const warnings = [
     ...state.unknownKeys.map(
       (key) => `warning: unrecognized key ${key} (ignored by this kit version)`,
@@ -320,10 +343,12 @@ function verify(state: LoadedConfig, json: boolean): never {
   if (state.config.registry?.project) {
     const registryErrors = projectRegistryErrors(".", state.config.registry);
     checks.registry = registryErrors.length === 0 ? "ok" : "fail";
+
     if (registryErrors.length === 0) {
       events.push({ stream: "stdout", text: "registry ok" });
     } else {
       const added = appendUnique(errors, registryErrors);
+
       if (added.length > 0) events.push({ stream: "stderr", text: added.join("\n") });
       failures.push("registry validation failed (exit 1)");
     }
@@ -333,10 +358,12 @@ function verify(state: LoadedConfig, json: boolean): never {
     try {
       const result = registryPointers(".", state.config.registry, { check: true });
       checks.registryPointers = result.planned.length === 0 ? "ok" : "fail";
+
       if (result.planned.length === 0) {
         events.push({ stream: "stdout", text: "registry-pointers ok" });
       } else {
         const added = appendUnique(errors, result.planned);
+
         if (added.length > 0) events.push({ stream: "stderr", text: added.join("\n") });
         failures.push("registry pointers check failed (exit 1)");
       }
@@ -344,6 +371,7 @@ function verify(state: LoadedConfig, json: boolean): never {
       const message = error instanceof Error ? error.message : String(error);
       checks.registryPointers = "fail";
       const added = appendUnique(errors, [message]);
+
       if (added.length > 0) events.push({ stream: "stderr", text: added.join("\n") });
       failures.push("registry pointers check failed (exit 1)");
     }
@@ -364,11 +392,14 @@ function verify(state: LoadedConfig, json: boolean): never {
   }
 
   emitOutputEvents(events);
+
   if (warnings.length > 0) console.error(warnings.join("\n"));
+
   if (failures.length > 0) {
     console.error(failures.join("\n"));
     process.exit(1);
   }
+
   console.log("verify ok");
   process.exit(0);
 }
@@ -381,12 +412,14 @@ function main(): void {
     console.log(kitVersion());
     process.exit(0);
   }
+
   if (!command || command === "-h" || command === "--help") usageExit();
 
   if (command === "init") {
     let profile = "personal";
     let dir = ".";
     let wiki = false;
+
     for (let i = 0; i < rest.length; i += 1) {
       if (rest[i] === "--profile" && rest[i + 1]) {
         profile = rest[i + 1]!;
@@ -400,20 +433,26 @@ function main(): void {
         usageExit();
       }
     }
+
     if (!["personal", "runtime", "work"].includes(profile)) usageExit();
     let result;
+
     try {
       result = initWorkspace(dir, profile as "personal" | "runtime" | "work", { wiki });
     } catch (error) {
       failWith(error instanceof Error ? error.message : String(error));
     }
+
     for (const line of result.created) console.log(`created ${line}`);
+
     for (const line of result.skipped) console.log(`kept existing ${line}`);
     console.log(`workspace scaffolded (${profile} profile)`);
     console.log("next: replace the AGENTS.md TODOs using @uinaf/workspace-kit/docs/convention.md");
+
     if (result.created.includes(".githooks/pre-commit")) {
       console.log("enable the hook with: pnpm hooks:install");
     }
+
     process.exit(0);
   }
 
@@ -421,7 +460,9 @@ function main(): void {
 
   if (command === "verify") {
     const json = rest.includes("--json");
+
     if (rest.some((arg) => arg !== "--json")) usageExit();
+
     try {
       verify(loadConfigStateOrFail(json), json);
     } catch (error) {
@@ -431,7 +472,9 @@ function main(): void {
 
   if (command === "doctor") {
     const json = rest.includes("--json");
+
     if (rest.some((arg) => arg !== "--json")) usageExit();
+
     try {
       doctor(loadConfigOrFail(json), json);
     } catch (error) {
@@ -443,6 +486,7 @@ function main(): void {
     if (rest.length !== 1 || rest[0] !== "check") usageExit();
     const config = loadConfigOrFail();
     const errors = wikiErrors(requireSection(config.wiki, "wiki"), wikiExclusions(config));
+
     if (errors.length > 0) failWith(errors.join("\n"));
     console.log("wiki ok");
     process.exit(0);
@@ -459,14 +503,17 @@ function main(): void {
 
     if (mode === "peer" && args.length === 1) {
       const contract = requireSection(config.contract, "contract");
+
       try {
         const current = loadContract(".", contract.file);
         const peer = loadContract(args[0]);
         const errors = peerErrors(".", args[0]!, contract.file);
+
         if (errors.length > 0) {
           console.error(errors.join("\n"));
           process.exit(1);
         }
+
         console.log(
           `workspace histories are separate (${current.repository} <-> ${peer.repository})`,
         );
@@ -479,10 +526,12 @@ function main(): void {
     if (mode === "handoff" && args.length > 0) {
       const handoff = requireSection(config.handoff, "handoff");
       const blocked = args.filter((path) => isPrivateHandoffPath(path, handoff));
+
       if (blocked.length > 0) {
         console.error(blocked.map((path) => `owner-private handoff path: ${path}`).join("\n"));
         process.exit(1);
       }
+
       console.log(`handoff paths eligible for review:\n${args.join("\n")}`);
       process.exit(0);
     }
@@ -492,11 +541,14 @@ function main(): void {
 
   if (command === "links") {
     const [mode, ...args] = rest;
+
     if (args.length > 0) usageExit();
     const config = loadConfigOrFail();
     const links = requireSection(config.links, "links");
+
     if (mode === "check") {
       const bad: Array<string> = [];
+
       for (const { path, target } of links) {
         try {
           assertWorkspaceLinkTarget(".", path, target);
@@ -506,37 +558,47 @@ function main(): void {
           );
           continue;
         }
+
         const stat = workspaceLstat(".", path, "link path");
+
         if (!stat) {
           bad.push(`missing ${path}`);
         } else if (!stat.isSymbolicLink()) {
           bad.push(`${path} should be a symlink to ${target}`);
         } else {
           const actual = readWorkspaceLink(".", path);
+
           if (actual !== target) bad.push(`${path} points to ${actual}, expected ${target}`);
         }
       }
+
       if (bad.length > 0) {
         console.error(bad.join("\n"));
         process.exit(1);
       }
+
       console.log("links ok");
       process.exit(0);
     }
+
     if (mode === "fix") {
       const current = links.map((link) => {
         assertWorkspaceLinkTarget(".", link.path, link.target);
         const stat = workspaceLstat(".", link.path, "link path");
+
         if (stat && !stat.isSymbolicLink()) {
           failWith(`${link.path} exists and is not a symlink; refusing to replace it`);
         }
+
         return {
           ...link,
           actual: stat?.isSymbolicLink() ? readWorkspaceLink(".", link.path) : undefined,
         };
       });
+
       for (const { path, target, actual } of current) {
         if (actual === target) continue;
+
         try {
           if (actual !== undefined) unlinkWorkspaceLink(".", path);
           createWorkspaceLink(".", path, target);
@@ -545,24 +607,30 @@ function main(): void {
             `could not link ${path}: ${error instanceof Error ? error.message : String(error)}`,
           );
         }
+
         console.log(`linked ${path} -> ${target}`);
       }
+
       console.log("links ok");
       process.exit(0);
     }
+
     usageExit();
   }
 
   if (command === "docs") {
     const [mode, ...args] = rest;
+
     if (mode !== "links" || args.length > 0) usageExit();
     const config = loadConfigOrFail();
     const docsLinks = requireSection(config.docsLinks, "docsLinks");
     const errors = docsLinkErrors(docsLinks);
+
     if (errors.length > 0) {
       console.error(errors.join("\n"));
       process.exit(1);
     }
+
     console.log("docs-links ok");
     process.exit(0);
   }
@@ -572,23 +640,29 @@ function main(): void {
     const config = loadConfigOrFail();
     const registry = requireSection(config.registry, "registry");
     const errors = projectRegistryErrors(".", registry);
+
     if (errors.length > 0) {
       console.error(errors.join("\n"));
       process.exit(1);
     }
+
     if (mode === "validate" && args.length === 0) {
       console.log("registry ok");
       process.exit(0);
     }
+
     if (mode === "pointers" && args.length <= 1) {
       const check = args[0] === "--check";
+
       if (args.length === 1 && !check) usageExit();
       let result;
+
       try {
         result = registryPointers(".", registry, { check });
       } catch (error) {
         failWith(error instanceof Error ? error.message : String(error));
       }
+
       for (const line of result.planned) {
         if (check) console.error(line);
         else
@@ -596,23 +670,32 @@ function main(): void {
             line.replace(/^would write /, "wrote ").replace(/^would delete /, "deleted "),
           );
       }
+
       if (check && result.planned.length > 0) process.exit(1);
       console.log("registry-pointers ok");
       process.exit(0);
     }
+
     const entries = projectRegistryEntries(".", registry);
+
     if (mode === "clone" && args.length === 0) process.exit(cloneProjects(entries));
+
     if (mode === "status" && args.length === 0) process.exit(statusProjects(entries));
+
     if (mode === "pull" && args.length === 0) process.exit(pullProjects(entries));
+
     if (mode === "path") {
       const label = args[0];
+
       if (!label) usageExit();
       let requiredMode: string | undefined;
+
       if (args.length === 3 && args[1] === "--mode" && args[2]) {
         requiredMode = args[2];
       } else if (args.length !== 1) {
         usageExit();
       }
+
       try {
         console.log(resolveProjectPath(entries, label, requiredMode));
         process.exit(0);
@@ -620,12 +703,15 @@ function main(): void {
         failWith(error instanceof Error ? error.message : String(error));
       }
     }
+
     usageExit();
   }
 
   if (command === "hooks") {
     const [mode, ...args] = rest;
+
     if (mode !== "install" || args.length > 0) usageExit();
+
     try {
       console.log(installHooks(process.cwd()));
       process.exit(0);
@@ -636,24 +722,30 @@ function main(): void {
 
   if (command === "skills") {
     const [mode, ...args] = rest;
+
     if (args.length > 0 || (mode !== "check" && mode !== "sync")) usageExit();
     const config = loadConfigOrFail();
     const skills = requireSection(config.skills, "skills");
+
     if (mode === "check") {
       const errors = workspaceSkillErrors(".", skills);
+
       if (errors.length > 0) {
         console.error(errors.join("\n"));
         process.exit(1);
       }
+
       console.log("skills ok");
       process.exit(0);
     }
 
     const failures = syncWorkspaceSkills(".", skills);
+
     if (failures.length > 0) {
       console.error(`skill sync failed:\n${failures.map((failure) => `- ${failure}`).join("\n")}`);
       process.exit(1);
     }
+
     console.log("skills synced");
     process.exit(0);
   }
@@ -663,6 +755,7 @@ function main(): void {
     const config = loadConfigOrFail();
     const rules = requireSection(config.limits, "limits");
     const warnings = limitWarnings(rules);
+
     if (warnings.length > 0) console.error(warnings.join("\n"));
     else console.log("limits ok");
     process.exit(0);
@@ -670,11 +763,14 @@ function main(): void {
 
   if (command === "config") {
     const [mode, ...args] = rest;
+
     if (mode !== "validate" || args.length > 0) usageExit();
     const state = loadConfigStateOrFail();
+
     for (const key of state.unknownKeys) {
       console.error(`warning: unrecognized key ${key} (ignored by this kit version)`);
     }
+
     console.log("config ok");
     process.exit(0);
   }

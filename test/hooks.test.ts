@@ -22,15 +22,18 @@ const cli = join(root, "src", "cli.ts");
 for (const missing of ["directory", "file"]) {
   test(`hooks install reports a missing hook ${missing} without changing config`, () => {
     const fixture = mkdtempSync(join(tmpdir(), "workspace-hooks-"));
+
     try {
       if (missing === "file") mkdirSync(join(fixture, ".githooks"));
       git(fixture, "init", "-q");
       git(fixture, "config", "core.hooksPath", "existing-hooks");
       const configBefore = git(fixture, "config", "--local", "--list");
+
       const install = spawnSync(process.execPath, [cli, "hooks", "install"], {
         cwd: fixture,
         encoding: "utf8",
       });
+
       assert.equal(install.status, 1, install.stderr);
       assert.match(install.stderr, /\.githooks\/pre-commit is missing/);
       assert.equal(git(fixture, "config", "--local", "--list"), configBefore);
@@ -44,6 +47,7 @@ for (const link of ["parent", "hook"]) {
   for (const existingHooksPath of [undefined, "existing-hooks"]) {
     test(`hooks install rejects a symlinked ${link} with hooksPath ${existingHooksPath ?? "unset"}`, () => {
       const temporaryRoot = mkdtempSync(join(tmpdir(), "workspace-hooks-"));
+
       try {
         const fixture = join(temporaryRoot, "workspace");
         const external = join(temporaryRoot, "external");
@@ -52,19 +56,24 @@ for (const link of ["parent", "hook"]) {
         const externalHook = join(external, "pre-commit");
         writeFileSync(externalHook, "#!/bin/sh\nexit 0\n");
         chmodSync(externalHook, 0o600);
+
         if (link === "parent") {
           symlinkSync(external, join(fixture, ".githooks"));
         } else {
           mkdirSync(join(fixture, ".githooks"));
           symlinkSync(externalHook, join(fixture, ".githooks", "pre-commit"));
         }
+
         git(fixture, "init", "-q");
+
         if (existingHooksPath) git(fixture, "config", "core.hooksPath", existingHooksPath);
         const configBefore = git(fixture, "config", "--local", "--list");
+
         const install = spawnSync(process.execPath, [cli, "hooks", "install"], {
           cwd: fixture,
           encoding: "utf8",
         });
+
         assert.equal(statSync(externalHook).mode & 0o777, 0o600);
         assert.equal(git(fixture, "config", "--local", "--list"), configBefore);
         assert.equal(install.status, 1, install.stderr);
@@ -107,6 +116,7 @@ test("hooks install configures a linked worktree and makes the hook executable",
     cwd: linked,
     encoding: "utf8",
   });
+
   assert.equal(install.status, 0, install.stderr);
   assert.match(install.stdout, /Git hooks use .*\/linked\/\.githooks/);
   assert.equal(git(linked, "config", "--get", "core.hooksPath"), ".githooks");

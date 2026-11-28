@@ -28,6 +28,7 @@ function workspace(config: Record<string, unknown> = { wiki: {} }): string {
     join(dir, "docs", "log.md"),
     "# Log\n\n## [2026-01-01] seed\n\n## [2026-01-01] same day\n\n## [2026-01-03] later\n",
   );
+
   return dir;
 }
 
@@ -102,6 +103,7 @@ test("wiki check needs an index, honors wiki.root, and skips generated pointers"
       pointers: { dir: "docs/projects" },
     },
   });
+
   mkdirSync(join(pointers, "docs", "projects"));
   writeFileSync(join(pointers, "docs", "projects", "README.md"), "# Projects\n");
   symlinkSync("../../AGENTS.md", join(pointers, "docs", "projects", "agents-link.md"));

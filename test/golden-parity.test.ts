@@ -30,11 +30,13 @@ const env = makeEnv();
 
 const runner: Runner = (command, cwd) => {
   const result = spawnSync(process.execPath, [cli, ...command], { cwd, encoding: "utf8", env });
+
   return { stdout: result.stdout ?? "", stderr: result.stderr ?? "", status: result.status };
 };
 
 function scrub(name: string, text: string, dir: string): string {
   const normalized = normalize(text, dir, workRoot, today);
+
   return name === "peer-check-shared"
     ? normalized.replaceAll(/[0-9a-f]{40}/g, "<SHA>")
     : normalized;
@@ -59,8 +61,10 @@ test("kit CLI reproduces every legacy golden", () => {
         // Usage text is kit-owned; only the exit contract carries over.
         assert.equal(result.status, Number(golden(`${name}.exit`).trim()), name);
         assert.match(result.stderr, /usage:/, name);
+
         return;
       }
+
       compare(`${name}.out`, scrub(name, result.stdout, dir), golden(`${name}.out`));
       compare(`${name}.err`, scrub(name, result.stderr, dir), golden(`${name}.err`));
       compare(`${name}.exit`, `${result.status}\n`, golden(`${name}.exit`));

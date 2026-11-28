@@ -29,7 +29,9 @@ try {
     ],
     { stdio: "inherit" },
   );
+
   if (run.error) throw run.error;
+
   if (run.status !== 0) {
     process.exitCode = run.status ?? 1;
   } else {
@@ -41,9 +43,11 @@ try {
     for (const file of Object.keys(unit).sort((left, right) => left.localeCompare(right))) {
       const executable = lineHits(unit[file]);
       const childHits = lineHits(subprocess[file]);
+
       const fileCovered = [...executable].filter(
         ([line, hit]) => hit || childHits.get(line),
       ).length;
+
       covered += fileCovered;
       total += executable.size;
       const relative = file.includes("/src/") ? `src/${file.split("/src/")[1]}` : file;
@@ -53,6 +57,7 @@ try {
     console.log("");
     const result = percentage(covered, total);
     console.log(`lines: ${result}% (${covered}/${total})`);
+
     if (Number(result) < 90) {
       console.error("line coverage must be at least 90%");
       process.exitCode = 1;
@@ -68,11 +73,14 @@ function readCoverage(directory) {
 
 function lineHits(coverage) {
   const lines = new Map();
+
   if (!coverage) return lines;
+
   for (const [id, location] of Object.entries(coverage.statementMap)) {
     const line = location.start.line;
     lines.set(line, (lines.get(line) ?? false) || coverage.s[id] > 0);
   }
+
   return lines;
 }
 

@@ -8,6 +8,7 @@ import { tempDir } from "./temp-dir.ts";
 
 test("workspace paths use portable repository-relative semantics", () => {
   assert.equal(normalizeWorkspacePath("./memory//wiki/"), "memory/wiki");
+
   for (const path of [
     "../x",
     String.raw`..\x`,
@@ -22,6 +23,7 @@ test("workspace paths use portable repository-relative semantics", () => {
   ]) {
     assert.throws(() => normalizeWorkspacePath(path), /inside the workspace|repository-relative/);
   }
+
   for (const path of [".. /outside", "safe./file", "safe /file", "safe/.../file"]) {
     assert.throws(() => normalizeWorkspacePath(path), /ending in a space or period/);
   }
@@ -38,6 +40,7 @@ test("link targets may traverse only within the workspace", () => {
     () => normalizeLinkTarget("CLAUDE.md", String.raw`C:\outside`),
     /inside the workspace/,
   );
+
   for (const target of [".. /outside", "safe./file", "safe /file", "safe/.../file"]) {
     assert.throws(
       () => normalizeLinkTarget("nested/CLAUDE.md", target),

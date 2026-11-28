@@ -28,11 +28,13 @@ function run(command, args, cwd) {
       npm_config_update_notifier: "false",
     },
   });
+
   assert.equal(
     result.status,
     0,
     `${command} ${args.join(" ")} failed\n${result.stdout ?? ""}${result.stderr ?? ""}`,
   );
+
   return result.stdout ?? "";
 }
 
@@ -54,6 +56,7 @@ try {
     recursive: true,
     filter(source) {
       const topLevel = relative(repoRoot, source).split(sep)[0];
+
       return topLevel !== ".git" && topLevel !== "node_modules";
     },
   });
@@ -71,6 +74,7 @@ try {
       stagedPackageDir,
     ),
   );
+
   const packed = Array.isArray(packResult) ? packResult[0] : Object.values(packResult)[0];
   assert.ok(packed);
   assert.equal(packed.version, sourceVersion);
@@ -94,21 +98,26 @@ try {
     "dist",
     "cli.mjs",
   );
+
   const installedManifest = JSON.parse(
     readFileSync(
       join(consumerDir, "node_modules", "@uinaf", "workspace-kit", "package.json"),
       "utf8",
     ),
   );
+
   assert.equal(installedManifest.version, sourceVersion);
+
   for (const lifecycle of ["preinstall", "install", "postinstall", "prepare"]) {
     assert.equal(installedManifest.scripts?.[lifecycle], undefined);
   }
+
   const installedVersion = run(
     npm,
     ["exec", "--offline", "--", "workspace-kit", "--version"],
     consumerDir,
   ).trim();
+
   assert.equal(installedVersion, sourceVersion);
 
   run(

@@ -6,6 +6,7 @@ import { test } from "vite-plus/test";
 import { tempDir } from "./temp-dir.ts";
 
 const cli = join(import.meta.dirname, "..", "src", "cli.ts");
+
 const marker =
   "Generated from `projects.json` by `workspace-kit registry pointers`; edit the registry, then rerun it.";
 
@@ -28,6 +29,7 @@ function workspace(projects: unknown, pointers: unknown = { dir: "docs/projects"
     }),
   );
   writeFileSync(join(dir, "projects.json"), JSON.stringify(projects));
+
   return dir;
 }
 

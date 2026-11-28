@@ -27,11 +27,14 @@ function kit(cwd: string, ...args: Array<string>) {
 function kitCombined(cwd: string, ...args: Array<string>) {
   const outputPath = join(tempDir("cli-output-"), "combined.log");
   const output = openSync(outputPath, "w");
+
   const result = spawnSync(process.execPath, [cli, ...args], {
     cwd,
     stdio: ["ignore", output, output],
   });
+
   closeSync(output);
+
   return { status: result.status, output: readFileSync(outputPath, "utf8") };
 }
 
@@ -39,6 +42,7 @@ function scaffold(profile: "personal" | "work" = "personal"): string {
   const dir = tempDir(`cli-${profile}-`);
   initWorkspace(dir, profile, { wiki: profile === "personal" });
   execSync("git init -q", { cwd: dir });
+
   return dir;
 }
 

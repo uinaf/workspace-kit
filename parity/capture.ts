@@ -20,22 +20,28 @@ const env = makeEnv();
 // Translate the kit's semantic argv into legacy bun script invocations.
 function legacyArgv(command: Array<string>): Array<string> {
   const [tool, mode, ...rest] = command;
+
   if (tool === "contract" && mode === "check") return ["scripts/workspace-contract.ts", "--check"];
+
   if (tool === "contract" && mode === "peer")
     return ["scripts/workspace-contract.ts", "--peer", ...rest];
+
   if (tool === "contract" && mode === "handoff")
     return ["scripts/workspace-contract.ts", "--handoff", ...rest];
+
   if (tool === "contract" && mode === undefined) return ["scripts/workspace-contract.ts"];
   throw new Error(`no legacy mapping for command: ${command.join(" ")}`);
 }
 
 const runner: Runner = (command, cwd) => {
   const result = spawnSync("bun", legacyArgv(command), { cwd, encoding: "utf8", env });
+
   return { stdout: result.stdout ?? "", stderr: result.stderr ?? "", status: result.status };
 };
 
 function scrub(name: string, text: string, dir: string): string {
   const normalized = normalize(text, dir, workRoot, today);
+
   // Shared-history commit ids are deterministic but opaque; assert shape.
   return name === "peer-check-shared"
     ? normalized.replaceAll(/[0-9a-f]{40}/g, "<SHA>")
@@ -51,7 +57,9 @@ const sink: Sink = {
 };
 
 rmSync(goldenDir, { recursive: true, force: true });
+
 mkdirSync(goldenDir, { recursive: true });
+
 mkdirSync(workRoot, { recursive: true });
 
 runScenarios({ workRoot, fixtureSrc, legacyDir, runner, sink });

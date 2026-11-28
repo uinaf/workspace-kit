@@ -16,6 +16,7 @@ export function isPnpmPackageManagerPin(value: unknown): value is string {
 export function packageManagerErrors(config: PackageManagerConfig, repoRoot = "."): Array<string> {
   const bad: Array<string> = [];
   const stat = workspaceLstat(repoRoot, "package.json", "package.json");
+
   if (!stat) {
     bad.push("package.json: file is missing");
   } else {
@@ -23,7 +24,9 @@ export function packageManagerErrors(config: PackageManagerConfig, repoRoot = ".
       const parsed: unknown = JSON.parse(
         readWorkspaceText(repoRoot, "package.json", "package.json"),
       );
+
       const pin = isRecord(parsed) ? parsed.packageManager : undefined;
+
       if (!isPnpmPackageManagerPin(pin)) {
         bad.push(
           pin === undefined
@@ -33,6 +36,7 @@ export function packageManagerErrors(config: PackageManagerConfig, repoRoot = ".
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+
       if (error instanceof SyntaxError) {
         bad.push("package.json: is not valid JSON");
       } else {

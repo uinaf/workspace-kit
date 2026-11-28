@@ -28,6 +28,7 @@ function kit(cwd: string, ...args: Array<string>) {
 function scaffold(profile: "personal" | "work" = "work"): string {
   const dir = tempDir("workspace-boundary-");
   initWorkspace(dir, profile, { wiki: profile === "personal" });
+
   return dir;
 }
 

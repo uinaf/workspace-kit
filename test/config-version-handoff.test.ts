@@ -98,6 +98,7 @@ test("config validates declarative project ownership policies", () => {
       maxEntries: 3,
     },
   };
+
   const parsed = parseWorkspaceConfig({ registry });
   assert.deepEqual(parsed.registry?.project?.allowedOwners, ["fixture-owner"]);
   assert.deepEqual(parsed.registry?.project?.mustContain, [
@@ -224,6 +225,7 @@ test("config rejects identical and conflicting duplicate link paths", () => {
 
 test("contract files are read within their own workspace boundary", () => {
   const root = mkdtempSync(join(tmpdir(), "kit-contract-root-"));
+
   try {
     assert.throws(
       () => loadContract(root, "../outside.json"),
@@ -236,6 +238,7 @@ test("contract files are read within their own workspace boundary", () => {
 
 test("handoff screening canonicalizes portable paths and matches prefix roots", () => {
   const handoff = { paths: ["./AGENTS.md"], prefixes: ["./memory//"] };
+
   for (const path of [
     "AGENTS.md",
     "agents.md",
@@ -252,6 +255,7 @@ test("handoff screening canonicalizes portable paths and matches prefix roots", 
   ]) {
     assert.equal(isPrivateHandoffPath(path, handoff), true, path);
   }
+
   assert.equal(isPrivateHandoffPath("memory-old/notes.md", handoff), false);
   assert.equal(isPrivateHandoffPath("scripts/example.ts", handoff), false);
 });
@@ -269,6 +273,7 @@ test("source version requires full tag history and prefers a newer stamped packa
   const packageOnly = mkdtempSync(join(tmpdir(), "kit-version-package-"));
   const checkout = mkdtempSync(join(tmpdir(), "kit-version-checkout-"));
   const cloneParent = mkdtempSync(join(tmpdir(), "kit-version-clone-"));
+
   try {
     writePackage(packageOnly, "0.2.0");
     assert.throws(
@@ -296,6 +301,7 @@ test("source version requires full tag history and prefers a newer stamped packa
     git(cloneParent, ["clone", "-q", checkout, foreign]);
     git(foreign, ["-c", "tag.gpgSign=false", "tag", "v9.9.9"]);
     const resolver = new URL("../src/version.ts", import.meta.url).href;
+
     const isolated = spawnSync(
       process.execPath,
       [
@@ -306,6 +312,7 @@ test("source version requires full tag history and prefers a newer stamped packa
       ],
       { encoding: "utf8", env: { ...process.env, GIT_DIR: join(foreign, ".git") } },
     );
+
     assert.equal(isolated.status, 0, isolated.stderr);
     assert.equal(isolated.stdout.trim(), "0.3.0");
 

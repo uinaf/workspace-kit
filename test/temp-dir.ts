@@ -6,5 +6,6 @@ import { onTestFinished } from "vite-plus/test";
 export function tempDir(prefix: string): string {
   const dir = mkdtempSync(join(tmpdir(), prefix));
   onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
+
   return dir;
 }
