@@ -12,13 +12,13 @@ export type Contract = {
   repository: string;
   peerRepository: string;
   sharedAncestor: string;
-  requiredOwnerPaths: string[];
-  forbiddenOwnerPaths: string[];
+  requiredOwnerPaths: Array<string>;
+  forbiddenOwnerPaths: Array<string>;
 };
 
 type GitResult = { status: number; stdout: string; stderr: string };
 
-function git(repoRoot: string, args: string[]): GitResult {
+function git(repoRoot: string, args: Array<string>): GitResult {
   const result = spawnSync("git", ["-C", repoRoot, ...args], {
     encoding: "utf8",
     env: gitEnvironmentForRepository(),
@@ -44,11 +44,11 @@ function text(value: unknown, field: string): string {
   return value;
 }
 
-function textList(value: unknown, field: string): string[] {
+function textList(value: unknown, field: string): Array<string> {
   if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
     throw new Error(`${field} must be an array of strings`);
   }
-  return value as string[];
+  return value as Array<string>;
 }
 
 export function loadContract(repoRoot = ".", file = "workspace.contract.json"): Contract {
@@ -62,21 +62,21 @@ export function loadContract(repoRoot = ".", file = "workspace.contract.json"): 
   };
 }
 
-function trackedPaths(repoRoot: string): string[] {
+function trackedPaths(repoRoot: string): Array<string> {
   const result = git(repoRoot, ["ls-files", "-z"]);
   if (result.status !== 0) throw new Error("could not list tracked files");
   return result.stdout.split("\0").filter(Boolean);
 }
 
-function matchesTrackedPath(paths: string[], expected: string): boolean {
+function matchesTrackedPath(paths: Array<string>, expected: string): boolean {
   if (expected.endsWith("/")) return paths.some((path) => path.startsWith(expected));
   return paths.includes(expected);
 }
 
-export function workspaceErrors(repoRoot = ".", file = "workspace.contract.json"): string[] {
+export function workspaceErrors(repoRoot = ".", file = "workspace.contract.json"): Array<string> {
   const root = resolve(repoRoot);
   const contract = loadContract(root, file);
-  const errors: string[] = [];
+  const errors: Array<string> = [];
 
   const origin = git(root, ["remote", "get-url", "origin"]);
   if (origin.status !== 0) {
@@ -108,7 +108,7 @@ export function workspaceErrors(repoRoot = ".", file = "workspace.contract.json"
   return errors;
 }
 
-function postSplitCommits(repoRoot: string, ancestor: string): string[] {
+function postSplitCommits(repoRoot: string, ancestor: string): Array<string> {
   const result = git(repoRoot, ["rev-list", "HEAD", `^${ancestor}`]);
   if (result.status !== 0) {
     throw new Error(`could not inspect history: ${result.stderr.trim()}`);
@@ -120,7 +120,7 @@ export function peerErrors(
   currentRoot: string,
   peerRoot: string,
   file = "workspace.contract.json",
-): string[] {
+): Array<string> {
   const current = loadContract(currentRoot, file);
   // The peer's contract file name is protocol, not per-repo config.
   const peer = loadContract(peerRoot, "workspace.contract.json");

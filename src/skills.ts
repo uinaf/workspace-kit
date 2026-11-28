@@ -14,7 +14,7 @@ import {
 export const SKILLS_CLI_VERSION = "1.5.20";
 
 type RemoteSkill = { name: string; source: string };
-type WorkspaceSkills = { local: string[]; remote: RemoteSkill[] };
+type WorkspaceSkills = { local: Array<string>; remote: Array<RemoteSkill> };
 type RunResult = { status: number | null; error?: Error };
 type SkillLock = { skills: Record<string, unknown> };
 type ManagedSkillLock = Map<string, string>;
@@ -24,7 +24,7 @@ const GITHUB_SOURCE =
 
 export type SkillsRunner = (
   command: string,
-  args: readonly string[],
+  args: ReadonlyArray<string>,
   options: {
     cwd: string;
     env: NodeJS.ProcessEnv;
@@ -88,7 +88,7 @@ function skillManifestError(
   return undefined;
 }
 
-function readRemoteSkills(repoRoot: string, config: SkillsConfig): RemoteSkill[] {
+function readRemoteSkills(repoRoot: string, config: SkillsConfig): Array<RemoteSkill> {
   let parsed: unknown;
   try {
     parsed = JSON.parse(readWorkspaceText(repoRoot, config.manifest, "skills manifest"));
@@ -119,8 +119,8 @@ function readRemoteSkills(repoRoot: string, config: SkillsConfig): RemoteSkill[]
   });
 }
 
-function readLocalSkills(repoRoot: string): string[] {
-  const local: string[] = [];
+function readLocalSkills(repoRoot: string): Array<string> {
+  const local: Array<string> = [];
   for (const entry of readWorkspaceDirectory(repoRoot, "skills")) {
     if (
       entry.name === "skills.json" ||
@@ -194,9 +194,9 @@ function runtimeSkillError(
   return skillManifestError(repoRoot, `${runtimePath}/SKILL.md`, name);
 }
 
-function staleLocalLinkErrors(repoRoot: string, local: readonly string[]): string[] {
+function staleLocalLinkErrors(repoRoot: string, local: ReadonlyArray<string>): Array<string> {
   const localNames = new Set(local);
-  const errors: string[] = [];
+  const errors: Array<string> = [];
   for (const entry of readWorkspaceDirectory(repoRoot, ".agents/skills")) {
     if (!entry.isSymbolicLink() || localNames.has(entry.name)) continue;
     const runtimePath = `.agents/skills/${entry.name}`;
@@ -259,13 +259,13 @@ function writeManagedSkillLock(repoRoot: string, managed: ReadonlyMap<string, st
   );
 }
 
-function lockErrors(repoRoot: string, remote: readonly RemoteSkill[]): string[] {
+function lockErrors(repoRoot: string, remote: ReadonlyArray<RemoteSkill>): Array<string> {
   const lock = readSkillLock(repoRoot);
   if (!lock) return remote.length === 0 ? [] : ["skills-lock.json: file is missing"];
   if (typeof lock === "string") return [lock];
 
   const expected = new Map(remote.map(({ name, source }) => [name, source] as const));
-  const errors: string[] = [];
+  const errors: Array<string> = [];
   for (const [name, source] of expected) {
     const entry = lock.skills[name];
     if (!isRecord(entry)) {
@@ -284,12 +284,12 @@ function lockErrors(repoRoot: string, remote: readonly RemoteSkill[]): string[] 
 
 function retiredRemoteSkills(
   repoRoot: string,
-  remote: readonly RemoteSkill[],
+  remote: ReadonlyArray<RemoteSkill>,
   managed: ReadonlyMap<string, string>,
   dependencyLock: SkillLock | undefined,
-): RemoteSkill[] | string {
+): Array<RemoteSkill> | string {
   const declared = new Set(remote.map(({ name }) => name));
-  const retired: RemoteSkill[] = [];
+  const retired: Array<RemoteSkill> = [];
   for (const [name, source] of [...managed.entries()].sort(([left], [right]) =>
     left.localeCompare(right),
   )) {
@@ -321,11 +321,11 @@ function installedRemoteSkillError(repoRoot: string, skill: RemoteSkill): string
   return undefined;
 }
 
-function managedLockErrors(repoRoot: string, remote: readonly RemoteSkill[]): string[] {
+function managedLockErrors(repoRoot: string, remote: ReadonlyArray<RemoteSkill>): Array<string> {
   const managed = readManagedSkillLock(repoRoot);
   if (typeof managed === "string") return [managed];
   const declared = new Set(remote.map(({ name }) => name));
-  const errors: string[] = [];
+  const errors: Array<string> = [];
   for (const name of managed.keys()) {
     if (!declared.has(name)) {
       errors.push(`${MANAGED_SKILLS_LOCK} contains retired managed skill ${name}`);
@@ -334,7 +334,7 @@ function managedLockErrors(repoRoot: string, remote: readonly RemoteSkill[]): st
   return errors;
 }
 
-export function workspaceSkillErrors(repoRoot: string, config: SkillsConfig): string[] {
+export function workspaceSkillErrors(repoRoot: string, config: SkillsConfig): Array<string> {
   let skills: WorkspaceSkills;
   try {
     skills = readWorkspaceSkills(repoRoot, config);
@@ -342,7 +342,7 @@ export function workspaceSkillErrors(repoRoot: string, config: SkillsConfig): st
     return [errorText(error)];
   }
 
-  const errors: string[] = [];
+  const errors: Array<string> = [];
   const rootError = discoveryRootError(repoRoot);
   if (rootError) {
     errors.push(rootError);
@@ -378,9 +378,9 @@ export function syncWorkspaceSkills(
   config: SkillsConfig,
   run: SkillsRunner = spawnSync,
   env: NodeJS.ProcessEnv = process.env,
-): string[] {
+): Array<string> {
   let skills: WorkspaceSkills;
-  let retired: RemoteSkill[];
+  let retired: Array<RemoteSkill>;
   let managed: ManagedSkillLock;
   try {
     skills = readWorkspaceSkills(repoRoot, config);
@@ -439,7 +439,7 @@ export function syncWorkspaceSkills(
     return [errorText(error)];
   }
 
-  const failures: string[] = [];
+  const failures: Array<string> = [];
   const command = "npx";
   const options = {
     cwd: repoRoot,

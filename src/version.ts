@@ -30,7 +30,7 @@ function packageVersion(packageRoot: string): string {
   return "0.0.0";
 }
 
-function reachableTagVersions(packageRoot: string): string[] {
+function reachableTagVersions(packageRoot: string): Array<string> {
   // Requiring package-local Git metadata prevents source archives and an
   // installed package from inheriting tags from a repository around them.
   if (!existsSync(join(packageRoot, ".git"))) {

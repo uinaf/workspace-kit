@@ -45,7 +45,7 @@ function golden(file: string): string {
 }
 
 test("kit CLI reproduces every legacy golden", () => {
-  const mismatches: string[] = [];
+  const mismatches: Array<string> = [];
 
   const compare = (label: string, actual: string, expected: string) => {
     if (actual !== expected) {

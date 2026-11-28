@@ -256,7 +256,7 @@ test("handoff screening canonicalizes portable paths and matches prefix roots", 
   assert.equal(isPrivateHandoffPath("scripts/example.ts", handoff), false);
 });
 
-function git(cwd: string, args: string[]): void {
+function git(cwd: string, args: Array<string>): void {
   const result = spawnSync("git", args, { cwd, encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
 }

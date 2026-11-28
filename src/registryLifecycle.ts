@@ -12,7 +12,7 @@ type CommandResult = {
   errorCode?: string;
 };
 
-type RunCommand = (command: string, args: string[]) => CommandResult;
+type RunCommand = (command: string, args: Array<string>) => CommandResult;
 
 export type RegistryLifecycleOptions = {
   homeDirectory?: string;
@@ -25,7 +25,7 @@ export type RegistryLifecycleOptions = {
 // spawnSync's 1 MiB default kills git mid-output with no status.
 const MAX_OUTPUT_BYTES = 256 * 1024 * 1024;
 
-function defaultRun(command: string, args: string[]): CommandResult {
+function defaultRun(command: string, args: Array<string>): CommandResult {
   const result = spawnSync(command, args, {
     encoding: "utf8",
     env: command === "git" ? gitEnvironmentForRepository() : process.env,
@@ -82,7 +82,7 @@ function relay(
 }
 
 export function cloneProjects(
-  entries: ProjectEntry[],
+  entries: Array<ProjectEntry>,
   options: RegistryLifecycleOptions = {},
 ): number {
   const { home, run, stdout, stderr } = context(options);
@@ -112,7 +112,7 @@ export function cloneProjects(
 }
 
 export function statusProjects(
-  entries: ProjectEntry[],
+  entries: Array<ProjectEntry>,
   options: RegistryLifecycleOptions = {},
 ): number {
   const { home, run, stdout, stderr } = context(options);
@@ -131,7 +131,7 @@ export function statusProjects(
 }
 
 export function pullProjects(
-  entries: ProjectEntry[],
+  entries: Array<ProjectEntry>,
   options: RegistryLifecycleOptions = {},
 ): number {
   const { home, run, stdout, stderr } = context(options);
@@ -159,7 +159,7 @@ export function pullProjects(
 }
 
 export function resolveProjectPath(
-  entries: ProjectEntry[],
+  entries: Array<ProjectEntry>,
   label: string,
   requiredMode: string | undefined,
   options: RegistryLifecycleOptions = {},

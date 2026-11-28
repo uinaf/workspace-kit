@@ -25,12 +25,12 @@ function entry(name: string, overrides: Partial<ProjectEntry> = {}): ProjectEntr
 }
 
 function harness(home: string, worktrees: Set<string>) {
-  const stdout: string[] = [];
-  const stderr: string[] = [];
-  const calls: string[] = [];
+  const stdout: Array<string> = [];
+  const stderr: Array<string> = [];
+  const calls: Array<string> = [];
   let branch = "main";
   let missingGh = false;
-  const run = (command: string, args: string[]): Result => {
+  const run = (command: string, args: Array<string>): Result => {
     calls.push(`${command} ${args.join(" ")}`);
     if (command === "gh") {
       return missingGh
@@ -169,8 +169,8 @@ function installFakeGit(pullScript: string) {
 
 function pullWithRealProcess() {
   const home = tempDir("registry-lifecycle-home-");
-  const stdout: string[] = [];
-  const stderr: string[] = [];
+  const stdout: Array<string> = [];
+  const stderr: Array<string> = [];
   const status = pullProjects([entry("present")], {
     homeDirectory: home,
     stdout: (text) => stdout.push(text),

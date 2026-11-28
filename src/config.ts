@@ -8,35 +8,35 @@ import { isGitRepositoryPath, normalizeGitHost } from "./lib/gitRemote.ts";
 export type LinkRule = { path: string; target: string };
 export type ProjectRegistryConfig = {
   pathPrefix: string;
-  modes: string[];
-  originHosts: string[];
-  allowedOwners?: string[];
+  modes: Array<string>;
+  originHosts: Array<string>;
+  allowedOwners?: Array<string>;
   mustContain?: Array<{ repo: string; mode: string }>;
   maxEntries?: number;
-  catalog?: { field: string; modes: string[] };
+  catalog?: { field: string; modes: Array<string> };
 };
 export type RegistryConfig = {
   file: string;
-  entry: { required: string[]; optional: string[] };
+  entry: { required: Array<string>; optional: Array<string> };
   project?: ProjectRegistryConfig;
   pointers?: { dir: string };
 };
 export type WikiConfig = { root: string };
 export type LimitRule = { pattern: string; maxLines: number };
 export type ContractConfig = { file: string };
-export type HandoffConfig = { paths: string[]; prefixes: string[] };
-export type DocsLinksConfig = { enabled: boolean; exclude: string[] };
+export type HandoffConfig = { paths: Array<string>; prefixes: Array<string> };
+export type DocsLinksConfig = { enabled: boolean; exclude: Array<string> };
 export type SkillsConfig = { manifest: "skills/skills.json" };
 export type PackageManagerConfig = { enforce: boolean; allowForeignLockfiles: boolean };
 
 export type WorkspaceConfig = {
   minVersion?: string;
-  required?: string[];
-  forbidden?: string[];
-  links?: LinkRule[];
+  required?: Array<string>;
+  forbidden?: Array<string>;
+  links?: Array<LinkRule>;
   registry?: RegistryConfig;
   wiki?: WikiConfig;
-  limits?: LimitRule[];
+  limits?: Array<LimitRule>;
   contract?: ContractConfig;
   handoff?: HandoffConfig;
   docsLinks?: DocsLinksConfig;
@@ -54,14 +54,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function stringList(value: unknown, field: string): string[] {
+function stringList(value: unknown, field: string): Array<string> {
   if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
     fail(`${field} must be an array of strings`);
   }
-  return value as string[];
+  return value as Array<string>;
 }
 
-function workspacePathList(value: unknown, field: string): string[] {
+function workspacePathList(value: unknown, field: string): Array<string> {
   return stringList(value, field).map((path, index) =>
     normalizeWorkspacePath(path, `${field}[${index}]`),
   );
@@ -80,7 +80,7 @@ function text(value: unknown, field: string): string {
   return value;
 }
 
-function nonEmptyUniqueStringList(value: unknown, field: string): string[] {
+function nonEmptyUniqueStringList(value: unknown, field: string): Array<string> {
   const values = stringList(value, field);
   if (values.length === 0 || values.some((item) => item.length === 0)) {
     fail(`${field} must be a non-empty array of non-empty strings`);
@@ -139,7 +139,12 @@ const CONFIG_SHAPE: ConfigShape = {
   packageManager: { enforce: true, allowForeignLockfiles: true },
 };
 
-function collectUnknownKeys(value: unknown, shape: ConfigShape, path: string, out: string[]): void {
+function collectUnknownKeys(
+  value: unknown,
+  shape: ConfigShape,
+  path: string,
+  out: Array<string>,
+): void {
   if (shape === true) return;
   if (Array.isArray(shape)) {
     if (!Array.isArray(value)) return;
@@ -161,8 +166,8 @@ function collectUnknownKeys(value: unknown, shape: ConfigShape, path: string, ou
 
 // Unknown keys are tolerated at load (additive schema evolution across
 // staggered kit versions); `config validate` surfaces them as warnings.
-export function unknownConfigKeys(value: unknown): string[] {
-  const out: string[] = [];
+export function unknownConfigKeys(value: unknown): Array<string> {
+  const out: Array<string> = [];
   collectUnknownKeys(value, CONFIG_SHAPE, "", out);
   return out;
 }

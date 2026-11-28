@@ -8,7 +8,7 @@ import { join } from "node:path";
 
 export type RunResult = { stdout: string; stderr: string; status: number | null };
 // Commands use the kit's semantic argv; the legacy runner translates.
-export type Runner = (command: string[], cwd: string) => RunResult;
+export type Runner = (command: Array<string>, cwd: string) => RunResult;
 export type Sink = {
   emit(name: string, result: RunResult, dir: string): void;
 };
@@ -150,7 +150,7 @@ const HANDOFF_BLOCKED_ARGS = [
 
 export function runScenarios(opts: BuildOptions & { runner: Runner; sink: Sink }): void {
   const { runner, sink } = opts;
-  const run = (name: string, dir: string, command: string[]) =>
+  const run = (name: string, dir: string, command: Array<string>) =>
     sink.emit(name, runner(command, dir), dir);
 
   // --- Green path ---------------------------------------------------------

@@ -18,7 +18,7 @@ const today = utcToday();
 const env = makeEnv();
 
 // Translate the kit's semantic argv into legacy bun script invocations.
-function legacyArgv(command: string[]): string[] {
+function legacyArgv(command: Array<string>): Array<string> {
   const [tool, mode, ...rest] = command;
   if (tool === "contract" && mode === "check") return ["scripts/workspace-contract.ts", "--check"];
   if (tool === "contract" && mode === "peer")

@@ -76,7 +76,7 @@ for (const link of ["parent", "hook"]) {
   }
 }
 
-function git(cwd: string, ...args: string[]): string {
+function git(cwd: string, ...args: Array<string>): string {
   return execFileSync("git", args, {
     cwd,
     encoding: "utf8",

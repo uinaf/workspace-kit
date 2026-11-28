@@ -23,7 +23,7 @@ function fail(message: string): never {
   process.exit(1);
 }
 
-function git(args: string[], input?: string, index?: string): string {
+function git(args: Array<string>, input?: string, index?: string): string {
   return execFileSync(
     "git",
     [
@@ -51,7 +51,7 @@ function text(fields: Fields, key: string): string {
   return value;
 }
 
-function list(fields: Fields, key: string): unknown[] {
+function list(fields: Fields, key: string): Array<unknown> {
   const value = fields[key];
   if (!Array.isArray(value)) fail(`field ${key} must be an array`);
   return value;
@@ -72,12 +72,12 @@ function addField(fields: Fields, field: string, typed: boolean): void {
   const nested = /^(\w+)\[\]\[(\w+)\]$/.exec(key);
   const appended = /^(\w+)\[\]$/.exec(key);
   if (nested?.[1] && nested[2]) {
-    const items = (fields[nested[1]] ??= []) as Fields[];
+    const items = (fields[nested[1]] ??= []) as Array<Fields>;
     const last = items.at(-1);
     if (last && !(nested[2] in last)) last[nested[2]] = value;
     else items.push({ [nested[2]]: value });
   } else if (appended?.[1]) {
-    ((fields[appended[1]] ??= []) as unknown[]).push(value);
+    ((fields[appended[1]] ??= []) as Array<unknown>).push(value);
   } else {
     fields[key] = value;
   }
@@ -88,7 +88,7 @@ function createTree(fields: Fields): string {
   const index = join(scratch, "index");
   try {
     git(["read-tree", text(fields, "base_tree")], undefined, index);
-    for (const entry of list(fields, "tree") as Fields[]) {
+    for (const entry of list(fields, "tree") as Array<Fields>) {
       const blob = git(["hash-object", "-w", "--stdin"], text(entry, "content"));
       const cacheinfo = `${text(entry, "mode")},${blob},${text(entry, "path")}`;
       git(["update-index", "--add", "--cacheinfo", cacheinfo], undefined, index);

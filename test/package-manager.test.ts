@@ -25,7 +25,7 @@ function inDir<T>(dir: string, fn: () => T): T {
   }
 }
 
-function kit(cwd: string, ...args: string[]) {
+function kit(cwd: string, ...args: Array<string>) {
   return spawnSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8" });
 }
 
@@ -145,7 +145,7 @@ test("init enables package-manager enforcement and doctor stays green", () => {
   assert.equal(fail.status, 1);
   const payload = JSON.parse(fail.stdout) as {
     checks: { packageManager: string };
-    errors: string[];
+    errors: Array<string>;
   };
   assert.equal(payload.checks.packageManager, "fail");
   assert.ok(

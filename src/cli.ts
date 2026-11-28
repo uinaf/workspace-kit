@@ -99,7 +99,7 @@ function chdirToRepoRoot(): void {
   if (result.status === 0) chdir(result.stdout.trim());
 }
 
-type LoadedConfig = { config: WorkspaceConfig; unknownKeys: string[] };
+type LoadedConfig = { config: WorkspaceConfig; unknownKeys: Array<string> };
 
 function loadConfigStateOrFail(json = false): LoadedConfig {
   let raw: unknown;
@@ -130,7 +130,7 @@ function requireSection<T>(value: T | undefined, section: string): T {
   return value;
 }
 
-function wikiExclusions(config: WorkspaceConfig): string[] {
+function wikiExclusions(config: WorkspaceConfig): Array<string> {
   return config.registry?.pointers ? [config.registry.pointers.dir] : [];
 }
 
@@ -156,14 +156,14 @@ type OutputEvent = {
 };
 
 type DoctorReport = {
-  bad: string[];
+  bad: Array<string>;
   checks: Record<string, string>;
-  detail: string[];
-  events: OutputEvent[];
-  warnings: string[];
+  detail: Array<string>;
+  events: Array<OutputEvent>;
+  warnings: Array<string>;
 };
 
-function emitOutputEvents(events: readonly OutputEvent[]): void {
+function emitOutputEvents(events: ReadonlyArray<OutputEvent>): void {
   for (const event of events) {
     if (event.stream === "stdout") {
       console.log(event.text);
@@ -173,9 +173,9 @@ function emitOutputEvents(events: readonly OutputEvent[]): void {
   }
 }
 
-function appendUnique(target: string[], values: readonly string[]): string[] {
+function appendUnique(target: Array<string>, values: ReadonlyArray<string>): Array<string> {
   const seen = new Set(target);
-  const added: string[] = [];
+  const added: Array<string> = [];
   for (const value of values) {
     if (seen.has(value)) continue;
     seen.add(value);
@@ -186,10 +186,10 @@ function appendUnique(target: string[], values: readonly string[]): string[] {
 }
 
 function doctorReport(config: WorkspaceConfig): DoctorReport {
-  const bad: string[] = [];
+  const bad: Array<string> = [];
   const checks: Record<string, string> = {};
-  const detail: string[] = [];
-  const events: OutputEvent[] = [];
+  const detail: Array<string> = [];
+  const events: Array<OutputEvent> = [];
 
   const structural = structureErrors(config);
   bad.push(...structural);
@@ -197,7 +197,7 @@ function doctorReport(config: WorkspaceConfig): DoctorReport {
   checks.structure = structural.length === 0 ? "ok" : "fail";
 
   const stdout = (line: string) => events.push({ stream: "stdout", text: line });
-  const stderr = (lines: string[]) => {
+  const stderr = (lines: Array<string>) => {
     detail.push(...lines);
     if (lines.length > 0) events.push({ stream: "stderr", text: lines.join("\n") });
   };
@@ -307,7 +307,7 @@ function doctor(config: WorkspaceConfig, json: boolean): never {
 function verify(state: LoadedConfig, json: boolean): never {
   const report = doctorReport(state.config);
   const checks: Record<string, string> = { config: "ok", ...report.checks };
-  const events: OutputEvent[] = [{ stream: "stdout", text: "config ok" }, ...report.events];
+  const events: Array<OutputEvent> = [{ stream: "stdout", text: "config ok" }, ...report.events];
   const errors = [...report.detail];
   const failures = [...report.bad];
   const warnings = [
@@ -496,7 +496,7 @@ function main(): void {
     const config = loadConfigOrFail();
     const links = requireSection(config.links, "links");
     if (mode === "check") {
-      const bad: string[] = [];
+      const bad: Array<string> = [];
       for (const { path, target } of links) {
         try {
           assertWorkspaceLinkTarget(".", path, target);

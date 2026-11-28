@@ -163,7 +163,7 @@ export function readWorkspaceDirectory(
   root: string,
   path: string,
   missing: "empty" | "error" = "error",
-): Dirent[] {
+): Array<Dirent> {
   const relative = normalizeWorkspacePath(path);
   const stat = workspaceLstat(root, relative);
   if (!stat) {
@@ -184,9 +184,9 @@ export function walkWorkspaceMarkdown(
   path: string,
   missing: "empty" | "error" = "error",
   skip: (relative: string) => boolean = () => false,
-): string[] {
+): Array<string> {
   const relativeRoot = normalizeWorkspacePath(path);
-  const out: string[] = [];
+  const out: Array<string> = [];
 
   const walk = (relative: string, optional: "empty" | "error"): void => {
     const entries = readWorkspaceDirectory(root, relative, optional).sort((a, b) =>

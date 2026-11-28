@@ -25,7 +25,7 @@ function track(dir: string): void {
   execFileSync("git", ["add", "-A"], { cwd: dir });
 }
 
-function check(dir: string, checkConfig = config): string[] {
+function check(dir: string, checkConfig = config): Array<string> {
   const previous = process.cwd();
   process.chdir(dir);
   try {

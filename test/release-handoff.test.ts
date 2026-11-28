@@ -9,7 +9,7 @@ import { tempDir } from "./temp-dir.ts";
 type ExecConfig = { verifyReleaseCmd: string; prepareCmd: string };
 
 const releaseConfig = JSON.parse(readFileSync(".releaserc.json", "utf8")) as {
-  plugins: (string | [string, unknown])[];
+  plugins: Array<string | [string, unknown]>;
 };
 const execEntry = releaseConfig.plugins.find(
   (plugin): plugin is [string, ExecConfig] =>
@@ -19,7 +19,7 @@ assert.ok(execEntry, ".releaserc.json configures @semantic-release/exec");
 const exec = execEntry[1];
 const fakeGh = fileURLToPath(new URL("fake-gh.ts", import.meta.url));
 
-function git(dir: string, ...args: string[]): string {
+function git(dir: string, ...args: Array<string>): string {
   return execFileSync(
     "git",
     [

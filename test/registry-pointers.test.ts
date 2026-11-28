@@ -9,7 +9,7 @@ const cli = join(import.meta.dirname, "..", "src", "cli.ts");
 const marker =
   "Generated from `projects.json` by `workspace-kit registry pointers`; edit the registry, then rerun it.";
 
-function kit(cwd: string, ...args: string[]) {
+function kit(cwd: string, ...args: Array<string>) {
   return spawnSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8" });
 }
 

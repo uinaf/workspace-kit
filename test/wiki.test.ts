@@ -7,7 +7,7 @@ import { tempDir } from "./temp-dir.ts";
 
 const cli = join(import.meta.dirname, "..", "src", "cli.ts");
 
-function kit(cwd: string, ...args: string[]) {
+function kit(cwd: string, ...args: Array<string>) {
   return spawnSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8" });
 }
 

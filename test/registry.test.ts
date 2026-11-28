@@ -22,11 +22,11 @@ function scratch(prefix: string): string {
   return tempDir(prefix);
 }
 
-function git(cwd: string, ...args: string[]): void {
+function git(cwd: string, ...args: Array<string>): void {
   execFileSync("git", args, { cwd, stdio: "ignore" });
 }
 
-function workspace(projects: Record<string, Project[]>): string {
+function workspace(projects: Record<string, Array<Project>>): string {
   const dir = scratch("registry-workspace-");
   git(dir, "init", "-q");
   writeFileSync(
@@ -65,7 +65,7 @@ function project(name: string, overrides: Partial<Project> = {}): Project {
   };
 }
 
-function kit(cwd: string, home: string, ...args: string[]) {
+function kit(cwd: string, home: string, ...args: Array<string>) {
   return spawnSync(process.execPath, [cli, ...args], {
     cwd,
     encoding: "utf8",

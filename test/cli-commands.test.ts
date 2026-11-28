@@ -20,11 +20,11 @@ import { tempDir } from "./temp-dir.ts";
 const root = join(import.meta.dirname, "..");
 const cli = join(root, "src", "cli.ts");
 
-function kit(cwd: string, ...args: string[]) {
+function kit(cwd: string, ...args: Array<string>) {
   return spawnSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8" });
 }
 
-function kitCombined(cwd: string, ...args: string[]) {
+function kitCombined(cwd: string, ...args: Array<string>) {
   const outputPath = join(tempDir("cli-output-"), "combined.log");
   const output = openSync(outputPath, "w");
   const result = spawnSync(process.execPath, [cli, ...args], {

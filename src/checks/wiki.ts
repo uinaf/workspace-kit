@@ -20,8 +20,8 @@ function inside(path: string): boolean {
   return path !== ".." && !path.startsWith("../") && !path.startsWith("/");
 }
 
-function wikilinks(page: string, text: string, root: string): RelativeLink[] {
-  const out: RelativeLink[] = [];
+function wikilinks(page: string, text: string, root: string): Array<RelativeLink> {
+  const out: Array<RelativeLink> = [];
   for (const match of maskCode(text).matchAll(WIKILINK)) {
     const raw = match[0];
     const name = match[1]!.trim();
@@ -40,8 +40,8 @@ function validDate(date: string): boolean {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(date);
 }
 
-function logErrors(log: string): string[] {
-  const errors: string[] = [];
+function logErrors(log: string): Array<string> {
+  const errors: Array<string> = [];
   let previous: string | undefined;
   maskFencedBlocks(readWorkspaceText(".", log))
     .split(/\r?\n/)
@@ -60,7 +60,7 @@ function logErrors(log: string): string[] {
   return errors;
 }
 
-export function wikiErrors(wiki: WikiConfig, exclude: string[] = []): string[] {
+export function wikiErrors(wiki: WikiConfig, exclude: Array<string> = []): Array<string> {
   const index = posix.join(wiki.root, "index.md");
   const log = posix.join(wiki.root, "log.md");
   let indexStat;
@@ -74,7 +74,7 @@ export function wikiErrors(wiki: WikiConfig, exclude: string[] = []): string[] {
     exclude.some((dir) => path === dir || path.startsWith(`${dir}/`)),
   );
 
-  const errors: string[] = [];
+  const errors: Array<string> = [];
   const indexed = new Set<string>();
   for (const page of pages) {
     const text = readWorkspaceText(".", page);

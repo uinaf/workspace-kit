@@ -197,7 +197,7 @@ test("workspace skill sync owns links and delegates remote installation to skill
   const root = scratch();
   writeSkill(root, "skills", "local-skill");
   writeManifest(root, [{ name: "remote-skill", source: "fixture/skills" }]);
-  const calls: Array<{ command: string; args: readonly string[]; env: NodeJS.ProcessEnv }> = [];
+  const calls: Array<{ command: string; args: ReadonlyArray<string>; env: NodeJS.ProcessEnv }> = [];
   const runner: SkillsRunner = (command, args, options) => {
     calls.push({ command, args, env: options.env });
     writeSkill(root, ".agents/skills", "remote-skill");
@@ -250,7 +250,7 @@ test("workspace skill sync removes only retired skills recorded in its lock", ()
     { name: "retired-skill", source: "fixture/retired" },
     { name: "older-skill", source: "fixture/older" },
   ]);
-  const calls: string[][] = [];
+  const calls: Array<Array<string>> = [];
   const runner: SkillsRunner = (_command, args) => {
     calls.push([...args]);
     if (args[2] === "remove") {

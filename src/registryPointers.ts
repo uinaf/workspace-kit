@@ -9,7 +9,7 @@ import {
   writeWorkspaceText,
 } from "./lib/workspaceFs.ts";
 
-export type PointersResult = { planned: string[] };
+export type PointersResult = { planned: Array<string> };
 
 const SAFE_CATEGORY = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 
@@ -36,7 +36,7 @@ function entryLine(entry: Record<string, unknown>): string {
 function plannedFiles(file: string, registry: unknown): Map<string, string> {
   if (!isRecord(registry)) throw new Error(`${file} should be an object of category arrays`);
   const files = new Map<string, string>();
-  const index: string[] = [];
+  const index: Array<string> = [];
   const identities = new Set([portablePathIdentity("README.md")]);
   for (const [category, value] of Object.entries(registry)) {
     const identity = portablePathIdentity(`${category}.md`);
@@ -68,7 +68,7 @@ export function registryPointers(
   const dir = registry.pointers.dir;
   const files = plannedFiles(registry.file, JSON.parse(readWorkspaceText(repoRoot, registry.file)));
 
-  const deletes: string[] = [];
+  const deletes: Array<string> = [];
   for (const entry of readWorkspaceDirectory(repoRoot, dir, "empty")) {
     if (!entry.isFile() || !entry.name.endsWith(".md") || files.has(entry.name)) continue;
     const path = posix.join(dir, entry.name);

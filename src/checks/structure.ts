@@ -11,8 +11,8 @@ import {
   workspaceLstat,
 } from "../lib/workspaceFs.ts";
 
-export function requiredFileErrors(required: string[]): string[] {
-  const bad: string[] = [];
+export function requiredFileErrors(required: Array<string>): Array<string> {
+  const bad: Array<string> = [];
   for (const path of required) {
     const stat = workspaceLstat(".", path);
     if (!stat) {
@@ -30,16 +30,16 @@ export function requiredFileErrors(required: string[]): string[] {
   return bad;
 }
 
-export function forbiddenFileErrors(forbidden: string[]): string[] {
-  const bad: string[] = [];
+export function forbiddenFileErrors(forbidden: Array<string>): Array<string> {
+  const bad: Array<string> = [];
   for (const path of forbidden) {
     if (workspaceLstat(".", path)) bad.push(`forbidden file exists: ${path}`);
   }
   return bad;
 }
 
-export function linkErrors(links: LinkRule[]): string[] {
-  const bad: string[] = [];
+export function linkErrors(links: Array<LinkRule>): Array<string> {
+  const bad: Array<string> = [];
   for (const { path, target } of links) {
     try {
       assertWorkspaceLinkTarget(".", path, target);
@@ -63,8 +63,8 @@ export function linkErrors(links: LinkRule[]): string[] {
   return bad;
 }
 
-export function registryErrors(registry: RegistryConfig, repoRoot = "."): string[] {
-  const bad: string[] = [];
+export function registryErrors(registry: RegistryConfig, repoRoot = "."): Array<string> {
+  const bad: Array<string> = [];
   const file = registry.file;
   if (!workspaceLstat(repoRoot, file)) return bad; // missing is the required-list's job
   try {
@@ -102,7 +102,7 @@ export function registryErrors(registry: RegistryConfig, repoRoot = "."): string
   return bad;
 }
 
-export function structureErrors(config: WorkspaceConfig): string[] {
+export function structureErrors(config: WorkspaceConfig): Array<string> {
   return [
     ...requiredFileErrors(config.required ?? []),
     ...linkErrors(config.links ?? []),

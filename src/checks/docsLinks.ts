@@ -37,7 +37,7 @@ function fenceAt(line: string): Fence | undefined {
   return { marker, length: end - cursor, rest };
 }
 
-function blank(chars: string[], start: number, end: number): void {
+function blank(chars: Array<string>, start: number, end: number): void {
   for (let index = start; index < end; index += 1) {
     if (chars[index] !== "\n" && chars[index] !== "\r") chars[index] = " ";
   }
@@ -201,8 +201,8 @@ function titleEnd(text: string, start: number, end = text.length): number | unde
   return undefined;
 }
 
-function inlineDestinations(text: string): Destination[] {
-  const out: Destination[] = [];
+function inlineDestinations(text: string): Array<Destination> {
+  const out: Array<Destination> = [];
   for (let cursor = 0; cursor < text.length; cursor += 1) {
     if (text[cursor] !== "[" || isEscaped(text, cursor)) continue;
     const labelEnd = closingBracket(text, cursor);
@@ -224,8 +224,8 @@ function inlineDestinations(text: string): Destination[] {
   return out;
 }
 
-function referenceDestinations(text: string): Destination[] {
-  const out: Destination[] = [];
+function referenceDestinations(text: string): Array<Destination> {
+  const out: Array<Destination> = [];
   let lineStart = 0;
   while (lineStart < text.length) {
     const newline = text.indexOf("\n", lineStart);
@@ -262,7 +262,7 @@ function referenceDestinations(text: string): Destination[] {
   return out;
 }
 
-function destinations(text: string): Destination[] {
+function destinations(text: string): Array<Destination> {
   const visible = maskCode(text);
   return [...inlineDestinations(visible), ...referenceDestinations(visible)].sort(
     (left, right) => left.offset - right.offset,
@@ -331,8 +331,8 @@ export type RelativeLink =
   | { raw: string; target: string; reference?: true }
   | { raw: string; broken: true };
 
-export function relativeLinks(file: string, text: string): RelativeLink[] {
-  const out: RelativeLink[] = [];
+export function relativeLinks(file: string, text: string): Array<RelativeLink> {
+  const out: Array<RelativeLink> = [];
   for (const { raw, reference } of destinations(text)) {
     const unescaped = unescapeMarkdown(raw);
     if (/^[a-z][a-z0-9+.-]*:/i.test(unescaped) || unescaped.startsWith("//")) continue;
@@ -353,8 +353,8 @@ export function relativeLinks(file: string, text: string): RelativeLink[] {
   return out;
 }
 
-export function docsLinkErrors(config: DocsLinksConfig): string[] {
-  const bad: string[] = [];
+export function docsLinkErrors(config: DocsLinksConfig): Array<string> {
+  const bad: Array<string> = [];
   const result = spawnSync("git", ["ls-files", "-z"], { encoding: "utf8" });
   if (result.status !== 0) return ["could not list tracked files"];
   const tracked = new Set(result.stdout.split("\0").filter(Boolean));

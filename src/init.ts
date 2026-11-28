@@ -13,7 +13,7 @@ import {
 } from "./lib/workspaceFs.ts";
 
 export type Profile = "personal" | "runtime" | "work";
-export type InitResult = { created: string[]; skipped: string[] };
+export type InitResult = { created: Array<string>; skipped: Array<string> };
 
 const AGENTS_TEMPLATE = `# AGENTS.md
 
@@ -144,8 +144,8 @@ export function initWorkspace(
   profile: Profile,
   options: { wiki?: boolean } = {},
 ): InitResult {
-  const created: string[] = [];
-  const skipped: string[] = [];
+  const created: Array<string> = [];
+  const skipped: Array<string> = [];
 
   try {
     mkdirSync(dir, { recursive: true });

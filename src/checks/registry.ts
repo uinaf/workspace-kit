@@ -31,7 +31,7 @@ function errorCode(error: unknown): string | undefined {
   return typeof error.code === "string" ? error.code : undefined;
 }
 
-function git(repoRoot: string, args: string[]): GitResult {
+function git(repoRoot: string, args: Array<string>): GitResult {
   const result = spawnSync("git", ["-C", repoRoot, ...args], {
     encoding: "utf8",
     env: gitEnvironmentForRepository(),
@@ -94,9 +94,9 @@ function canonicalPath(path: string): string {
   return realpathSync.native(path);
 }
 
-function parseEntries(value: unknown, project: ProjectRegistryConfig): ProjectEntry[] {
+function parseEntries(value: unknown, project: ProjectRegistryConfig): Array<ProjectEntry> {
   if (!isRecord(value)) return [];
-  const entries: ProjectEntry[] = [];
+  const entries: Array<ProjectEntry> = [];
   for (const [category, categoryEntries] of Object.entries(value)) {
     if (!Array.isArray(categoryEntries)) continue;
     for (const value of categoryEntries) {
@@ -120,11 +120,11 @@ function parseEntries(value: unknown, project: ProjectRegistryConfig): ProjectEn
 
 function staticEntryErrors(
   file: string,
-  entries: ProjectEntry[],
+  entries: Array<ProjectEntry>,
   project: ProjectRegistryConfig,
-): string[] {
-  const errors: string[] = [];
-  const labels = new Map<string, string[]>();
+): Array<string> {
+  const errors: Array<string> = [];
+  const labels = new Map<string, Array<string>>();
   const paths = new Map<string, Array<{ label: string; path: string }>>();
 
   if (project.maxEntries !== undefined && entries.length > project.maxEntries) {
@@ -224,12 +224,12 @@ function catalogPathError(
 
 function checkoutErrors(
   file: string,
-  entries: ProjectEntry[],
+  entries: Array<ProjectEntry>,
   project: ProjectRegistryConfig,
   options: ProjectRegistryOptions,
-): string[] {
-  const errors: string[] = [];
-  const roots = new Map<string, string[]>();
+): Array<string> {
+  const errors: Array<string> = [];
+  const roots = new Map<string, Array<string>>();
   const home = configuredHome(options);
 
   for (const entry of entries) {
@@ -314,7 +314,10 @@ function checkoutErrors(
   return errors;
 }
 
-export function projectRegistryEntries(repoRoot: string, registry: RegistryConfig): ProjectEntry[] {
+export function projectRegistryEntries(
+  repoRoot: string,
+  registry: RegistryConfig,
+): Array<ProjectEntry> {
   if (!registry.project) {
     throw new Error("registry project operations require a registry.project policy");
   }
@@ -326,7 +329,7 @@ export function projectRegistryErrors(
   repoRoot: string,
   registry: RegistryConfig,
   options: ProjectRegistryOptions = {},
-): string[] {
+): Array<string> {
   if (!workspaceLstat(repoRoot, registry.file)) return [`missing ${registry.file}`];
 
   const shapeErrors = registryErrors(registry, repoRoot);

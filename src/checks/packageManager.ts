@@ -13,8 +13,8 @@ export function isPnpmPackageManagerPin(value: unknown): value is string {
   return typeof value === "string" && /^pnpm@\d+\.\d+\.\d+(?:\+[A-Za-z0-9._-]+)?$/.test(value);
 }
 
-export function packageManagerErrors(config: PackageManagerConfig, repoRoot = "."): string[] {
-  const bad: string[] = [];
+export function packageManagerErrors(config: PackageManagerConfig, repoRoot = "."): Array<string> {
+  const bad: Array<string> = [];
   const stat = workspaceLstat(repoRoot, "package.json", "package.json");
   if (!stat) {
     bad.push("package.json: file is missing");

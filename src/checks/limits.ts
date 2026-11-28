@@ -28,8 +28,8 @@ export function globToRegExp(pattern: string): RegExp {
   return new RegExp(`^${out}$`);
 }
 
-export function limitWarnings(rules: LimitRule[]): string[] {
-  const warnings: string[] = [];
+export function limitWarnings(rules: Array<LimitRule>): Array<string> {
+  const warnings: Array<string> = [];
   const result = spawnSync("git", ["ls-files", "-z"], { encoding: "utf8" });
   if (result.status !== 0) {
     warnings.push("warning: could not list tracked files for limit checks");
