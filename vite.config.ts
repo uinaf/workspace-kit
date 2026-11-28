@@ -43,7 +43,6 @@ export default defineConfig({
       "anti-slop/no-unknown-parameters": "off",
       "anti-slop/require-safety-comment-for-type-assertion": "off",
       curly: "off",
-      "no-console": "off",
       "quality/no-known-value-widening": "off",
       "quality/no-unknown-returns": "off",
       "quality/no-unsafe-dictionary-type": "off",
@@ -54,5 +53,11 @@ export default defineConfig({
       "typescript/no-unsafe-type-assertion": "off",
       "vite-plus/prefer-vite-plus-imports": "error",
     },
+    overrides: [
+      {
+        files: ["src/cli.ts", "scripts/**", "parity/capture.ts"],
+        rules: { "no-console": "off" },
+      },
+    ],
   },
 });
