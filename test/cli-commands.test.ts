@@ -119,14 +119,14 @@ test("config validate: minVersion gate, format, unknown keys, boolean enabled", 
 
   write((c) => {
     c.minVersion = "0.1.0";
-    (c as Record<string, unknown>).requird = ["typo"];
+    c.requird = ["typo"];
   });
   const warned = kit(dir, "config", "validate");
   assert.equal(warned.status, 0);
   assert.match(warned.stderr, /unrecognized key requird/);
 
   write((c) => {
-    delete (c as Record<string, unknown>).requird;
+    delete c.requird;
     c.docsLinks = { enabled: "true" };
   });
   assert.match(kit(dir, "config", "validate").stderr, /docsLinks\.enabled must be a boolean/);

@@ -461,7 +461,7 @@ function main(): void {
       const contract = requireSection(config.contract, "contract");
       try {
         const current = loadContract(".", contract.file);
-        const peer = loadContract(args[0]!);
+        const peer = loadContract(args[0]);
         const errors = peerErrors(".", args[0]!, contract.file);
         if (errors.length > 0) {
           console.error(errors.join("\n"));

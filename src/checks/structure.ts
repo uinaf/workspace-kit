@@ -84,19 +84,12 @@ export function registryErrors(registry: RegistryConfig, repoRoot = "."): string
           }
           const record = entry as Record<string, unknown>;
           for (const key of registry.entry.required) {
-            if (
-              !(key in record) ||
-              typeof record[key] !== "string" ||
-              (record[key] as string).length === 0
-            ) {
+            if (!(key in record) || typeof record[key] !== "string" || record[key].length === 0) {
               bad.push(`${file} category ${category} entry missing string ${key}`);
             }
           }
           for (const key of registry.entry.optional) {
-            if (
-              key in record &&
-              (typeof record[key] !== "string" || (record[key] as string).length === 0)
-            ) {
+            if (key in record && (typeof record[key] !== "string" || record[key].length === 0)) {
               bad.push(`${file} category ${category} entry has invalid ${key}`);
             }
           }
