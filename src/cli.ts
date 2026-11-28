@@ -417,11 +417,13 @@ function main(): void {
     let wiki = false;
 
     for (let i = 0; i < rest.length; i += 1) {
-      if (rest[i] === "--profile" && rest[i + 1]) {
-        profile = rest[i + 1]!;
+      const next = rest[i + 1];
+
+      if (rest[i] === "--profile" && next) {
+        profile = next;
         i += 1;
-      } else if (rest[i] === "--dir" && rest[i + 1]) {
-        dir = rest[i + 1]!;
+      } else if (rest[i] === "--dir" && next) {
+        dir = next;
         i += 1;
       } else if (rest[i] === "--wiki") {
         wiki = true;
@@ -503,7 +505,7 @@ function main(): void {
       try {
         const current = loadContract(".", contract.file);
         const peer = loadContract(args[0]);
-        const errors = peerErrors(".", args[0]!, contract.file);
+        const errors = peerErrors(".", args[0] ?? "", contract.file);
 
         if (errors.length > 0) {
           console.error(errors.join("\n"));

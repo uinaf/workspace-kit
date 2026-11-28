@@ -200,10 +200,12 @@ export function resolveProjectPath(
     (entry) => entry.label === label && (!requiredMode || entry.mode === requiredMode),
   );
 
-  if (matches.length !== 1) {
+  const [match, ...others] = matches;
+
+  if (match === undefined || others.length > 0) {
     const qualifier = requiredMode ? ` with mode ${requiredMode}` : "";
     throw new Error(`expected exactly one project ${label}${qualifier}`);
   }
 
-  return projectPath(context(options).home, matches[0]!);
+  return projectPath(context(options).home, match);
 }

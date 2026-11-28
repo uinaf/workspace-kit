@@ -26,7 +26,7 @@ function wikilinks(page: string, text: string, root: string): Array<RelativeLink
 
   for (const match of maskCode(text).matchAll(WIKILINK)) {
     const raw = match[0];
-    const name = match[1]!.trim();
+    const name = (match[1] ?? "").trim();
     const spellings = posix.extname(name) ? [name] : [`${name}.md`, name];
 
     const candidates = [posix.dirname(page), root]

@@ -161,7 +161,7 @@ function staticEntryErrors(
     if (!isGitRepositoryPath(entry.repo)) {
       errors.push(`${file} ${entry.label}: invalid Git repository path ${entry.repo}`);
     } else if (project.allowedOwners) {
-      const owner = entry.repo.split("/", 1)[0]!;
+      const owner = entry.repo.split("/", 1)[0] ?? "";
 
       if (!project.allowedOwners.includes(owner)) {
         errors.push(
@@ -196,7 +196,7 @@ function staticEntryErrors(
   for (const pathEntries of paths.values()) {
     if (pathEntries.length > 1) {
       errors.push(
-        `${file}: duplicate project path ${pathEntries[0]!.path}: ${pathEntries
+        `${file}: duplicate project path ${pathEntries[0]?.path}: ${pathEntries
           .map(({ label, path }) => `${label}=${path}`)
           .join(", ")}`,
       );
@@ -226,7 +226,7 @@ function catalogPathError(
   const segments = catalog.split("/");
 
   for (let index = 0; index < segments.length; index += 1) {
-    current = join(current, segments[index]!);
+    current = join(current, segments[index] ?? "");
     let stat: Stats | undefined;
 
     try {

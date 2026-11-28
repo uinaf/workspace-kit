@@ -134,7 +134,7 @@ export function maskCode(text: string): string {
 function skipWhitespace(text: string, start: number, end = text.length): number {
   let cursor = start;
 
-  while (cursor < end && /\s/.test(text[cursor]!)) cursor += 1;
+  while (cursor < end && /\s/.test(text.charAt(cursor))) cursor += 1;
 
   return cursor;
 }
@@ -192,7 +192,7 @@ function destinationToken(
   let cursor = start;
 
   while (cursor < end) {
-    const char = text[cursor]!;
+    const char = text.charAt(cursor);
 
     if (char === "\\" && cursor + 1 < end) {
       cursor += 2;

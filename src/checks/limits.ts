@@ -6,7 +6,7 @@ export function globToRegExp(pattern: string): RegExp {
   let out = "";
 
   for (let i = 0; i < pattern.length; i += 1) {
-    const char = pattern[i]!;
+    const char = pattern.charAt(i);
 
     if (char === "*") {
       if (pattern[i + 1] === "*") {
