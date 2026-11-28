@@ -80,8 +80,8 @@ test("doctor counts limit warnings without failing, and limits command works", (
   assert.match(limits.stderr, /exceeds soft limit 1/);
 });
 
-for (const shape of ["missing", "directory", "symlink-parent"] as const) {
-  test(`soft limits keep unreadable tracked files nonfatal (${shape})`, () => {
+for (const unreadable of ["missing", "directory", "symlink-parent"] as const) {
+  test(`soft limits keep unreadable tracked files nonfatal (${unreadable})`, () => {
     const dir = tempDir("soft-limits-");
     execSync("git init -q", { cwd: dir });
     writeFileSync(
@@ -94,9 +94,9 @@ for (const shape of ["missing", "directory", "symlink-parent"] as const) {
     execSync("git add -A", { cwd: dir });
     rmSync(join(dir, "notes", "a.md"));
 
-    if (shape === "directory") mkdirSync(join(dir, "notes", "a.md"));
+    if (unreadable === "directory") mkdirSync(join(dir, "notes", "a.md"));
 
-    if (shape === "symlink-parent") {
+    if (unreadable === "symlink-parent") {
       rmSync(join(dir, "notes"), { recursive: true });
       const outside = tempDir("soft-limits-outside-");
       writeFileSync(join(outside, "a.md"), "outside\n".repeat(10));
@@ -107,7 +107,7 @@ for (const shape of ["missing", "directory", "symlink-parent"] as const) {
     assert.equal(limits.status, 0, limits.stderr);
     assert.match(limits.stderr, /warning: could not check soft limit for notes\/a\.md/);
 
-    if (shape === "symlink-parent") {
+    if (unreadable === "symlink-parent") {
       assert.match(limits.stderr, /symbolic-link parent is not allowed/);
       assert.doesNotMatch(limits.stderr, /10 lines exceeds/);
     } else {

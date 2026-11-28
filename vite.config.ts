@@ -40,7 +40,6 @@ export default defineConfig({
     ],
     rules: {
       "anti-slop/no-runtime-typeof": "off",
-      "anti-slop/no-shape-in-symbol-names": "off",
       "anti-slop/no-unknown-parameters": "off",
       "anti-slop/require-safety-comment-for-type-assertion": "off",
       curly: "off",

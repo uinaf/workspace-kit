@@ -603,7 +603,7 @@ test("remote installation preflights all destinations before any mutation", () =
 });
 
 test("remote installation rejects occupied files and symlinks even with matching locks", () => {
-  for (const shape of ["file", "symlink"]) {
+  for (const occupant of ["file", "symlink"]) {
     const root = scratch();
     const remote = { name: "remote-skill", source: "fixture/remote" };
     writeManifest(root, [remote]);
@@ -612,7 +612,7 @@ test("remote installation rejects occupied files and symlinks even with matching
     writeManagedLock(root, [remote]);
     const path = join(root, ".agents/skills/remote-skill");
 
-    if (shape === "file") writeFileSync(path, "keep");
+    if (occupant === "file") writeFileSync(path, "keep");
     else symlinkSync("../../skills/remote-skill", path);
     let called = false;
     assert.match(
@@ -625,7 +625,7 @@ test("remote installation rejects occupied files and symlinks even with matching
     );
     assert.equal(called, false);
 
-    if (shape === "file") assert.equal(readFileSync(path, "utf8"), "keep");
+    if (occupant === "file") assert.equal(readFileSync(path, "utf8"), "keep");
     else assert.equal(readlinkSync(path), "../../skills/remote-skill");
   }
 });

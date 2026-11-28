@@ -122,9 +122,12 @@ function homePathPrefix(value: unknown, field: string): string {
   return prefix;
 }
 
-type ConfigShape = true | { readonly [key: string]: ConfigShape } | readonly [ConfigShape];
+type KnownConfigKeys =
+  | true
+  | { readonly [key: string]: KnownConfigKeys }
+  | readonly [KnownConfigKeys];
 
-const CONFIG_SHAPE: ConfigShape = {
+const KNOWN_CONFIG_KEYS: KnownConfigKeys = {
   $schema: true,
   minVersion: true,
   required: true,
@@ -155,22 +158,22 @@ const CONFIG_SHAPE: ConfigShape = {
 
 function collectUnknownKeys(
   value: unknown,
-  shape: ConfigShape,
+  known: KnownConfigKeys,
   path: string,
   out: Array<string>,
 ): void {
-  if (shape === true) return;
+  if (known === true) return;
 
-  if (Array.isArray(shape)) {
+  if (Array.isArray(known)) {
     if (!Array.isArray(value)) return;
-    value.forEach((entry, index) => collectUnknownKeys(entry, shape[0], `${path}[${index}]`, out));
+    value.forEach((entry, index) => collectUnknownKeys(entry, known[0], `${path}[${index}]`, out));
 
     return;
   }
 
   if (!isRecord(value)) return;
 
-  const fields = shape as { readonly [key: string]: ConfigShape };
+  const fields = known as { readonly [key: string]: KnownConfigKeys };
 
   for (const [key, child] of Object.entries(value)) {
     const childPath = path ? `${path}.${key}` : key;
@@ -180,13 +183,13 @@ function collectUnknownKeys(
       continue;
     }
 
-    collectUnknownKeys(child, fields[key] as ConfigShape, childPath, out);
+    collectUnknownKeys(child, fields[key] as KnownConfigKeys, childPath, out);
   }
 }
 
 export function unknownConfigKeys(value: unknown): Array<string> {
   const out: Array<string> = [];
-  collectUnknownKeys(value, CONFIG_SHAPE, "", out);
+  collectUnknownKeys(value, KNOWN_CONFIG_KEYS, "", out);
 
   return out;
 }

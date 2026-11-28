@@ -369,9 +369,9 @@ export function projectRegistryErrors(
 ): Array<string> {
   if (!workspaceLstat(repoRoot, registry.file)) return [`missing ${registry.file}`];
 
-  const shapeErrors = registryErrors(registry, repoRoot);
+  const definitionErrors = registryErrors(registry, repoRoot);
 
-  if (shapeErrors.length > 0) return shapeErrors;
+  if (definitionErrors.length > 0) return definitionErrors;
 
   const missingFields = PROJECT_FIELDS.filter((field) => !registry.entry.required.includes(field));
 
