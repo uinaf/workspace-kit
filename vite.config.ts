@@ -1,3 +1,4 @@
+import uinaf, { env, ignorePatterns } from "@uinaf/oxlint-config/vite-plus";
 import { defineConfig } from "vite-plus";
 import { kitVersion } from "./src/version.ts";
 
@@ -24,7 +25,9 @@ export default defineConfig({
     ignorePatterns: ["parity/legacy/**", "parity/fixtures/**"],
   },
   lint: {
-    ignorePatterns: ["parity/legacy/**", "parity/fixtures/**"],
+    extends: [uinaf],
+    env,
+    ignorePatterns: [...ignorePatterns, "parity/legacy/**", "parity/fixtures/**"],
     options: {
       typeAware: true,
       typeCheck: true,
@@ -36,6 +39,33 @@ export default defineConfig({
       },
     ],
     rules: {
+      "anti-slop/no-runtime-typeof": "off",
+      "anti-slop/no-shape-in-symbol-names": "off",
+      "anti-slop/no-unknown-parameters": "off",
+      "anti-slop/require-readable-spacing": "off",
+      "anti-slop/require-safety-comment-for-type-assertion": "off",
+      curly: "off",
+      "no-console": "off",
+      "preserve-caught-error": "off",
+      "import/consistent-type-specifier-style": "off",
+      "quality/no-conditional-empty-object-spread": "off",
+      "quality/no-known-value-widening": "off",
+      "quality/no-unknown-returns": "off",
+      "quality/no-unsafe-dictionary-type": "off",
+      "typescript/array-type": "off",
+      "typescript/no-non-null-assertion": "off",
+      "typescript/no-unnecessary-type-assertion": "off",
+      "typescript/no-unsafe-argument": "off",
+      "typescript/no-unsafe-assignment": "off",
+      "typescript/no-unsafe-call": "off",
+      "typescript/no-unsafe-member-access": "off",
+      "typescript/no-unsafe-type-assertion": "off",
+      "uinaf/no-comments": "off",
+      "unicorn/consistent-function-scoping": "off",
+      "unicorn/prefer-import-meta-properties": "off",
+      "unicorn/prefer-single-call": "off",
+      "unicorn/prefer-string-raw": "off",
+      "unicorn/prefer-string-replace-all": "off",
       "vite-plus/prefer-vite-plus-imports": "error",
     },
   },

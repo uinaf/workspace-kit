@@ -206,6 +206,9 @@ importers:
       '@types/node':
         specifier: ^26.0.0
         version: 26.6.11
+      '@uinaf/oxlint-config':
+        specifier: 1.0.0
+        version: 1.0.0(oxlint@1.94.0(vite-plus@1.8.0(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(typescript@7.0.2)))(tsrs@7.1.0-beta.tsrs4)(vite-plus@1.8.0(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(typescript@7.0.2))
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 5.1.1(@vitest/browser@5.1.1)(vitest@5.1.1)
@@ -256,6 +259,21 @@ packages:
   '@blazediff/core@1.10.0':
     resolution: {integrity: sha512-AOQff0zgR7cGsZL+4E7hVkmujoPUpm0J9xzWGWZj5wCjd3gmxESXAPfKyuzs93VdpQNFhHlBhfOjrcZ+XTERtQ==}
 
+  '@cloudflare/oxlint-config@0.2.0':
+    resolution: {integrity: sha512-HENc8yIzCuIPvUyQbX47UKv2kgA26iZt1XRsrlQXayJG6cWmBNlnHXfPy7oNCghqWpTBcbFRdGwsHd1Ahe3zhw==}
+    engines: {node: ^22.18.0 || >=24.0.0}
+    peerDependencies:
+      oxlint: ^1.94.0
+      tsrs: '>=7.1.0-beta.tsrs2'
+      vite-plus: '>=1.7.0'
+    peerDependenciesMeta:
+      oxlint:
+        optional: true
+      tsrs:
+        optional: true
+      vite-plus:
+        optional: true
+
   '@istanbuljs/schema@0.1.6':
     resolution: {integrity: sha512-+Sg6GCR/wy1oSmQDFq4LQDAhm3ETKnorxN+y5nbLULOR3P0c14f2Wurzj3/xqPXtasLFfHd5iRFQ7AJt4KH2cw==}
     engines: {node: '>=8'}
@@ -269,6 +287,31 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
+
+  '@nkzw/eslint-plugin@3.0.0':
+    resolution: {integrity: sha512-J6Ms/OzUxx7BNBggCKOqFWbESgAJYjvXvekCjjpxVJA2fBv5xOsC5P+2WDYqQUMCvDOU3GxBgG/jrmbqf+/wQA==}
+    peerDependencies:
+      eslint: '>= 9'
+    peerDependenciesMeta:
+      eslint:
+        optional: true
+
+  '@nkzw/oxlint-config@4.1.0':
+    resolution: {integrity: sha512-uFJxSqD8LPGe+uYVh+EC9BwndUGr3h7+aHQhKcdUANNSV4c1vvRoOqqHUTlML5RnHtvABtapW1ZyY4gkz6sKOA==}
+    peerDependencies:
+      eslint-plugin-perfectionist: ^5.14.0
+      oxlint: '>=1.94.0'
+      tsrs: '>=0.25.0-ts7.1.0-beta || ^7.1.0-beta.tsrs2'
+      vite-plus: '>=1.7.0'
+    peerDependenciesMeta:
+      eslint-plugin-perfectionist:
+        optional: true
+      oxlint:
+        optional: true
+      tsrs:
+        optional: true
+      vite-plus:
+        optional: true
 
   '@oxc-project/runtime@0.159.0':
     resolution: {integrity: sha512-z+wJlHpqB2rsnQ5PbQlWKC7lYISlHrniQ3N5JF4LGaa+kOopx5u5DMT2P7pN12fsXFg1gVcoLdRXPRyIS61OKQ==}
@@ -728,6 +771,22 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@uinaf/oxlint-config@1.0.0':
+    resolution: {integrity: sha512-mijhPRhKF+MTJZHEh2aXWNAZpkeq1EF4J/sm2uh0NsoIioB8bW8AJJepqQ3+wXBCRB5k0d9K0aEUAuHyDPfhKw==}
+    engines: {node: ^22.18.0 || >=24.0.0}
+    peerDependencies:
+      oxlint: '>=1.94.0'
+      vite-plus: '>=1.7.0'
+    peerDependenciesMeta:
+      oxlint:
+        optional: true
+      vite-plus:
+        optional: true
+
+  '@uinaf/oxlint-plugin-no-comments@1.1.0':
+    resolution: {integrity: sha512-Jc1LomQyspHZCKNRX+5OLXqzWgz+Z1Jey1JxpbBITSxTrQ7RLR3JmWsSpbReyP8p6Xa/Bzx1+tVJJ67tD57kPw==}
+    engines: {node: '>=20.19.0'}
+
   '@vitest/browser-preview@5.1.1':
     resolution: {integrity: sha512-HKTjVL3gVfc/GNcs2z1urdFN5bONsEUb9k+2E1rBL+774SqsPMrtCQ32CVpCbWB+I8ZTokjIFEFAzm+AjCd6RA==}
     peerDependencies:
@@ -1052,6 +1111,10 @@ packages:
   escalade@3.2.0:
     resolution: {integrity: sha512-WUj2qlxaQtO4g6Pq5c29GTcWGDyd8itL8zTlipgECz3JesAiiOKotd8JU6otB3PACgG6xkJUyVhboMS+bje/jA==}
     engines: {node: '>=6'}
+
+  eslint-plugin-no-only-tests@3.4.0:
+    resolution: {integrity: sha512-4S3/9Nb7A2tiMcpzEQE9bQSlpeOz6WJkgryBuou/SA8W2x2c8Zf4j0NvTKBjv6qNhF9T79tmkecm/0CHqV0UGg==}
+    engines: {node: '>=5.0.0'}
 
   estree-walker@3.0.3:
     resolution: {integrity: sha512-7RUKfXgSMMkzt6ZuXmqapOurLGPPfgj6l9uRZ7lRGolvk0y2yocc35LdcxKC5PQZdn2DMqioAQ2NoWcrTKmm6g==}
@@ -1544,6 +1607,17 @@ snapshots:
 
   '@blazediff/core@1.10.0': {}
 
+  '@cloudflare/oxlint-config@0.2.0(oxlint@1.94.0(vite-plus@1.8.0(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(typescript@7.0.2)))(tsrs@7.1.0-beta.tsrs4)(vite-plus@1.8.0(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(typescript@7.0.2))':
+    dependencies:
+      '@nkzw/oxlint-config': 4.1.0(oxlint@1.94.0(vite-plus@1.8.0(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(typescript@7.0.2)))(tsrs@7.1.0-beta.tsrs4)(vite-plus@1.8.0(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(typescript@7.0.2))
+    optionalDependencies:
+      oxlint: 1.94.0(vite-plus@1.8.0(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(typescript@7.0.2))
+      tsrs: 7.1.0-beta.tsrs4
+      vite-plus: 1.8.0(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(typescript@7.0.2)
+    transitivePeerDependencies:
+      - eslint
+      - eslint-plugin-perfectionist
+
   '@istanbuljs/schema@0.1.6': {}
 
   '@jridgewell/resolve-uri@3.1.2': {}
@@ -1554,6 +1628,19 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
+
+  '@nkzw/eslint-plugin@3.0.0': {}
+
+  '@nkzw/oxlint-config@4.1.0(oxlint@1.94.0(vite-plus@1.8.0(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(typescript@7.0.2)))(tsrs@7.1.0-beta.tsrs4)(vite-plus@1.8.0(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(typescript@7.0.2))':
+    dependencies:
+      '@nkzw/eslint-plugin': 3.0.0
+      eslint-plugin-no-only-tests: 3.4.0
+    optionalDependencies:
+      oxlint: 1.94.0(vite-plus@1.8.0(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(typescript@7.0.2))
+      tsrs: 7.1.0-beta.tsrs4
+      vite-plus: 1.8.0(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(typescript@7.0.2)
+    transitivePeerDependencies:
+      - eslint
 
   '@oxc-project/runtime@0.159.0': {}
 
@@ -1793,6 +1880,20 @@ snapshots:
   '@typescript/typescript-win32-x64@7.0.2':
     optional: true
 
+  '@uinaf/oxlint-config@1.0.0(oxlint@1.94.0(vite-plus@1.8.0(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(typescript@7.0.2)))(tsrs@7.1.0-beta.tsrs4)(vite-plus@1.8.0(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(typescript@7.0.2))':
+    dependencies:
+      '@cloudflare/oxlint-config': 0.2.0(oxlint@1.94.0(vite-plus@1.8.0(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(typescript@7.0.2)))(tsrs@7.1.0-beta.tsrs4)(vite-plus@1.8.0(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(typescript@7.0.2))
+      '@uinaf/oxlint-plugin-no-comments': 1.1.0
+    optionalDependencies:
+      oxlint: 1.94.0(vite-plus@1.8.0(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(typescript@7.0.2))
+      vite-plus: 1.8.0(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(typescript@7.0.2)
+    transitivePeerDependencies:
+      - eslint
+      - eslint-plugin-perfectionist
+      - tsrs
+
+  '@uinaf/oxlint-plugin-no-comments@1.1.0': {}
+
   '@vitest/browser-preview@5.1.1(@voidzero-dev/vite-plus-core@8.3.8001(@types/node@26.6.11)(typescript@7.0.2))(vitest@5.1.1)':
     dependencies:
       '@testing-library/dom': 10.4.2
@@ -2030,6 +2131,8 @@ snapshots:
   es-module-lexer@2.3.2: {}
 
   escalade@3.2.0: {}
+
+  eslint-plugin-no-only-tests@3.4.0: {}
 
   estree-walker@3.0.3:
     dependencies:
