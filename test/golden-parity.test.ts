@@ -36,7 +36,9 @@ const runner: Runner = (command, cwd) => {
 
 function scrub(name: string, text: string, dir: string): string {
   const normalized = normalize(text, dir, workRoot, today);
-  return name === "peer-check-shared" ? normalized.replace(/[0-9a-f]{40}/g, "<SHA>") : normalized;
+  return name === "peer-check-shared"
+    ? normalized.replaceAll(/[0-9a-f]{40}/g, "<SHA>")
+    : normalized;
 }
 
 function golden(file: string): string {

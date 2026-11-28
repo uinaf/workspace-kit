@@ -63,7 +63,6 @@ export default defineConfig({
       "unicorn/consistent-function-scoping": "off",
       "unicorn/prefer-import-meta-properties": "off",
       "unicorn/prefer-single-call": "off",
-      "unicorn/prefer-string-replace-all": "off",
       "vite-plus/prefer-vite-plus-imports": "error",
     },
   },

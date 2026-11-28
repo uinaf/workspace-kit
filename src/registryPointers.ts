@@ -22,7 +22,7 @@ function marker(file: string): string {
 }
 
 function inline(value: string): string {
-  return value.replace(/\s+/g, " ").trim();
+  return value.replaceAll(/\s+/g, " ").trim();
 }
 
 function entryLine(entry: Record<string, unknown>): string {

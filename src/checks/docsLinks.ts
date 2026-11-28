@@ -270,7 +270,7 @@ function destinations(text: string): Destination[] {
 }
 
 function unescapeMarkdown(text: string): string {
-  return text.replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, "$1");
+  return text.replaceAll(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, "$1");
 }
 
 function pathPart(href: string): string {
