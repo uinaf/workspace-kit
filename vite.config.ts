@@ -32,12 +32,6 @@ export default defineConfig({
       typeAware: true,
       typeCheck: true,
     },
-    jsPlugins: [
-      {
-        name: "vite-plus",
-        specifier: "vite-plus/oxlint-plugin",
-      },
-    ],
     rules: {
       "anti-slop/no-runtime-typeof": "off",
       "anti-slop/no-unknown-parameters": "off",
@@ -51,7 +45,6 @@ export default defineConfig({
       "typescript/no-unsafe-call": "off",
       "typescript/no-unsafe-member-access": "off",
       "typescript/no-unsafe-type-assertion": "off",
-      "vite-plus/prefer-vite-plus-imports": "error",
     },
     overrides: [
       {
