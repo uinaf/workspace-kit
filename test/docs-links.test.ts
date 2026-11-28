@@ -4,7 +4,8 @@ import { existsSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:
 import { dirname, join } from "node:path";
 import { test } from "vite-plus/test";
 import { docsLinkErrors } from "../src/checks/docsLinks.ts";
-import { parseWorkspaceConfig, type DocsLinksConfig } from "../src/config.ts";
+import { parseWorkspaceConfig } from "../src/config.ts";
+import type { DocsLinksConfig } from "../src/config.ts";
 import { tempDir } from "./temp-dir.ts";
 
 const config: DocsLinksConfig = { enabled: true, exclude: [] };
@@ -12,6 +13,7 @@ const config: DocsLinksConfig = { enabled: true, exclude: [] };
 function repository(): string {
   const dir = tempDir("docs-links-");
   execFileSync("git", ["init", "-q"], { cwd: dir });
+
   return dir;
 }
 
@@ -24,9 +26,10 @@ function track(dir: string): void {
   execFileSync("git", ["add", "-A"], { cwd: dir });
 }
 
-function check(dir: string, checkConfig = config): string[] {
+function check(dir: string, checkConfig = config): Array<string> {
   const previous = process.cwd();
   process.chdir(dir);
+
   try {
     return docsLinkErrors(checkConfig);
   } finally {
@@ -128,9 +131,6 @@ test("docs links keeps case collisions broken and reports embedded repositories 
   put(dir, "README.md", "[case](guide.md)\n[embedded](nested)\n");
   put(dir, "Guide.md", "# guide\n");
   track(dir);
-  // On a case-insensitive filesystem this overwrites Guide.md; on a
-  // case-sensitive one it creates a distinct untracked file. Both must stay
-  // broken: staging cannot produce a tree that checks out everywhere.
   put(dir, "guide.md", "# guide\n");
   mkdirSync(join(dir, "nested"), { recursive: true });
   execFileSync("git", ["init", "-q"], { cwd: join(dir, "nested") });
@@ -177,9 +177,6 @@ test("docs links rejects an untracked target below a tracked path that aliases i
   put(dir, "README.md", "[ancestor](guide/sub/file.md)\n");
   put(dir, "Guide", "# tracked file\n");
   track(dir);
-  // Keep `Guide` in the index but clear the working copy so the colliding
-  // directory can exist on a case-insensitive filesystem too; on Linux both
-  // would coexist and git would stage the file.
   rmSync(join(dir, "Guide"));
   put(dir, "guide/sub/file.md", "# collides with tracked Guide\n");
 
@@ -223,10 +220,12 @@ test("docs links resolves Git paths with POSIX semantics and exact traversal che
 test("docs links rejects non-portable tracked Markdown paths", () => {
   const dir = repository();
   put(dir, "docs/literal.md", "# Portable spelling\n");
-  put(dir, "docs\\literal.md", "[silently missed before](missing.md)\n");
+  put(dir, String.raw`docs\literal.md`, "[silently missed before](missing.md)\n");
   track(dir);
 
-  assert.deepEqual(check(dir), ["docs\\literal.md: tracked Markdown path is not portable"]);
+  assert.deepEqual(check(dir), [
+    String.raw`docs\literal.md: tracked Markdown path is not portable`,
+  ]);
 });
 
 test("docs link exclusions match only the configured path boundary", () => {
@@ -238,6 +237,7 @@ test("docs link exclusions match only the configured path boundary", () => {
   const parsed = parseWorkspaceConfig({
     docsLinks: { enabled: true, exclude: ["docs/generated/"] },
   });
+
   assert.ok(parsed.docsLinks);
   assert.deepEqual(check(dir, parsed.docsLinks), [
     "docs/generated-old.md: broken link (missing.md)",

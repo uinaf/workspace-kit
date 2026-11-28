@@ -1,14 +1,13 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { test } from "vite-plus/test";
 import { tempDir } from "./temp-dir.ts";
 
-const cli = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "cli.ts");
+const cli = join(import.meta.dirname, "..", "src", "cli.ts");
 
-function kit(cwd: string, ...args: string[]) {
+function kit(cwd: string, ...args: Array<string>) {
   return spawnSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8" });
 }
 
@@ -29,6 +28,7 @@ function workspace(config: Record<string, unknown> = { wiki: {} }): string {
     join(dir, "docs", "log.md"),
     "# Log\n\n## [2026-01-01] seed\n\n## [2026-01-01] same day\n\n## [2026-01-03] later\n",
   );
+
   return dir;
 }
 
@@ -103,6 +103,7 @@ test("wiki check needs an index, honors wiki.root, and skips generated pointers"
       pointers: { dir: "docs/projects" },
     },
   });
+
   mkdirSync(join(pointers, "docs", "projects"));
   writeFileSync(join(pointers, "docs", "projects", "README.md"), "# Projects\n");
   symlinkSync("../../AGENTS.md", join(pointers, "docs", "projects", "agents-link.md"));

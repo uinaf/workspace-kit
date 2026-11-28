@@ -12,23 +12,23 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { test } from "vite-plus/test";
 import { initWorkspace } from "../src/init.ts";
 import { writeWorkspaceText } from "../src/lib/workspaceFs.ts";
 import { tempDir } from "./temp-dir.ts";
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const root = join(import.meta.dirname, "..");
 const cli = join(root, "src", "cli.ts");
 
-function kit(cwd: string, ...args: string[]) {
+function kit(cwd: string, ...args: Array<string>) {
   return spawnSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8" });
 }
 
 function scaffold(profile: "personal" | "work" = "work"): string {
   const dir = tempDir("workspace-boundary-");
   initWorkspace(dir, profile, { wiki: profile === "personal" });
+
   return dir;
 }
 

@@ -1,4 +1,3 @@
-// Legacy contracts that the golden parity suite cannot capture.
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 import { execSync } from "node:child_process";
@@ -37,6 +36,7 @@ test("handoff invariants are not configurable", () => {
   ]) {
     assert.equal(isPrivateHandoffPath(path, HANDOFF), true, path);
   }
+
   assert.equal(isPrivateHandoffPath("scripts/ok.ts", HANDOFF), false);
 });
 
@@ -67,41 +67,42 @@ test("contract reports missing origin and non-hex ancestor", () => {
   assert.ok(errors.includes("sharedAncestor must be a full commit id"), errors.join("; "));
 });
 
+function makePeerRepository(repo: string, peer: string, ancestor: string): string {
+  const dir = scratch("peer-");
+  execSync("git init -q -b main", { cwd: dir });
+  execSync(`git remote add origin git@github.com:${repo}.git`, { cwd: dir });
+  writeFileSync(
+    join(dir, "workspace.contract.json"),
+    JSON.stringify({
+      repository: repo,
+      peerRepository: peer,
+      sharedAncestor: ancestor,
+      requiredOwnerPaths: [],
+      forbiddenOwnerPaths: [],
+    }),
+  );
+  execSync("git add -A && git -c user.email=f@example.com -c user.name=F commit -qm x", {
+    cwd: dir,
+    env: {
+      ...process.env,
+      GIT_AUTHOR_DATE: "2026-01-01T00:00:00Z",
+      GIT_COMMITTER_DATE: "2026-01-01T00:00:00Z",
+    },
+  });
+
+  return dir;
+}
+
 test("non-reciprocal peers error; different ancestors skip the history check", () => {
-  const make = (repo: string, peer: string, ancestor: string): string => {
-    const dir = scratch("peer-");
-    execSync("git init -q -b main", { cwd: dir });
-    execSync(`git remote add origin git@github.com:${repo}.git`, { cwd: dir });
-    writeFileSync(
-      join(dir, "workspace.contract.json"),
-      JSON.stringify({
-        repository: repo,
-        peerRepository: peer,
-        sharedAncestor: ancestor,
-        requiredOwnerPaths: [],
-        forbiddenOwnerPaths: [],
-      }),
-    );
-    execSync("git add -A && git -c user.email=f@example.com -c user.name=F commit -qm x", {
-      cwd: dir,
-      env: {
-        ...process.env,
-        GIT_AUTHOR_DATE: "2026-01-01T00:00:00Z",
-        GIT_COMMITTER_DATE: "2026-01-01T00:00:00Z",
-      },
-    });
-    return dir;
-  };
   const ancestorA = "a".repeat(40);
   const ancestorB = "b".repeat(40);
-  const current = make("o/current", "o/peer", ancestorA);
-  const peer = make("o/peer", "o/somebody-else", ancestorB);
+  const current = makePeerRepository("o/current", "o/peer", ancestorA);
+  const peer = makePeerRepository("o/peer", "o/somebody-else", ancestorB);
   const errors = peerErrors(current, peer);
   assert.ok(errors.includes("workspace contracts are not reciprocal"), errors.join("; "));
   assert.ok(
     errors.includes("workspace contracts name different shared ancestors"),
     errors.join("; "),
   );
-  // Early return: the shared-history check must NOT have run.
   assert.ok(!errors.some((e) => e.startsWith("post-split history is shared")));
 });

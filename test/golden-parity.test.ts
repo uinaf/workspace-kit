@@ -1,13 +1,8 @@
-// THE migration gate: the kit CLI must reproduce every legacy golden
-// byte-for-byte (normalization identical to capture). Scenario definitions
-// are shared with the capture script via parity/scenarios.ts, so the two
-// runners cannot drift.
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 import { readFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import {
   PARITY_EXEMPT,
   buildBase,
@@ -15,12 +10,10 @@ import {
   normalize,
   runScenarios,
   utcToday,
-  type Runner,
-  type RunResult,
-  type Sink,
 } from "../parity/scenarios.ts";
+import type { Runner, RunResult, Sink } from "../parity/scenarios.ts";
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const root = join(import.meta.dirname, "..");
 const parityDir = join(root, "parity");
 const fixtureSrc = join(parityDir, "fixtures", "green-personal");
 const legacyDir = join(parityDir, "legacy");
@@ -33,12 +26,16 @@ const env = makeEnv();
 
 const runner: Runner = (command, cwd) => {
   const result = spawnSync(process.execPath, [cli, ...command], { cwd, encoding: "utf8", env });
+
   return { stdout: result.stdout ?? "", stderr: result.stderr ?? "", status: result.status };
 };
 
 function scrub(name: string, text: string, dir: string): string {
   const normalized = normalize(text, dir, workRoot, today);
-  return name === "peer-check-shared" ? normalized.replace(/[0-9a-f]{40}/g, "<SHA>") : normalized;
+
+  return name === "peer-check-shared"
+    ? normalized.replaceAll(/[0-9a-f]{40}/g, "<SHA>")
+    : normalized;
 }
 
 function golden(file: string): string {
@@ -46,7 +43,7 @@ function golden(file: string): string {
 }
 
 test("kit CLI reproduces every legacy golden", () => {
-  const mismatches: string[] = [];
+  const mismatches: Array<string> = [];
 
   const compare = (label: string, actual: string, expected: string) => {
     if (actual !== expected) {
@@ -57,11 +54,12 @@ test("kit CLI reproduces every legacy golden", () => {
   const sink: Sink = {
     emit(name: string, result: RunResult, dir: string): void {
       if (PARITY_EXEMPT.has(name)) {
-        // Usage text is kit-owned; only the exit contract carries over.
         assert.equal(result.status, Number(golden(`${name}.exit`).trim()), name);
         assert.match(result.stderr, /usage:/, name);
+
         return;
       }
+
       compare(`${name}.out`, scrub(name, result.stdout, dir), golden(`${name}.out`));
       compare(`${name}.err`, scrub(name, result.stderr, dir), golden(`${name}.err`));
       compare(`${name}.exit`, `${result.status}\n`, golden(`${name}.exit`));

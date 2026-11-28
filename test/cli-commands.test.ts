@@ -1,4 +1,3 @@
-// Integration coverage for CLI surfaces outside the golden parity suite.
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 import { execSync, spawnSync } from "node:child_process";
@@ -13,26 +12,28 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { initWorkspace } from "../src/init.ts";
 import { tempDir } from "./temp-dir.ts";
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const root = join(import.meta.dirname, "..");
 const cli = join(root, "src", "cli.ts");
 
-function kit(cwd: string, ...args: string[]) {
+function kit(cwd: string, ...args: Array<string>) {
   return spawnSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8" });
 }
 
-function kitCombined(cwd: string, ...args: string[]) {
+function kitCombined(cwd: string, ...args: Array<string>) {
   const outputPath = join(tempDir("cli-output-"), "combined.log");
   const output = openSync(outputPath, "w");
+
   const result = spawnSync(process.execPath, [cli, ...args], {
     cwd,
     stdio: ["ignore", output, output],
   });
+
   closeSync(output);
+
   return { status: result.status, output: readFileSync(outputPath, "utf8") };
 }
 
@@ -40,6 +41,7 @@ function scaffold(profile: "personal" | "work" = "personal"): string {
   const dir = tempDir(`cli-${profile}-`);
   initWorkspace(dir, profile, { wiki: profile === "personal" });
   execSync("git init -q", { cwd: dir });
+
   return dir;
 }
 
@@ -50,7 +52,7 @@ function commitAll(dir: string): void {
 }
 
 test("contract handoff works without a contract section and blocks ./ paths", () => {
-  const dir = scaffold("personal"); // personal profile has handoff, no contract
+  const dir = scaffold("personal");
   const blocked = kit(dir, "contract", "handoff", "./MEMORY.md");
   assert.equal(blocked.status, 1, "dot-slash bypass must be blocked");
   assert.match(blocked.stderr, /owner-private handoff path: \.\/MEMORY\.md/);
@@ -71,7 +73,6 @@ test("docs links: broken, title-syntax, malformed-escape, and untracked targets"
   commitAll(dir);
   assert.equal(kit(dir, "docs", "links").status, 0);
 
-  // CommonMark title syntax must not be a false positive.
   writeFileSync(
     join(dir, "docs", "guide.md"),
     '# Guide\n\nSee [readme](../AGENTS.md "The Guide").\n',
@@ -79,7 +80,6 @@ test("docs links: broken, title-syntax, malformed-escape, and untracked targets"
   commitAll(dir);
   assert.equal(kit(dir, "docs", "links").status, 0);
 
-  // Malformed percent-escape must be a broken link, not a crash.
   writeFileSync(join(dir, "docs", "guide.md"), "# Guide\n\nSee [x](%zz) and [y](gone.md).\n");
   commitAll(dir);
   const broken = kit(dir, "docs", "links");
@@ -87,7 +87,6 @@ test("docs links: broken, title-syntax, malformed-escape, and untracked targets"
   assert.match(broken.stderr, /broken link \(%zz\)/);
   assert.match(broken.stderr, /broken link \(gone\.md\)/);
 
-  // Gitignored-but-present targets are broken for consumers of the repo.
   writeFileSync(join(dir, ".gitignore"), "tmp/\n");
   mkdirSync(join(dir, "tmp"), { recursive: true });
   writeFileSync(join(dir, "tmp", "local.md"), "# Local\n");
@@ -120,14 +119,14 @@ test("config validate: minVersion gate, format, unknown keys, boolean enabled", 
 
   write((c) => {
     c.minVersion = "0.1.0";
-    (c as Record<string, unknown>).requird = ["typo"];
+    c.requird = ["typo"];
   });
   const warned = kit(dir, "config", "validate");
   assert.equal(warned.status, 0);
   assert.match(warned.stderr, /unrecognized key requird/);
 
   write((c) => {
-    delete (c as Record<string, unknown>).requird;
+    delete c.requird;
     c.docsLinks = { enabled: "true" };
   });
   assert.match(kit(dir, "config", "validate").stderr, /docsLinks\.enabled must be a boolean/);

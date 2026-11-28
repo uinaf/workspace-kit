@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { test } from "vite-plus/test";
 import { tempDir } from "./temp-dir.ts";
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const root = join(import.meta.dirname, "..");
 const cli = join(root, "src", "cli.ts");
 
 type Project = {
@@ -23,11 +22,11 @@ function scratch(prefix: string): string {
   return tempDir(prefix);
 }
 
-function git(cwd: string, ...args: string[]): void {
+function git(cwd: string, ...args: Array<string>): void {
   execFileSync("git", args, { cwd, stdio: "ignore" });
 }
 
-function workspace(projects: Record<string, Project[]>): string {
+function workspace(projects: Record<string, Array<Project>>): string {
   const dir = scratch("registry-workspace-");
   git(dir, "init", "-q");
   writeFileSync(
@@ -52,6 +51,7 @@ function workspace(projects: Record<string, Project[]>): string {
     )}\n`,
   );
   writeFileSync(join(dir, "projects.json"), `${JSON.stringify(projects, null, 2)}\n`);
+
   return dir;
 }
 
@@ -66,7 +66,7 @@ function project(name: string, overrides: Partial<Project> = {}): Project {
   };
 }
 
-function kit(cwd: string, home: string, ...args: string[]) {
+function kit(cwd: string, home: string, ...args: Array<string>) {
   return spawnSync(process.execPath, [cli, ...args], {
     cwd,
     encoding: "utf8",
@@ -78,7 +78,9 @@ function checkout(home: string, name: string, origin?: string): string {
   const dir = join(home, "projects", "fixture-owner", name);
   mkdirSync(dir, { recursive: true });
   git(dir, "init", "-q");
+
   if (origin) git(dir, "remote", "add", "origin", origin);
+
   return dir;
 }
 
@@ -112,6 +114,7 @@ test("registry validate rejects malformed optional fields before checkout inspec
 
 test("registry validate rejects invalid project policy and duplicate declarations", () => {
   const home = scratch("registry-home-");
+
   const invalid = workspace({
     tools: [
       project("alpha", {
@@ -122,6 +125,7 @@ test("registry validate rejects invalid project policy and duplicate declaration
       project("catalog", { mode: "route-only", catalog: "./repos.json" }),
     ],
   });
+
   const invalidResult = kit(invalid, home, "registry", "validate");
   assert.equal(invalidResult.status, 1);
   assert.match(invalidResult.stderr, /invalid mode automatic/);
@@ -137,6 +141,7 @@ test("registry validate rejects invalid project policy and duplicate declaration
       project("beta", { path: "~/projects/fixture-owner/alpha" }),
     ],
   });
+
   const duplicateResult = kit(duplicates, home, "registry", "validate");
   assert.equal(duplicateResult.status, 1);
   assert.match(duplicateResult.stderr, /duplicate project label tools\/alpha/);
@@ -145,12 +150,14 @@ test("registry validate rejects invalid project policy and duplicate declaration
 
 test("registry validate rejects portable aliases before checkout inspection", () => {
   const home = scratch("registry-home-");
+
   const caseAliases = workspace({
     tools: [
       project("upper", { path: "~/projects/fixture-owner/Alpha" }),
       project("lower", { path: "~/projects/fixture-owner/alpha" }),
     ],
   });
+
   const caseResult = kit(caseAliases, home, "registry", "validate");
   assert.equal(caseResult.status, 1);
   assert.match(caseResult.stderr, /duplicate project path/);
@@ -163,6 +170,7 @@ test("registry validate rejects portable aliases before checkout inspection", ()
       project("long-s", { path: "~/projects/fixture-owner/ſ" }),
     ],
   });
+
   const unicodeResult = kit(unicodeAliases, home, "registry", "validate");
   assert.equal(unicodeResult.status, 1);
   assert.match(unicodeResult.stderr, /duplicate project path/);
@@ -172,13 +180,16 @@ test("registry validate rejects portable aliases before checkout inspection", ()
 
 test("registry validate accepts supported GitHub origins and an existing catalog", () => {
   const home = scratch("registry-home-");
+
   const origins = [
     ["alpha", "git@github.com:fixture-owner/alpha.git"],
     ["beta", "https://github.com/fixture-owner/beta.git"],
     ["gamma", "ssh://git@github.com/fixture-owner/gamma.git"],
   ] as const;
+
   for (const [name, origin] of origins) checkout(home, name, origin);
   writeFileSync(join(home, "projects", "fixture-owner", "alpha", "repos.json"), "{}\n");
+
   const dir = workspace({
     tools: [project("alpha", { catalog: "repos.json" }), project("beta"), project("gamma")],
   });
@@ -232,6 +243,7 @@ test("registry validate rejects nested paths and duplicate canonical roots", () 
   const home = scratch("registry-home-");
   const alpha = checkout(home, "alpha", "git@github.com:fixture-owner/alpha.git");
   mkdirSync(join(alpha, "nested"));
+
   const nested = workspace({
     tools: [
       project("nested", {
@@ -240,11 +252,13 @@ test("registry validate rejects nested paths and duplicate canonical roots", () 
       }),
     ],
   });
+
   const nestedResult = kit(nested, home, "registry", "validate");
   assert.equal(nestedResult.status, 1);
   assert.match(nestedResult.stderr, /registered path is inside another checkout/);
 
   symlinkSync(alpha, join(home, "projects", "fixture-owner", "alpha-alias"), "junction");
+
   const aliased = workspace({
     tools: [
       project("alpha"),
@@ -254,6 +268,7 @@ test("registry validate rejects nested paths and duplicate canonical roots", () 
       }),
     ],
   });
+
   const aliasResult = kit(aliased, home, "registry", "validate");
   assert.equal(aliasResult.status, 1);
   assert.match(aliasResult.stderr, /multiple project entries resolve to the same checkout/);
@@ -276,6 +291,7 @@ test("registry validate rejects missing, unsupported, and mismatched origins", (
   checkout(home, "unsupported", "ftp://example.invalid/fixture-owner/unsupported.git");
   checkout(home, "unapproved", "https://gitlab.com/fixture-owner/unapproved.git");
   checkout(home, "mismatch", "git@github.com:fixture-owner/elsewhere.git");
+
   const dir = workspace({
     tools: [project("missing"), project("unsupported"), project("unapproved"), project("mismatch")],
   });
@@ -312,6 +328,7 @@ test("registry validate rejects catalog symlink traversal", () => {
   const outside = scratch("registry-catalog-outside-");
   writeFileSync(join(outside, "repos.json"), "{}\n");
   symlinkSync(outside, join(alpha, "catalog-link"), "junction");
+
   const dir = workspace({
     tools: [project("alpha", { catalog: "catalog-link/repos.json" })],
   });
@@ -380,9 +397,11 @@ test("registry project policy is explicit and validated", () => {
 
 test("registry project paths use the configured home-relative prefix", () => {
   const home = scratch("registry-home-");
+
   const dir = workspace({
     tools: [project("alpha", { path: "~/worktrees/fixture-owner/alpha" })],
   });
+
   const configPath = join(dir, "workspace.json");
   const config = JSON.parse(readFileSync(configPath, "utf8"));
   config.registry.project.pathPrefix = "~/worktrees/";
@@ -396,9 +415,11 @@ test("registry project paths use the configured home-relative prefix", () => {
 
 test("registry validate enforces owner, required-entry, and size policies", () => {
   const home = scratch("registry-home-");
+
   const valid = workspace({
     tools: [project("workspace"), project("tool")],
   });
+
   const configPath = join(valid, "workspace.json");
   const config = JSON.parse(readFileSync(configPath, "utf8"));
   Object.assign(config.registry.project, {
@@ -418,6 +439,7 @@ test("registry validate enforces owner, required-entry, and size policies", () =
       }),
     ],
   });
+
   const invalidConfigPath = join(invalid, "workspace.json");
   const invalidConfig = JSON.parse(readFileSync(invalidConfigPath, "utf8"));
   Object.assign(invalidConfig.registry.project, {

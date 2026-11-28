@@ -1,15 +1,14 @@
 import assert from "node:assert/strict";
 import { execSync, spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { test } from "vite-plus/test";
 import { CONSUMER_PACKAGE_MANAGER, packageManagerErrors } from "../src/checks/packageManager.ts";
 import { parseWorkspaceConfig } from "../src/config.ts";
 import { initWorkspace } from "../src/init.ts";
 import { tempDir } from "./temp-dir.ts";
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const root = join(import.meta.dirname, "..");
 const cli = join(root, "src", "cli.ts");
 
 function scratch(): string {
@@ -19,6 +18,7 @@ function scratch(): string {
 function inDir<T>(dir: string, fn: () => T): T {
   const previous = process.cwd();
   process.chdir(dir);
+
   try {
     return fn();
   } finally {
@@ -26,7 +26,7 @@ function inDir<T>(dir: string, fn: () => T): T {
   }
 }
 
-function kit(cwd: string, ...args: string[]) {
+function kit(cwd: string, ...args: Array<string>) {
   return spawnSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8" });
 }
 
@@ -132,9 +132,11 @@ test("init enables package-manager enforcement and doctor stays green", () => {
   const dir = scratch();
   initWorkspace(dir, "work");
   execSync("git init -q", { cwd: dir });
+
   const config = JSON.parse(readFileSync(join(dir, "workspace.json"), "utf8")) as {
     packageManager?: { enforce?: boolean };
   };
+
   assert.deepEqual(config.packageManager, { enforce: true });
 
   const pass = kit(dir, "doctor", "--json");
@@ -144,10 +146,12 @@ test("init enables package-manager enforcement and doctor stays green", () => {
   writeFileSync(join(dir, "package-lock.json"), "{}\n");
   const fail = kit(dir, "doctor", "--json");
   assert.equal(fail.status, 1);
+
   const payload = JSON.parse(fail.stdout) as {
     checks: { packageManager: string };
-    errors: string[];
+    errors: Array<string>;
   };
+
   assert.equal(payload.checks.packageManager, "fail");
   assert.ok(
     payload.errors.includes(
@@ -160,10 +164,12 @@ test("package-manager enforcement stays off for existing configs without the fla
   const dir = scratch();
   initWorkspace(dir, "work");
   execSync("git init -q", { cwd: dir });
+
   const config = JSON.parse(readFileSync(join(dir, "workspace.json"), "utf8")) as Record<
     string,
     unknown
   >;
+
   delete config.packageManager;
   writeFileSync(join(dir, "workspace.json"), `${JSON.stringify(config, null, 2)}\n`);
   writeFileSync(join(dir, "package.json"), '{"packageManager":"npm@11.16.0"}\n');

@@ -8,8 +8,8 @@ import {
   pullProjects,
   resolveProjectPath,
   statusProjects,
-  type RegistryLifecycleOptions,
 } from "../src/registryLifecycle.ts";
+import type { RegistryLifecycleOptions } from "../src/registryLifecycle.ts";
 import { tempDir } from "./temp-dir.ts";
 
 type Result = { status: number; stdout: string; stderr: string; errorCode?: string };
@@ -25,19 +25,23 @@ function entry(name: string, overrides: Partial<ProjectEntry> = {}): ProjectEntr
 }
 
 function harness(home: string, worktrees: Set<string>) {
-  const stdout: string[] = [];
-  const stderr: string[] = [];
-  const calls: string[] = [];
+  const stdout: Array<string> = [];
+  const stderr: Array<string> = [];
+  const calls: Array<string> = [];
   let branch = "main";
   let missingGh = false;
-  const run = (command: string, args: string[]): Result => {
+
+  const run = (command: string, args: Array<string>): Result => {
     calls.push(`${command} ${args.join(" ")}`);
+
     if (command === "gh") {
       return missingGh
         ? { status: 1, stdout: "", stderr: "", errorCode: "ENOENT" }
         : { status: 0, stdout: "cloned\n", stderr: "" };
     }
+
     const path = args[1]!;
+
     if (args.includes("--is-inside-work-tree")) {
       return {
         status: worktrees.has(path) ? 0 : 1,
@@ -45,19 +49,25 @@ function harness(home: string, worktrees: Set<string>) {
         stderr: "",
       };
     }
+
     if (args.includes("--show-current")) {
       return { status: 0, stdout: `${branch}\n`, stderr: "" };
     }
+
     if (args.includes("status")) return { status: 0, stdout: "## main\n", stderr: "" };
+
     if (args.includes("pull")) return { status: 0, stdout: "Already up to date.\n", stderr: "" };
+
     return { status: 1, stdout: "", stderr: "unexpected command\n" };
   };
+
   const options: RegistryLifecycleOptions = {
     homeDirectory: home,
     run,
     stdout: (text) => stdout.push(text),
     stderr: (text) => stderr.push(text),
   };
+
   return {
     calls,
     options,
@@ -169,18 +179,20 @@ function installFakeGit(pullScript: string) {
 
 function pullWithRealProcess() {
   const home = tempDir("registry-lifecycle-home-");
-  const stdout: string[] = [];
-  const stderr: string[] = [];
+  const stdout: Array<string> = [];
+  const stderr: Array<string> = [];
+
   const status = pullProjects([entry("present")], {
     homeDirectory: home,
     stdout: (text) => stdout.push(text),
     stderr: (text) => stderr.push(text),
   });
+
   return { status, stdout: stdout.join(""), stderr: stderr.join("") };
 }
 
 test("registry pull relays git output larger than the default child-process buffer", () => {
-  installFakeGit("head -c 2097152 /dev/zero | tr '\\0' x; echo");
+  installFakeGit(String.raw`head -c 2097152 /dev/zero | tr '\0' x; echo`);
 
   const result = pullWithRealProcess();
 

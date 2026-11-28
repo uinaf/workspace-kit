@@ -1,12 +1,10 @@
 import { spawnSync } from "node:child_process";
-import { lstatSync, realpathSync, type Stats } from "node:fs";
+import { lstatSync, realpathSync } from "node:fs";
+import type { Stats } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import {
-  portablePathIdentity,
-  type ProjectRegistryConfig,
-  type RegistryConfig,
-} from "../config.ts";
+import { portablePathIdentity } from "../config.ts";
+import type { ProjectRegistryConfig, RegistryConfig } from "../config.ts";
 import { isGitRepositoryPath, parseGitRemote } from "../lib/gitRemote.ts";
 import { gitEnvironmentForRepository } from "../lib/gitProcess.ts";
 import { readWorkspaceText, workspaceLstat } from "../lib/workspaceFs.ts";
@@ -15,6 +13,7 @@ import { registryErrors } from "./structure.ts";
 const PROJECT_FIELDS = ["name", "repo", "path", "mode"] as const;
 
 type GitResult = { status: number; stdout: string };
+
 export type ProjectEntry = {
   label: string;
   repo: string;
@@ -30,14 +29,16 @@ export type ProjectRegistryOptions = {
 
 function errorCode(error: unknown): string | undefined {
   if (!error || typeof error !== "object" || !("code" in error)) return undefined;
+
   return typeof error.code === "string" ? error.code : undefined;
 }
 
-function git(repoRoot: string, args: string[]): GitResult {
+function git(repoRoot: string, args: Array<string>): GitResult {
   const result = spawnSync("git", ["-C", repoRoot, ...args], {
     encoding: "utf8",
     env: gitEnvironmentForRepository(),
   });
+
   return {
     status: result.status ?? 1,
     stdout: result.stdout ?? "",
@@ -61,9 +62,11 @@ function unsafeProjectPath(path: string, pathPrefix: string): boolean {
   if (!path.startsWith(pathPrefix) || path.length === pathPrefix.length) {
     return true;
   }
+
   if (path.includes("\\") || path.includes("\0") || path.endsWith("/") || path.includes("//")) {
     return true;
   }
+
   return path
     .slice(pathPrefix.length)
     .split("/")
@@ -81,6 +84,7 @@ function unsafeCatalogPath(path: string): boolean {
   ) {
     return true;
   }
+
   return path.split("/").some((part) => part === "." || part === ".." || /[ .]$/.test(part));
 }
 
@@ -96,37 +100,45 @@ function canonicalPath(path: string): string {
   return realpathSync.native(path);
 }
 
-function parseEntries(value: unknown, project: ProjectRegistryConfig): ProjectEntry[] {
+function parseEntries(value: unknown, project: ProjectRegistryConfig): Array<ProjectEntry> {
   if (!isRecord(value)) return [];
-  const entries: ProjectEntry[] = [];
+  const entries: Array<ProjectEntry> = [];
+
   for (const [category, categoryEntries] of Object.entries(value)) {
     if (!Array.isArray(categoryEntries)) continue;
+
     for (const value of categoryEntries) {
       if (!isRecord(value)) continue;
       const name = value.name as string;
       const catalogField = project.catalog?.field;
-      entries.push({
+
+      const entry: ProjectEntry = {
         label: `${category}/${name}`,
         repo: value.repo as string,
         path: value.path as string,
         mode: value.mode as string,
-        ...(typeof value.branch === "string" ? { branch: value.branch } : {}),
-        ...(catalogField !== undefined && typeof value[catalogField] === "string"
-          ? { catalog: value[catalogField] }
-          : {}),
-      });
+      };
+
+      if (typeof value.branch === "string") entry.branch = value.branch;
+
+      if (catalogField !== undefined && typeof value[catalogField] === "string") {
+        entry.catalog = value[catalogField];
+      }
+
+      entries.push(entry);
     }
   }
+
   return entries;
 }
 
 function staticEntryErrors(
   file: string,
-  entries: ProjectEntry[],
+  entries: Array<ProjectEntry>,
   project: ProjectRegistryConfig,
-): string[] {
-  const errors: string[] = [];
-  const labels = new Map<string, string[]>();
+): Array<string> {
+  const errors: Array<string> = [];
+  const labels = new Map<string, Array<string>>();
   const paths = new Map<string, Array<{ label: string; path: string }>>();
 
   if (project.maxEntries !== undefined && entries.length > project.maxEntries) {
@@ -150,25 +162,30 @@ function staticEntryErrors(
         `${file} ${entry.label}: invalid mode ${entry.mode} (expected ${project.modes.join(" or ")})`,
       );
     }
+
     if (!isGitRepositoryPath(entry.repo)) {
       errors.push(`${file} ${entry.label}: invalid Git repository path ${entry.repo}`);
     } else if (project.allowedOwners) {
-      const owner = entry.repo.split("/", 1)[0]!;
+      const owner = entry.repo.split("/", 1)[0] ?? "";
+
       if (!project.allowedOwners.includes(owner)) {
         errors.push(
           `${file} ${entry.label}: repository owner is not allowed (found ${owner}; allowed ${project.allowedOwners.join(", ")})`,
         );
       }
     }
+
     if (unsafeProjectPath(entry.path, project.pathPrefix)) {
       errors.push(`${file} ${entry.label}: unsafe project path ${entry.path}`);
     }
+
     if (entry.catalog !== undefined) {
       if (!project.catalog?.modes.includes(entry.mode)) {
         errors.push(
           `${file} ${entry.label}: ${project.catalog?.field ?? "catalog"} is not allowed for mode ${entry.mode}`,
         );
       }
+
       if (unsafeCatalogPath(entry.catalog)) {
         errors.push(`${file} ${entry.label}: unsafe catalog path ${entry.catalog}`);
       }
@@ -180,25 +197,29 @@ function staticEntryErrors(
       errors.push(`${file}: duplicate project label ${label}: ${projectPaths.join(", ")}`);
     }
   }
+
   for (const pathEntries of paths.values()) {
     if (pathEntries.length > 1) {
       errors.push(
-        `${file}: duplicate project path ${pathEntries[0]!.path}: ${pathEntries
+        `${file}: duplicate project path ${pathEntries[0]?.path}: ${pathEntries
           .map(({ label, path }) => `${label}=${path}`)
           .join(", ")}`,
       );
     }
   }
+
   for (const required of project.mustContain ?? []) {
     const matches = entries.filter(
       (entry) => entry.repo === required.repo && entry.mode === required.mode,
     ).length;
+
     if (matches !== 1) {
       errors.push(
         `${file}: must contain exactly one ${required.repo} entry in ${required.mode} mode (found ${matches})`,
       );
     }
   }
+
   return errors;
 }
 
@@ -208,44 +229,54 @@ function catalogPathError(
 ): "missing" | "symlink" | "not-file" | undefined {
   let current = projectPath;
   const segments = catalog.split("/");
+
   for (let index = 0; index < segments.length; index += 1) {
-    current = join(current, segments[index]!);
+    current = join(current, segments[index] ?? "");
     let stat: Stats | undefined;
+
     try {
       stat = lstatOrUndefined(current);
     } catch {
       return "missing";
     }
+
     if (!stat) return "missing";
+
     if (stat.isSymbolicLink()) return "symlink";
+
     if (index < segments.length - 1 && !stat.isDirectory()) return "missing";
+
     if (index === segments.length - 1 && !stat.isFile()) return "not-file";
   }
+
   return undefined;
 }
 
 function checkoutErrors(
   file: string,
-  entries: ProjectEntry[],
+  entries: Array<ProjectEntry>,
   project: ProjectRegistryConfig,
   options: ProjectRegistryOptions,
-): string[] {
-  const errors: string[] = [];
-  const roots = new Map<string, string[]>();
+): Array<string> {
+  const errors: Array<string> = [];
+  const roots = new Map<string, Array<string>>();
   const home = configuredHome(options);
 
   for (const entry of entries) {
     const projectPath = absoluteProjectPath(home, entry.path);
     let stat: Stats | undefined;
+
     try {
       stat = lstatOrUndefined(projectPath);
     } catch {
       errors.push(`${file} ${entry.label}: could not inspect project path ${entry.path}`);
       continue;
     }
+
     if (!stat) continue;
 
     const inside = git(projectPath, ["rev-parse", "--is-inside-work-tree"]);
+
     if (inside.status !== 0 || inside.stdout.trim() !== "true") {
       errors.push(`${file} ${entry.label}: registered path is not a Git worktree: ${entry.path}`);
       continue;
@@ -253,12 +284,15 @@ function checkoutErrors(
 
     let expectedRoot: string;
     let actualRoot: string;
+
     try {
       expectedRoot = canonicalPath(projectPath);
       const root = git(projectPath, ["rev-parse", "--show-toplevel"]);
+
       if (root.status !== 0 || root.stdout.trim().length === 0) {
         throw new Error("missing worktree root");
       }
+
       actualRoot = canonicalPath(root.stdout.trim());
     } catch {
       errors.push(`${file} ${entry.label}: could not resolve Git worktree root for ${entry.path}`);
@@ -277,10 +311,12 @@ function checkoutErrors(
     roots.set(actualRoot, rootLabels);
 
     const origin = git(projectPath, ["remote", "get-url", "origin"]);
+
     if (origin.status !== 0 || origin.stdout.trim().length === 0) {
       errors.push(`${file} ${entry.label}: origin remote is missing`);
     } else {
       const actual = parseGitRemote(origin.stdout);
+
       if (actual === undefined) {
         errors.push(`${file} ${entry.label}: origin is not a supported Git URL`);
       } else if (!project.originHosts.includes(actual.host)) {
@@ -296,6 +332,7 @@ function checkoutErrors(
 
     if (entry.catalog !== undefined) {
       const problem = catalogPathError(projectPath, entry.catalog);
+
       if (problem === "symlink") {
         errors.push(
           `${file} ${entry.label}: catalog must not traverse symbolic links: ${entry.catalog}`,
@@ -313,14 +350,20 @@ function checkoutErrors(
       );
     }
   }
+
   return errors;
 }
 
-export function projectRegistryEntries(repoRoot: string, registry: RegistryConfig): ProjectEntry[] {
+export function projectRegistryEntries(
+  repoRoot: string,
+  registry: RegistryConfig,
+): Array<ProjectEntry> {
   if (!registry.project) {
     throw new Error("registry project operations require a registry.project policy");
   }
+
   const parsed: unknown = JSON.parse(readWorkspaceText(repoRoot, registry.file));
+
   return parseEntries(parsed, registry.project);
 }
 
@@ -328,13 +371,15 @@ export function projectRegistryErrors(
   repoRoot: string,
   registry: RegistryConfig,
   options: ProjectRegistryOptions = {},
-): string[] {
+): Array<string> {
   if (!workspaceLstat(repoRoot, registry.file)) return [`missing ${registry.file}`];
 
-  const shapeErrors = registryErrors(registry, repoRoot);
-  if (shapeErrors.length > 0) return shapeErrors;
+  const definitionErrors = registryErrors(registry, repoRoot);
+
+  if (definitionErrors.length > 0) return definitionErrors;
 
   const missingFields = PROJECT_FIELDS.filter((field) => !registry.entry.required.includes(field));
+
   if (missingFields.length > 0) {
     return [
       `registry project validation requires registry.entry.required to include ${missingFields.join(", ")}`,
@@ -347,6 +392,8 @@ export function projectRegistryErrors(
 
   const entries = projectRegistryEntries(repoRoot, registry);
   const staticErrors = staticEntryErrors(registry.file, entries, registry.project);
+
   if (staticErrors.length > 0) return staticErrors;
+
   return checkoutErrors(registry.file, entries, registry.project, options);
 }

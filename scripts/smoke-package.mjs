@@ -10,11 +10,10 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, relative, resolve, sep } from "node:path";
 import { gitEnvironmentForRepository } from "../src/lib/gitProcess.ts";
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = resolve(import.meta.dirname, "..");
 const npm = "npm";
 const scratch = mkdtempSync(join(tmpdir(), "workspace-kit-package-smoke-"));
 
@@ -22,18 +21,19 @@ function run(command, args, cwd) {
   const result = spawnSync(command, args, {
     cwd,
     encoding: "utf8",
-    // Git hooks export the outer repository's GIT_DIR; the fixture `git init` must not reinitialize it.
     env: {
       ...gitEnvironmentForRepository(),
       npm_config_cache: join(scratch, "npm-cache"),
       npm_config_update_notifier: "false",
     },
   });
+
   assert.equal(
     result.status,
     0,
     `${command} ${args.join(" ")} failed\n${result.stdout ?? ""}${result.stderr ?? ""}`,
   );
+
   return result.stdout ?? "";
 }
 
@@ -55,6 +55,7 @@ try {
     recursive: true,
     filter(source) {
       const topLevel = relative(repoRoot, source).split(sep)[0];
+
       return topLevel !== ".git" && topLevel !== "node_modules";
     },
   });
@@ -72,6 +73,7 @@ try {
       stagedPackageDir,
     ),
   );
+
   const packed = Array.isArray(packResult) ? packResult[0] : Object.values(packResult)[0];
   assert.ok(packed);
   assert.equal(packed.version, sourceVersion);
@@ -95,21 +97,26 @@ try {
     "dist",
     "cli.mjs",
   );
+
   const installedManifest = JSON.parse(
     readFileSync(
       join(consumerDir, "node_modules", "@uinaf", "workspace-kit", "package.json"),
       "utf8",
     ),
   );
+
   assert.equal(installedManifest.version, sourceVersion);
+
   for (const lifecycle of ["preinstall", "install", "postinstall", "prepare"]) {
     assert.equal(installedManifest.scripts?.[lifecycle], undefined);
   }
+
   const installedVersion = run(
     npm,
     ["exec", "--offline", "--", "workspace-kit", "--version"],
     consumerDir,
   ).trim();
+
   assert.equal(installedVersion, sourceVersion);
 
   run(

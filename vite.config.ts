@@ -1,3 +1,4 @@
+import uinaf, { env, ignorePatterns } from "@uinaf/oxlint-config/vite-plus";
 import { defineConfig } from "vite-plus";
 import { kitVersion } from "./src/version.ts";
 
@@ -24,7 +25,9 @@ export default defineConfig({
     ignorePatterns: ["parity/legacy/**", "parity/fixtures/**"],
   },
   lint: {
-    ignorePatterns: ["parity/legacy/**", "parity/fixtures/**"],
+    extends: [uinaf],
+    env,
+    ignorePatterns: [...ignorePatterns, "parity/legacy/**", "parity/fixtures/**"],
     options: {
       typeAware: true,
       typeCheck: true,
@@ -36,7 +39,25 @@ export default defineConfig({
       },
     ],
     rules: {
+      "anti-slop/no-runtime-typeof": "off",
+      "anti-slop/no-unknown-parameters": "off",
+      "anti-slop/require-safety-comment-for-type-assertion": "off",
+      curly: "off",
+      "quality/no-known-value-widening": "off",
+      "quality/no-unknown-returns": "off",
+      "quality/no-unsafe-dictionary-type": "off",
+      "typescript/no-unsafe-argument": "off",
+      "typescript/no-unsafe-assignment": "off",
+      "typescript/no-unsafe-call": "off",
+      "typescript/no-unsafe-member-access": "off",
+      "typescript/no-unsafe-type-assertion": "off",
       "vite-plus/prefer-vite-plus-imports": "error",
     },
+    overrides: [
+      {
+        files: ["src/cli.ts", "scripts/**", "parity/capture.ts"],
+        rules: { "no-console": "off" },
+      },
+    ],
   },
 });

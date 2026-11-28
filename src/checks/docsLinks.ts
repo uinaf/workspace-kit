@@ -1,14 +1,13 @@
-// Bounded Markdown destination checking for git-tracked *.md files. This is
-// intentionally not a complete CommonMark parser: it covers inline links and
-// images plus one-line reference definitions, while ignoring code spans and
-// backtick/tilde fenced blocks.
 import { spawnSync } from "node:child_process";
 import { posix } from "node:path";
-import { portablePathIdentity, type DocsLinksConfig } from "../config.ts";
+import { portablePathIdentity } from "../config.ts";
+import type { DocsLinksConfig } from "../config.ts";
 import { readWorkspaceText, workspaceLstat } from "../lib/workspaceFs.ts";
 
 type Destination = { offset: number; raw: string; reference?: true };
+
 type DestinationToken = { end: number; raw: string };
+
 type Fence = { marker: "`" | "~"; length: number; rest: string };
 
 function message(error: unknown): string {
@@ -17,26 +16,34 @@ function message(error: unknown): string {
 
 function isEscaped(text: string, index: number): boolean {
   let slashes = 0;
+
   for (let cursor = index - 1; cursor >= 0 && text[cursor] === "\\"; cursor -= 1) {
     slashes += 1;
   }
+
   return slashes % 2 === 1;
 }
 
 function fenceAt(line: string): Fence | undefined {
   let cursor = 0;
+
   while (cursor < 3 && line[cursor] === " ") cursor += 1;
   const marker = line[cursor];
+
   if (marker !== "`" && marker !== "~") return undefined;
   let end = cursor;
+
   while (line[end] === marker) end += 1;
+
   if (end - cursor < 3) return undefined;
   const rest = line.slice(end);
+
   if (marker === "`" && rest.includes("`")) return undefined;
+
   return { marker, length: end - cursor, rest };
 }
 
-function blank(chars: string[], start: number, end: number): void {
+function blank(chars: Array<string>, start: number, end: number): void {
   for (let index = start; index < end; index += 1) {
     if (chars[index] !== "\n" && chars[index] !== "\r") chars[index] = " ";
   }
@@ -49,6 +56,7 @@ export function maskFencedBlocks(text: string): string {
 
   for (const match of text.matchAll(/[^\n]*(?:\n|$)/g)) {
     const rawLine = match[0];
+
     if (!rawLine) continue;
     const withoutLf = rawLine.endsWith("\n") ? rawLine.slice(0, -1) : rawLine;
     const line = withoutLf.endsWith("\r") ? withoutLf.slice(0, -1) : withoutLf;
@@ -56,6 +64,7 @@ export function maskFencedBlocks(text: string): string {
 
     if (open) {
       blank(chars, offset, offset + rawLine.length);
+
       if (
         fence?.marker === open.marker &&
         fence.length >= open.length &&
@@ -67,6 +76,7 @@ export function maskFencedBlocks(text: string): string {
       blank(chars, offset, offset + rawLine.length);
       open = { marker: fence.marker, length: fence.length };
     }
+
     offset += rawLine.length;
   }
 
@@ -83,28 +93,37 @@ export function maskCode(text: string): string {
       cursor += 1;
       continue;
     }
+
     let openingEnd = cursor;
+
     while (fenced[openingEnd] === "`") openingEnd += 1;
     const width = openingEnd - cursor;
     let search = openingEnd;
     let closingEnd: number | undefined;
+
     while (search < fenced.length) {
       if (fenced[search] !== "`") {
         search += 1;
         continue;
       }
+
       let runEnd = search;
+
       while (fenced[runEnd] === "`") runEnd += 1;
+
       if (runEnd - search === width) {
         closingEnd = runEnd;
         break;
       }
+
       search = runEnd;
     }
+
     if (closingEnd === undefined) {
       cursor = openingEnd;
       continue;
     }
+
     blank(chars, cursor, closingEnd);
     cursor = closingEnd;
   }
@@ -114,18 +133,23 @@ export function maskCode(text: string): string {
 
 function skipWhitespace(text: string, start: number, end = text.length): number {
   let cursor = start;
-  while (cursor < end && /\s/.test(text[cursor]!)) cursor += 1;
+
+  while (cursor < end && /\s/.test(text.charAt(cursor))) cursor += 1;
+
   return cursor;
 }
 
 function skipHorizontalWhitespace(text: string, start: number, end: number): number {
   let cursor = start;
+
   while (cursor < end && (text[cursor] === " " || text[cursor] === "\t")) cursor += 1;
+
   return cursor;
 }
 
 function closingBracket(text: string, open: number, end = text.length): number | undefined {
   let depth = 0;
+
   for (let cursor = open; cursor < end; cursor += 1) {
     if (text[cursor] === "\\") {
       cursor += 1;
@@ -133,9 +157,11 @@ function closingBracket(text: string, open: number, end = text.length): number |
       depth += 1;
     } else if (text[cursor] === "]") {
       depth -= 1;
+
       if (depth === 0) return cursor;
     }
   }
+
   return undefined;
 }
 
@@ -145,28 +171,36 @@ function destinationToken(
   end = text.length,
 ): DestinationToken | undefined {
   if (start >= end) return undefined;
+
   if (text[start] === "<") {
     for (let cursor = start + 1; cursor < end; cursor += 1) {
       const char = text[cursor];
+
       if (char === "\n" || char === "\r" || (char === "<" && !isEscaped(text, cursor))) {
         return undefined;
       }
+
       if (char === ">" && !isEscaped(text, cursor)) {
         return { raw: text.slice(start + 1, cursor), end: cursor + 1 };
       }
     }
+
     return undefined;
   }
 
   let depth = 0;
   let cursor = start;
+
   while (cursor < end) {
-    const char = text[cursor]!;
+    const char = text.charAt(cursor);
+
     if (char === "\\" && cursor + 1 < end) {
       cursor += 2;
       continue;
     }
+
     if (/\s/.test(char)) break;
+
     if (char === "(") {
       depth += 1;
     } else if (char === ")") {
@@ -175,20 +209,27 @@ function destinationToken(
     } else if (char === "<" || char === ">") {
       return undefined;
     }
+
     cursor += 1;
   }
+
   if (depth !== 0) return undefined;
+
   return { raw: text.slice(start, cursor), end: cursor };
 }
 
 function titleEnd(text: string, start: number, end = text.length): number | undefined {
   const opener = text[start];
   const closer = opener === "(" ? ")" : opener;
+
   if (opener !== '"' && opener !== "'" && opener !== "(") return undefined;
   let depth = opener === "(" ? 1 : 0;
+
   for (let cursor = start + 1; cursor < end; cursor += 1) {
     const char = text[cursor];
+
     if (char === "\n" || char === "\r") return undefined;
+
     if (char === "\\") {
       cursor += 1;
     } else if (opener === "(" && char === "(") {
@@ -197,79 +238,99 @@ function titleEnd(text: string, start: number, end = text.length): number | unde
       if (opener !== "(" || --depth === 0) return cursor + 1;
     }
   }
+
   return undefined;
 }
 
-function inlineDestinations(text: string): Destination[] {
-  const out: Destination[] = [];
+function inlineDestinations(text: string): Array<Destination> {
+  const out: Array<Destination> = [];
+
   for (let cursor = 0; cursor < text.length; cursor += 1) {
     if (text[cursor] !== "[" || isEscaped(text, cursor)) continue;
     const labelEnd = closingBracket(text, cursor);
+
     if (labelEnd === undefined || text[labelEnd + 1] !== "(") continue;
     const bodyStart = skipWhitespace(text, labelEnd + 2);
     const token = destinationToken(text, bodyStart);
+
     if (!token) continue;
     let tail = skipWhitespace(text, token.end);
+
     if (text[tail] !== ")") {
       if (tail === token.end) continue;
       const end = titleEnd(text, tail);
+
       if (end === undefined) continue;
       tail = skipWhitespace(text, end);
+
       if (text[tail] !== ")") continue;
     }
+
     out.push({ offset: bodyStart, raw: token.raw });
     cursor = tail;
   }
+
   return out;
 }
 
-function referenceDestinations(text: string): Destination[] {
-  const out: Destination[] = [];
+function referenceDestinations(text: string): Array<Destination> {
+  const out: Array<Destination> = [];
   let lineStart = 0;
+
   while (lineStart < text.length) {
     const newline = text.indexOf("\n", lineStart);
     const rawEnd = newline === -1 ? text.length : newline;
     const lineEnd = rawEnd > lineStart && text[rawEnd - 1] === "\r" ? rawEnd - 1 : rawEnd;
     let cursor = lineStart;
     let indent = 0;
+
     while (indent < 3 && text[cursor] === " ") {
       cursor += 1;
       indent += 1;
     }
+
     if (text[cursor] === "[" && text[cursor + 1] !== "^") {
       const labelEnd = closingBracket(text, cursor, lineEnd);
+
       if (labelEnd !== undefined && text[labelEnd + 1] === ":") {
         const bodyStart = skipHorizontalWhitespace(text, labelEnd + 2, lineEnd);
         const token = destinationToken(text, bodyStart, lineEnd);
+
         if (token && token.raw.length > 0) {
           let tail = skipHorizontalWhitespace(text, token.end, lineEnd);
           let valid = tail === lineEnd;
+
           if (!valid && tail > token.end) {
             const end = titleEnd(text, tail, lineEnd);
+
             if (end !== undefined) {
               tail = skipHorizontalWhitespace(text, end, lineEnd);
               valid = tail === lineEnd;
             }
           }
+
           if (valid) out.push({ offset: bodyStart, raw: token.raw, reference: true });
         }
       }
     }
+
     if (newline === -1) break;
     lineStart = newline + 1;
   }
+
   return out;
 }
 
-function destinations(text: string): Destination[] {
+function destinations(text: string): Array<Destination> {
   const visible = maskCode(text);
+
   return [...inlineDestinations(visible), ...referenceDestinations(visible)].sort(
     (left, right) => left.offset - right.offset,
   );
 }
 
 function unescapeMarkdown(text: string): string {
-  return text.replace(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, "$1");
+  return text.replaceAll(/\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g, "$1");
 }
 
 function pathPart(href: string): string {
@@ -280,30 +341,25 @@ function pathPart(href: string): string {
       return href.slice(0, cursor);
     }
   }
+
   return href;
 }
 
-// Whether git itself lists the target as an untracked, non-ignored path, so
-// the diagnostic can say "untracked" instead of "broken". This is a
-// classification, not a promise that `git add` will succeed: deciding that
-// would mean entering git's check-in pipeline (clean filters execute
-// commands) and re-deriving its path validity rules. The listing is
-// filter-free, literal, and collapses directories to one entry so output is
-// bounded. Portable-identity collisions with tracked paths stay broken: the
-// link is spelled differently from the file git tracks, and no commit of the
-// untracked spelling could check out next to it on a case-insensitive
-// filesystem.
 function isUntrackedTarget(target: string, trackedIdentities: Set<string>): boolean {
   if (target.includes("\0")) return false;
   const identity = portablePathIdentity(target);
   const components = identity.split("/");
+
   for (let depth = 1; depth <= components.length; depth += 1) {
     if (trackedIdentities.has(components.slice(0, depth).join("/"))) return false;
   }
+
   const prefix = `${identity}/`;
+
   for (const tracked of trackedIdentities) {
     if (tracked.startsWith(prefix)) return false;
   }
+
   try {
     const result = spawnSync(
       "git",
@@ -320,6 +376,7 @@ function isUntrackedTarget(target: string, trackedIdentities: Set<string>): bool
       ],
       { encoding: "utf8" },
     );
+
     return result.status === 0 && result.stdout.split("\0").some(Boolean);
   } catch {
     return false;
@@ -330,51 +387,65 @@ export type RelativeLink =
   | { raw: string; target: string; reference?: true }
   | { raw: string; broken: true };
 
-export function relativeLinks(file: string, text: string): RelativeLink[] {
-  const out: RelativeLink[] = [];
+export function relativeLinks(file: string, text: string): Array<RelativeLink> {
+  const out: Array<RelativeLink> = [];
+
   for (const { raw, reference } of destinations(text)) {
     const unescaped = unescapeMarkdown(raw);
+
     if (/^[a-z][a-z0-9+.-]*:/i.test(unescaped) || unescaped.startsWith("//")) continue;
     const encodedPath = pathPart(raw);
+
     if (!encodedPath) continue;
     let href: string;
+
     try {
       href = decodeURIComponent(unescapeMarkdown(encodedPath));
     } catch {
       out.push({ raw, broken: true });
       continue;
     }
+
     if (href.startsWith("/")) continue;
     const target = posix.normalize(posix.join(posix.dirname(file), href)).replace(/\/+$/, "");
+
     if (target === ".." || target.startsWith("../")) out.push({ raw, broken: true });
     else out.push(reference ? { raw, target, reference } : { raw, target });
   }
+
   return out;
 }
 
-export function docsLinkErrors(config: DocsLinksConfig): string[] {
-  const bad: string[] = [];
+export function docsLinkErrors(config: DocsLinksConfig): Array<string> {
+  const bad: Array<string> = [];
   const result = spawnSync("git", ["ls-files", "-z"], { encoding: "utf8" });
+
   if (result.status !== 0) return ["could not list tracked files"];
   const tracked = new Set(result.stdout.split("\0").filter(Boolean));
   const trackedIdentities = new Set([...tracked].map(portablePathIdentity));
-  // One git process per distinct target, not per link occurrence.
   const untrackedByTarget = new Map<string, boolean>();
+
   const isUntracked = (target: string): boolean => {
     let known = untrackedByTarget.get(target);
+
     if (known === undefined) {
       known = isUntrackedTarget(target, trackedIdentities);
       untrackedByTarget.set(target, known);
     }
+
     return known;
   };
+
   const isTracked = (target: string): boolean => {
     if (target === ".") return tracked.size > 0;
+
     if (tracked.has(target)) return true;
     const prefix = `${target}/`;
+
     for (const file of tracked) {
       if (file.startsWith(prefix)) return true;
     }
+
     return false;
   };
 
@@ -390,13 +461,17 @@ export function docsLinkErrors(config: DocsLinksConfig): string[] {
       bad.push(`${file}: tracked Markdown path is not portable`);
       continue;
     }
+
     let text: string;
+
     try {
       const stat = workspaceLstat(".", file, "tracked Markdown file");
+
       if (!stat) {
         bad.push(`${file}: tracked Markdown file is missing`);
         continue;
       }
+
       if (stat.isSymbolicLink()) continue;
       text = readWorkspaceText(".", file, "tracked Markdown file");
     } catch (error) {
@@ -408,8 +483,6 @@ export function docsLinkErrors(config: DocsLinksConfig): string[] {
       if ("broken" in link) {
         bad.push(`${file}: broken link (${link.raw})`);
       } else if (!isTracked(link.target)) {
-        // The rule is deliberate: a present-but-untracked target would break
-        // for everyone else. Name the cause; do not promise a remedy.
         bad.push(
           isUntracked(link.target)
             ? `${file}: untracked link target (${link.raw}); the link resolves only once it is tracked`
@@ -418,5 +491,6 @@ export function docsLinkErrors(config: DocsLinksConfig): string[] {
       }
     }
   }
+
   return bad;
 }

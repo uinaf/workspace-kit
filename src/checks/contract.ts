@@ -1,6 +1,3 @@
-// Port of the legacy workspace-contract validator. Message strings and
-// evaluation order are parity-locked to parity/goldens. Regenerate the oracle
-// when changing them.
 import { spawnSync } from "node:child_process";
 import { posix, resolve, win32 } from "node:path";
 import type { HandoffConfig } from "../config.ts";
@@ -12,17 +9,18 @@ export type Contract = {
   repository: string;
   peerRepository: string;
   sharedAncestor: string;
-  requiredOwnerPaths: string[];
-  forbiddenOwnerPaths: string[];
+  requiredOwnerPaths: Array<string>;
+  forbiddenOwnerPaths: Array<string>;
 };
 
 type GitResult = { status: number; stdout: string; stderr: string };
 
-function git(repoRoot: string, args: string[]): GitResult {
+function git(repoRoot: string, args: Array<string>): GitResult {
   const result = spawnSync("git", ["-C", repoRoot, ...args], {
     encoding: "utf8",
     env: gitEnvironmentForRepository(),
   });
+
   return {
     status: result.status ?? 1,
     stdout: result.stdout ?? "",
@@ -34,6 +32,7 @@ function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("contract must be an object");
   }
+
   return value as Record<string, unknown>;
 }
 
@@ -41,18 +40,21 @@ function text(value: unknown, field: string): string {
   if (typeof value !== "string" || value.length === 0) {
     throw new Error(`${field} must be a non-empty string`);
   }
+
   return value;
 }
 
-function textList(value: unknown, field: string): string[] {
+function textList(value: unknown, field: string): Array<string> {
   if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
     throw new Error(`${field} must be an array of strings`);
   }
-  return value as string[];
+
+  return value as Array<string>;
 }
 
 export function loadContract(repoRoot = ".", file = "workspace.contract.json"): Contract {
   const value = record(JSON.parse(readWorkspaceText(repoRoot, file, "contract file")));
+
   return {
     repository: text(value.repository, "repository"),
     peerRepository: text(value.peerRepository, "peerRepository"),
@@ -62,37 +64,44 @@ export function loadContract(repoRoot = ".", file = "workspace.contract.json"): 
   };
 }
 
-function trackedPaths(repoRoot: string): string[] {
+function trackedPaths(repoRoot: string): Array<string> {
   const result = git(repoRoot, ["ls-files", "-z"]);
+
   if (result.status !== 0) throw new Error("could not list tracked files");
+
   return result.stdout.split("\0").filter(Boolean);
 }
 
-function matchesTrackedPath(paths: string[], expected: string): boolean {
+function matchesTrackedPath(paths: Array<string>, expected: string): boolean {
   if (expected.endsWith("/")) return paths.some((path) => path.startsWith(expected));
+
   return paths.includes(expected);
 }
 
-export function workspaceErrors(repoRoot = ".", file = "workspace.contract.json"): string[] {
+export function workspaceErrors(repoRoot = ".", file = "workspace.contract.json"): Array<string> {
   const root = resolve(repoRoot);
   const contract = loadContract(root, file);
-  const errors: string[] = [];
+  const errors: Array<string> = [];
 
   const origin = git(root, ["remote", "get-url", "origin"]);
+
   if (origin.status !== 0) {
     errors.push("origin remote is missing");
   } else {
     const remote = parseGitRemote(origin.stdout);
+
     if (remote?.host !== "github.com" || remote.repository !== contract.repository) {
       errors.push(`origin does not match ${contract.repository}`);
     }
   }
 
   const paths = trackedPaths(root);
+
   for (const path of contract.requiredOwnerPaths) {
     if (!matchesTrackedPath(paths, path))
       errors.push(`required owner path is not tracked: ${path}`);
   }
+
   for (const path of contract.forbiddenOwnerPaths) {
     if (matchesTrackedPath(paths, path)) errors.push(`foreign owner path is tracked: ${path}`);
   }
@@ -108,11 +117,13 @@ export function workspaceErrors(repoRoot = ".", file = "workspace.contract.json"
   return errors;
 }
 
-function postSplitCommits(repoRoot: string, ancestor: string): string[] {
+function postSplitCommits(repoRoot: string, ancestor: string): Array<string> {
   const result = git(repoRoot, ["rev-list", "HEAD", `^${ancestor}`]);
+
   if (result.status !== 0) {
     throw new Error(`could not inspect history: ${result.stderr.trim()}`);
   }
+
   return result.stdout.trim().split("\n").filter(Boolean);
 }
 
@@ -120,10 +131,10 @@ export function peerErrors(
   currentRoot: string,
   peerRoot: string,
   file = "workspace.contract.json",
-): string[] {
+): Array<string> {
   const current = loadContract(currentRoot, file);
-  // The peer's contract file name is protocol, not per-repo config.
   const peer = loadContract(peerRoot, "workspace.contract.json");
+
   const errors = [
     ...workspaceErrors(currentRoot, file).map((error) => `current: ${error}`),
     ...workspaceErrors(peerRoot, "workspace.contract.json").map((error) => `peer: ${error}`),
@@ -132,24 +143,27 @@ export function peerErrors(
   if (current.peerRepository !== peer.repository || peer.peerRepository !== current.repository) {
     errors.push("workspace contracts are not reciprocal");
   }
+
   if (current.sharedAncestor !== peer.sharedAncestor) {
     errors.push("workspace contracts name different shared ancestors");
+
     return errors;
   }
 
   const peerCommits = new Set(postSplitCommits(peerRoot, peer.sharedAncestor));
+
   const shared = postSplitCommits(currentRoot, current.sharedAncestor).filter((commit) =>
     peerCommits.has(commit),
   );
+
   if (shared.length > 0) errors.push(`post-split history is shared: ${shared.join(", ")}`);
 
   return errors;
 }
 
 export function isPrivateHandoffPath(path: string, handoff: HandoffConfig): boolean {
-  // Kit-level invariants: never configurable. Raw-path checks run first so
-  // traversal is always blocked regardless of what it would normalize to.
   const portable = path.replaceAll("\\", "/");
+
   if (
     !path ||
     path.includes("\0") ||
@@ -160,16 +174,19 @@ export function isPrivateHandoffPath(path: string, handoff: HandoffConfig): bool
   ) {
     return true;
   }
-  // Normalize candidates and configured rules alike so spelling differences
-  // cannot sidestep the denylist.
+
   const normalized = normalizePath(path);
+
   if (!normalized) return true;
   const base = normalized.split("/").at(-1) ?? "";
+
   if (base.startsWith(".env")) return true;
+
   return (
     handoff.paths.some((configured) => normalizePath(configured) === normalized) ||
     handoff.prefixes.some((configured) => {
       const prefix = normalizePath(configured);
+
       return prefix !== "" && (normalized === prefix || normalized.startsWith(`${prefix}/`));
     })
   );
@@ -180,7 +197,6 @@ function normalizePath(path: string): string {
     .replaceAll("\\", "/")
     .split("/")
     .filter((segment) => segment !== "" && segment !== ".");
-  // Treat case aliases conservatively so a path approved on a case-sensitive
-  // host cannot name protected content on a case-insensitive filesystem.
+
   return segments.join("/").toLowerCase();
 }

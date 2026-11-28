@@ -1,8 +1,3 @@
-// Port of the legacy doctor's own checks (required files, alias symlinks,
-// registry shape). Message strings and ordering are
-// parity-locked to parity/goldens. Required files deliberately use
-// filesystem existence instead of git-tracked state. The contract check owns
-// tracked semantics.
 import type { LinkRule, RegistryConfig, WorkspaceConfig } from "../config.ts";
 import {
   assertWorkspaceLinkTarget,
@@ -11,14 +6,17 @@ import {
   workspaceLstat,
 } from "../lib/workspaceFs.ts";
 
-export function requiredFileErrors(required: string[]): string[] {
-  const bad: string[] = [];
+export function requiredFileErrors(required: Array<string>): Array<string> {
+  const bad: Array<string> = [];
+
   for (const path of required) {
     const stat = workspaceLstat(".", path);
+
     if (!stat) {
       bad.push(`missing ${path}`);
       continue;
     }
+
     if (stat.isSymbolicLink()) {
       try {
         assertWorkspaceLinkTarget(".", path, readWorkspaceLink(".", path));
@@ -27,19 +25,23 @@ export function requiredFileErrors(required: string[]): string[] {
       }
     }
   }
+
   return bad;
 }
 
-export function forbiddenFileErrors(forbidden: string[]): string[] {
-  const bad: string[] = [];
+export function forbiddenFileErrors(forbidden: Array<string>): Array<string> {
+  const bad: Array<string> = [];
+
   for (const path of forbidden) {
     if (workspaceLstat(".", path)) bad.push(`forbidden file exists: ${path}`);
   }
+
   return bad;
 }
 
-export function linkErrors(links: LinkRule[]): string[] {
-  const bad: string[] = [];
+export function linkErrors(links: Array<LinkRule>): Array<string> {
+  const bad: Array<string> = [];
+
   for (const { path, target } of links) {
     try {
       assertWorkspaceLinkTarget(".", path, target);
@@ -49,26 +51,34 @@ export function linkErrors(links: LinkRule[]): string[] {
       );
       continue;
     }
+
     const stat = workspaceLstat(".", path);
-    if (!stat) continue; // missing is the required-list's job
+
+    if (!stat) continue;
+
     if (!stat.isSymbolicLink()) {
       bad.push(`${path} should be a symlink to ${target}`);
     } else {
       const actual = readWorkspaceLink(".", path);
+
       if (actual !== target) {
         bad.push(`${path} points to ${actual}, expected ${target}`);
       }
     }
   }
+
   return bad;
 }
 
-export function registryErrors(registry: RegistryConfig, repoRoot = "."): string[] {
-  const bad: string[] = [];
+export function registryErrors(registry: RegistryConfig, repoRoot = "."): Array<string> {
+  const bad: Array<string> = [];
   const file = registry.file;
-  if (!workspaceLstat(repoRoot, file)) return bad; // missing is the required-list's job
+
+  if (!workspaceLstat(repoRoot, file)) return bad;
+
   try {
     const parsed: unknown = JSON.parse(readWorkspaceText(repoRoot, file));
+
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       bad.push(`${file} should be an object of category arrays`);
     } else {
@@ -77,26 +87,23 @@ export function registryErrors(registry: RegistryConfig, repoRoot = "."): string
           bad.push(`${file} category ${category} should be an array`);
           continue;
         }
+
         for (const entry of entries) {
           if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
             bad.push(`${file} category ${category} has a non-object entry`);
             continue;
           }
+
           const record = entry as Record<string, unknown>;
+
           for (const key of registry.entry.required) {
-            if (
-              !(key in record) ||
-              typeof record[key] !== "string" ||
-              (record[key] as string).length === 0
-            ) {
+            if (!(key in record) || typeof record[key] !== "string" || record[key].length === 0) {
               bad.push(`${file} category ${category} entry missing string ${key}`);
             }
           }
+
           for (const key of registry.entry.optional) {
-            if (
-              key in record &&
-              (typeof record[key] !== "string" || (record[key] as string).length === 0)
-            ) {
+            if (key in record && (typeof record[key] !== "string" || record[key].length === 0)) {
               bad.push(`${file} category ${category} entry has invalid ${key}`);
             }
           }
@@ -106,10 +113,11 @@ export function registryErrors(registry: RegistryConfig, repoRoot = "."): string
   } catch (error) {
     bad.push(`${file} parse failed: ${error instanceof Error ? error.message : String(error)}`);
   }
+
   return bad;
 }
 
-export function structureErrors(config: WorkspaceConfig): string[] {
+export function structureErrors(config: WorkspaceConfig): Array<string> {
   return [
     ...requiredFileErrors(config.required ?? []),
     ...linkErrors(config.links ?? []),

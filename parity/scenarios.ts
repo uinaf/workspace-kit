@@ -1,33 +1,31 @@
-// Single source of truth for parity scenarios. Both runners consume this:
-// parity/capture.ts drives the frozen legacy scripts (bun) and writes
-// goldens; test/golden-parity.test.ts drives the kit CLI (node) and compares
-// against those goldens. Node-clean: no bun APIs.
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { join } from "node:path";
 
 export type RunResult = { stdout: string; stderr: string; status: number | null };
-// Commands use the kit's semantic argv; the legacy runner translates.
-export type Runner = (command: string[], cwd: string) => RunResult;
+
+export type Runner = (command: Array<string>, cwd: string) => RunResult;
+
 export type Sink = {
   emit(name: string, result: RunResult, dir: string): void;
 };
 
-// Scenarios whose outputs are legacy-only by design (usage text differs
-// between the legacy script and the kit CLI; exit codes still match).
 export const PARITY_EXEMPT = new Set(["contract-usage-error"]);
 
 export function utcToday(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-// Never spread process.env. FORCE_COLOR or the invoking shell's locale would
-// poison outputs with ANSI codes or ICU-collated ordering.
 export function makeEnv(): Record<string, string> {
-  return {
+  const base: Record<string, string> = {
     PATH: process.env.PATH ?? "",
     HOME: process.env.HOME ?? "",
-    ...(process.env.TMPDIR ? { TMPDIR: process.env.TMPDIR } : {}),
+  };
+
+  if (process.env.TMPDIR) base.TMPDIR = process.env.TMPDIR;
+
+  return {
+    ...base,
     TZ: "UTC",
     LANG: "C",
     LC_ALL: "C",
@@ -43,6 +41,7 @@ export function makeEnv(): Record<string, string> {
 
 export function sh(cwd: string, command: string, date?: string): string {
   const env = date ? { ...makeEnv(), GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date } : makeEnv();
+
   return execSync(command, { cwd, env, encoding: "utf8" });
 }
 
@@ -53,7 +52,6 @@ export function normalize(text: string, dir: string, workRoot: string, today: st
     .replaceAll(today, "<TODAY>");
 }
 
-// The workspace.json equivalent of every list the legacy scripts hardcode.
 const FIXTURE_CONFIG = {
   required: [
     "AGENTS.md",
@@ -123,6 +121,7 @@ export function buildBase(opts: BuildOptions, name: string): string {
   );
   sh(dir, "git add workspace.contract.json");
   sh(dir, 'git commit -qm "contract"', "2026-01-02T00:00:00Z");
+
   return dir;
 }
 
@@ -150,10 +149,10 @@ const HANDOFF_BLOCKED_ARGS = [
 
 export function runScenarios(opts: BuildOptions & { runner: Runner; sink: Sink }): void {
   const { runner, sink } = opts;
-  const run = (name: string, dir: string, command: string[]) =>
+
+  const run = (name: string, dir: string, command: Array<string>) =>
     sink.emit(name, runner(command, dir), dir);
 
-  // --- Green path ---------------------------------------------------------
   {
     const dir = buildBase(opts, "green");
     run("contract-check-green", dir, ["contract", "check"]);
@@ -167,7 +166,6 @@ export function runScenarios(opts: BuildOptions & { runner: Runner; sink: Sink }
     run("handoff-blocked", dir, ["contract", "handoff", ...HANDOFF_BLOCKED_ARGS]);
   }
 
-  // --- Peer check -----------------------------------------------------------
   {
     const base = buildBase(opts, "peer-base");
     const ancestor = sh(base, "git rev-parse HEAD~1").trim();
@@ -203,14 +201,12 @@ export function runScenarios(opts: BuildOptions & { runner: Runner; sink: Sink }
     run("peer-check-shared", base, ["contract", "peer", shared]);
   }
 
-  // --- Green https remote form ----------------------------------------------
   {
     const dir = buildBase(opts, "green-https");
     sh(dir, "git remote set-url origin https://github.com/fixture-owner/fixture-workspace.git");
     run("contract-check-green-https", dir, ["contract", "check"]);
   }
 
-  // --- Contract errors --------------------------------------------------------
   {
     const dir = buildBase(opts, "errors-contract");
     sh(dir, "git remote set-url origin git@github.com:someone-else/elsewhere.git");
@@ -229,7 +225,6 @@ export function runScenarios(opts: BuildOptions & { runner: Runner; sink: Sink }
     run("contract-check-errors", dir, ["contract", "check"]);
   }
 
-  // --- Usage and malformed-config errors --------------------------------------
   {
     const dir = buildBase(opts, "errors-usage");
     run("contract-usage-error", dir, ["contract"]);

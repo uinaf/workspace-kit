@@ -1,5 +1,3 @@
-// Every init profile must produce a verify-green workspace out of the box
-// (contract deliberately deferred until an origin remote exists).
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 import { execSync, spawnSync } from "node:child_process";
@@ -12,13 +10,12 @@ import {
   readlinkSync,
   writeFileSync,
 } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { initWorkspace } from "../src/init.ts";
 import { kitVersion } from "../src/version.ts";
 import { tempDir } from "./temp-dir.ts";
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const root = join(import.meta.dirname, "..");
 const cli = join(root, "src", "cli.ts");
 
 for (const profile of ["personal", "runtime", "work"] as const) {
@@ -38,16 +35,17 @@ for (const profile of ["personal", "runtime", "work"] as const) {
       assert.ok(lstatSync(join(dir, "CLAUDE.md")).isSymbolicLink());
       assert.equal(readlinkSync(join(dir, "CLAUDE.md")), "AGENTS.md");
 
-      // Scaffolded AGENTS.md is a structural skeleton, never behavioral prose.
       const agents = readFileSync(join(dir, "AGENTS.md"), "utf8");
       assert.match(agents, /TODO/);
       assert.match(agents, /## Skill Ownership/);
       assert.match(agents, /pnpm verify/);
+
       const packageJson = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as {
         scripts: Record<string, string>;
         devDependencies: Record<string, string>;
         packageManager: string;
       };
+
       assert.equal(packageJson.devDependencies["@uinaf/workspace-kit"], kitVersion());
       assert.equal(packageJson.scripts.doctor, "workspace-kit doctor");
       assert.equal(packageJson.scripts.test, "pnpm verify");
@@ -58,6 +56,7 @@ for (const profile of ["personal", "runtime", "work"] as const) {
       assert.equal(packageJson.scripts["registry:status"], "workspace-kit registry status");
       assert.equal(packageJson.scripts["registry:pull"], "workspace-kit registry pull");
       assert.equal(packageJson.scripts["registry:pointers"], "workspace-kit registry pointers");
+
       if (profile === "personal" || profile === "runtime") {
         const hook = readFileSync(join(dir, ".githooks", "pre-commit"), "utf8");
         assert.match(hook, /pnpm verify/);
@@ -68,11 +67,13 @@ for (const profile of ["personal", "runtime", "work"] as const) {
         const config = JSON.parse(readFileSync(join(dir, "workspace.json"), "utf8")) as {
           handoff?: { prefixes?: unknown };
         };
+
         const prefixes = config.handoff?.prefixes;
         assert.ok(Array.isArray(prefixes));
         assert.ok(prefixes.includes("skills/"));
         assert.ok(prefixes.includes("docs/projects/"));
         assert.equal(prefixes.includes("docs/"), wiki);
+
         if (profile === "runtime") {
           assert.ok(lstatSync(join(dir, "skills")).isDirectory());
           assert.ok(lstatSync(join(dir, ".agents", "skills")).isDirectory());
@@ -85,10 +86,12 @@ for (const profile of ["personal", "runtime", "work"] as const) {
       }
 
       execSync("git init -q", { cwd: dir });
+
       const verify = spawnSync(process.execPath, [cli, "verify"], {
         cwd: dir,
         encoding: "utf8",
       });
+
       assert.equal(
         verify.status,
         0,
@@ -102,11 +105,13 @@ for (const profile of ["personal", "runtime", "work"] as const) {
         const shim = join(bin, "workspace-kit");
         writeFileSync(shim, `#!/bin/sh\nexec "${process.execPath}" "${cli}" "$@"\n`);
         chmodSync(shim, 0o755);
+
         const hook = spawnSync(join(dir, ".githooks", "pre-commit"), [], {
           cwd: dir,
           encoding: "utf8",
           env: { ...process.env, npm_config_offline: "true" },
         });
+
         assert.equal(hook.status, 0, `${hook.stdout}${hook.stderr}`);
       }
     });

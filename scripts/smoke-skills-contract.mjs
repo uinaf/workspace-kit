@@ -40,6 +40,7 @@ function sync() {
     cwd: workspace,
     encoding: "utf8",
   });
+
   process.stdout.write(result.stdout);
   process.stderr.write(result.stderr);
   assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
@@ -47,6 +48,7 @@ function sync() {
 
 function readLock() {
   const path = join(workspace, "skills-lock.json");
+
   return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : { version: 1, skills: {} };
 }
 

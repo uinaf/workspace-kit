@@ -9,17 +9,20 @@ import { tempDir } from "./temp-dir.ts";
 type ExecConfig = { verifyReleaseCmd: string; prepareCmd: string };
 
 const releaseConfig = JSON.parse(readFileSync(".releaserc.json", "utf8")) as {
-  plugins: (string | [string, unknown])[];
+  plugins: Array<string | [string, unknown]>;
 };
+
 const execEntry = releaseConfig.plugins.find(
   (plugin): plugin is [string, ExecConfig] =>
     Array.isArray(plugin) && plugin[0] === "@semantic-release/exec",
 );
+
 assert.ok(execEntry, ".releaserc.json configures @semantic-release/exec");
+
 const exec = execEntry[1];
 const fakeGh = fileURLToPath(new URL("fake-gh.ts", import.meta.url));
 
-function git(dir: string, ...args: string[]): string {
+function git(dir: string, ...args: Array<string>): string {
   return execFileSync(
     "git",
     [
@@ -39,12 +42,10 @@ function commit(dir: string, files: Record<string, string>, message: string): st
   for (const [path, content] of Object.entries(files)) writeFileSync(join(dir, path), content);
   git(dir, "add", "-A");
   git(dir, "commit", "-qm", message);
+
   return git(dir, "rev-parse", "HEAD");
 }
 
-// The release checkout sits on the verified commit and `gh` talks to a bare remote through
-// fake-gh.ts. `release` follows semantic-release: verifyRelease, then prepare (npm writes the
-// version, then exec), then it tags HEAD and publishes the working tree.
 function fixture() {
   const root = tempDir("release-handoff-");
   const remote = join(root, "remote.git");
@@ -84,17 +85,21 @@ function fixture() {
         FIXTURE_RACE: race,
       },
     }).status;
+
   const main = () => git(root, "--git-dir", remote, "rev-parse", "refs/heads/main");
+
   const setMain = (sha: string) =>
     git(root, "--git-dir", remote, "update-ref", "refs/heads/main", sha);
 
   const release = (version: string, options: { pushDuringRelease?: boolean } = {}) => {
     const verify = run(exec.verifyReleaseCmd);
     writeFileSync(join(dir, "package.json"), `{"version":"${version}"}\n`);
+
     if (options.pushDuringRelease) writeFileSync(race, unverified);
     const prepareCmd = exec.prepareCmd.replaceAll("${nextRelease.version}", version);
     assert.doesNotMatch(prepareCmd, /\$\{/);
     const prepare = run(prepareCmd);
+
     return {
       verify,
       prepare,
@@ -103,6 +108,7 @@ function fixture() {
       main: main(),
     };
   };
+
   return { dir, verified, unverified, run, setMain, release };
 }
 

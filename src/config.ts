@@ -6,37 +6,46 @@ import {
 import { isGitRepositoryPath, normalizeGitHost } from "./lib/gitRemote.ts";
 
 export type LinkRule = { path: string; target: string };
+
 export type ProjectRegistryConfig = {
   pathPrefix: string;
-  modes: string[];
-  originHosts: string[];
-  allowedOwners?: string[];
+  modes: Array<string>;
+  originHosts: Array<string>;
+  allowedOwners?: Array<string>;
   mustContain?: Array<{ repo: string; mode: string }>;
   maxEntries?: number;
-  catalog?: { field: string; modes: string[] };
+  catalog?: { field: string; modes: Array<string> };
 };
+
 export type RegistryConfig = {
   file: string;
-  entry: { required: string[]; optional: string[] };
+  entry: { required: Array<string>; optional: Array<string> };
   project?: ProjectRegistryConfig;
   pointers?: { dir: string };
 };
+
 export type WikiConfig = { root: string };
+
 export type LimitRule = { pattern: string; maxLines: number };
+
 export type ContractConfig = { file: string };
-export type HandoffConfig = { paths: string[]; prefixes: string[] };
-export type DocsLinksConfig = { enabled: boolean; exclude: string[] };
+
+export type HandoffConfig = { paths: Array<string>; prefixes: Array<string> };
+
+export type DocsLinksConfig = { enabled: boolean; exclude: Array<string> };
+
 export type SkillsConfig = { manifest: "skills/skills.json" };
+
 export type PackageManagerConfig = { enforce: boolean; allowForeignLockfiles: boolean };
 
 export type WorkspaceConfig = {
   minVersion?: string;
-  required?: string[];
-  forbidden?: string[];
-  links?: LinkRule[];
+  required?: Array<string>;
+  forbidden?: Array<string>;
+  links?: Array<LinkRule>;
   registry?: RegistryConfig;
   wiki?: WikiConfig;
-  limits?: LimitRule[];
+  limits?: Array<LimitRule>;
   contract?: ContractConfig;
   handoff?: HandoffConfig;
   docsLinks?: DocsLinksConfig;
@@ -54,22 +63,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function stringList(value: unknown, field: string): string[] {
+function stringList(value: unknown, field: string): Array<string> {
   if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
     fail(`${field} must be an array of strings`);
   }
-  return value as string[];
+
+  return value as Array<string>;
 }
 
-function workspacePathList(value: unknown, field: string): string[] {
+function workspacePathList(value: unknown, field: string): Array<string> {
   return stringList(value, field).map((path, index) =>
     normalizeWorkspacePath(path, `${field}[${index}]`),
   );
 }
 
 export function portablePathIdentity(path: string): string {
-  // Uppercase collapses Unicode aliases that lowercasing misses (for example,
-  // long s/S and final sigma/sigma) on common case-insensitive filesystems.
   return path.normalize("NFC").toUpperCase().normalize("NFC");
 }
 
@@ -77,20 +85,25 @@ function text(value: unknown, field: string): string {
   if (typeof value !== "string" || value.length === 0) {
     fail(`${field} must be a non-empty string`);
   }
+
   return value;
 }
 
-function nonEmptyUniqueStringList(value: unknown, field: string): string[] {
+function nonEmptyUniqueStringList(value: unknown, field: string): Array<string> {
   const values = stringList(value, field);
+
   if (values.length === 0 || values.some((item) => item.length === 0)) {
     fail(`${field} must be a non-empty array of non-empty strings`);
   }
+
   if (new Set(values).size !== values.length) fail(`${field} must not contain duplicates`);
+
   return values;
 }
 
 function homePathPrefix(value: unknown, field: string): string {
   const prefix = text(value, field);
+
   if (
     !prefix.startsWith("~/") ||
     prefix.length <= 2 ||
@@ -105,12 +118,16 @@ function homePathPrefix(value: unknown, field: string): string {
   ) {
     fail(`${field} must be a portable, traversal-free home-relative directory ending in /`);
   }
+
   return prefix;
 }
 
-type ConfigShape = true | { readonly [key: string]: ConfigShape } | readonly [ConfigShape];
+type KnownConfigKeys =
+  | true
+  | { readonly [key: string]: KnownConfigKeys }
+  | readonly [KnownConfigKeys];
 
-const CONFIG_SHAPE: ConfigShape = {
+const KNOWN_CONFIG_KEYS: KnownConfigKeys = {
   $schema: true,
   minVersion: true,
   required: true,
@@ -139,31 +156,41 @@ const CONFIG_SHAPE: ConfigShape = {
   packageManager: { enforce: true, allowForeignLockfiles: true },
 };
 
-function collectUnknownKeys(value: unknown, shape: ConfigShape, path: string, out: string[]): void {
-  if (shape === true) return;
-  if (Array.isArray(shape)) {
+function collectUnknownKeys(
+  value: unknown,
+  known: KnownConfigKeys,
+  path: string,
+  out: Array<string>,
+): void {
+  if (known === true) return;
+
+  if (Array.isArray(known)) {
     if (!Array.isArray(value)) return;
-    value.forEach((entry, index) => collectUnknownKeys(entry, shape[0], `${path}[${index}]`, out));
+    value.forEach((entry, index) => collectUnknownKeys(entry, known[0], `${path}[${index}]`, out));
+
     return;
   }
+
   if (!isRecord(value)) return;
 
-  const fields = shape as { readonly [key: string]: ConfigShape };
+  const fields = known as { readonly [key: string]: KnownConfigKeys };
+
   for (const [key, child] of Object.entries(value)) {
     const childPath = path ? `${path}.${key}` : key;
+
     if (!Object.hasOwn(fields, key)) {
       out.push(childPath);
       continue;
     }
-    collectUnknownKeys(child, fields[key] as ConfigShape, childPath, out);
+
+    collectUnknownKeys(child, fields[key] as KnownConfigKeys, childPath, out);
   }
 }
 
-// Unknown keys are tolerated at load (additive schema evolution across
-// staggered kit versions); `config validate` surfaces them as warnings.
-export function unknownConfigKeys(value: unknown): string[] {
-  const out: string[] = [];
-  collectUnknownKeys(value, CONFIG_SHAPE, "", out);
+export function unknownConfigKeys(value: unknown): Array<string> {
+  const out: Array<string> = [];
+  collectUnknownKeys(value, KNOWN_CONFIG_KEYS, "", out);
+
   return out;
 }
 
@@ -173,12 +200,16 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
 
   if ("minVersion" in value) {
     const minVersion = text(value.minVersion, "minVersion");
+
     if (!/^\d+\.\d+\.\d+$/.test(minVersion)) {
       fail("minVersion must be a semver version (X.Y.Z)");
     }
+
     out.minVersion = minVersion;
   }
+
   if ("required" in value) out.required = workspacePathList(value.required, "required");
+
   if ("forbidden" in value) out.forbidden = workspacePathList(value.forbidden, "forbidden");
 
   if ("links" in value) {
@@ -186,16 +217,21 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
     const linkPaths = new Map<string, number>();
     out.links = value.links.map((entry, index) => {
       if (!isRecord(entry)) fail(`links[${index}] must be an object`);
+
       const path = normalizeWorkspacePath(
         text(entry.path, `links[${index}].path`),
         `links[${index}].path`,
       );
+
       const pathIdentity = portablePathIdentity(path);
       const previous = linkPaths.get(pathIdentity);
+
       if (previous !== undefined) {
         fail(`links[${index}].path duplicates links[${previous}].path`);
       }
+
       linkPaths.set(pathIdentity, index);
+
       return {
         path,
         target: normalizeLinkTarget(
@@ -210,7 +246,9 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
   if ("registry" in value) {
     if (!isRecord(value.registry)) fail("registry must be an object");
     const entry = value.registry.entry;
+
     if (!isRecord(entry)) fail("registry.entry must be an object");
+
     const registry: RegistryConfig = {
       file: normalizeWorkspacePath(text(value.registry.file, "registry.file"), "registry.file"),
       entry: {
@@ -218,10 +256,12 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
         optional: "optional" in entry ? stringList(entry.optional, "registry.entry.optional") : [],
       },
     };
+
     if ("project" in value.registry) {
       if (!isRecord(value.registry.project)) fail("registry.project must be an object");
       const project = value.registry.project;
       const modes = nonEmptyUniqueStringList(project.modes, "registry.project.modes");
+
       const originHosts = (
         "originHosts" in project
           ? nonEmptyUniqueStringList(project.originHosts, "registry.project.originHosts")
@@ -230,19 +270,23 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
         (host) =>
           normalizeGitHost(host) ?? fail("registry.project.originHosts must contain valid hosts"),
       );
+
       if (new Set(originHosts).size !== originHosts.length) {
         fail("registry.project.originHosts must not contain duplicates after normalization");
       }
+
       registry.project = {
         pathPrefix: homePathPrefix(project.pathPrefix, "registry.project.pathPrefix"),
         modes,
         originHosts,
       };
+
       if ("allowedOwners" in project) {
         const allowedOwners = nonEmptyUniqueStringList(
           project.allowedOwners,
           "registry.project.allowedOwners",
         );
+
         if (
           allowedOwners.some(
             (owner) => owner.includes("/") || !isGitRepositoryPath(`${owner}/repository`),
@@ -250,33 +294,43 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
         ) {
           fail("registry.project.allowedOwners must contain valid Git repository owners");
         }
+
         registry.project.allowedOwners = allowedOwners;
       }
+
       if ("mustContain" in project) {
         if (!Array.isArray(project.mustContain)) {
           fail("registry.project.mustContain must be an array");
         }
+
         const seen = new Set<string>();
         registry.project.mustContain = project.mustContain.map((entry, index) => {
           if (!isRecord(entry)) fail(`registry.project.mustContain[${index}] must be an object`);
           const repo = text(entry.repo, `registry.project.mustContain[${index}].repo`);
           const mode = text(entry.mode, `registry.project.mustContain[${index}].mode`);
+
           if (!isGitRepositoryPath(repo)) {
             fail(`registry.project.mustContain[${index}].repo must be a Git repository path`);
           }
+
           if (!modes.includes(mode)) {
             fail(
               `registry.project.mustContain[${index}].mode must be included in registry.project.modes`,
             );
           }
+
           const identity = `${repo}\0${mode}`;
+
           if (seen.has(identity)) {
             fail("registry.project.mustContain must not contain duplicate repo and mode pairs");
           }
+
           seen.add(identity);
+
           return { repo, mode };
         });
       }
+
       if ("maxEntries" in project) {
         if (
           typeof project.maxEntries !== "number" ||
@@ -285,10 +339,13 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
         ) {
           fail("registry.project.maxEntries must be a non-negative integer");
         }
+
         registry.project.maxEntries = project.maxEntries;
       }
+
       const allowedOwners = registry.project.allowedOwners;
       const requiredEntries = registry.project.mustContain ?? [];
+
       if (
         allowedOwners &&
         requiredEntries.some(
@@ -297,30 +354,38 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
       ) {
         fail("registry.project.mustContain repository owners must be included in allowedOwners");
       }
+
       if (
         registry.project.maxEntries !== undefined &&
         requiredEntries.length > registry.project.maxEntries
       ) {
         fail("registry.project.maxEntries must allow every mustContain entry");
       }
+
       if ("catalog" in project) {
         if (!isRecord(project.catalog)) fail("registry.project.catalog must be an object");
         const field = text(project.catalog.field, "registry.project.catalog.field");
+
         if (!registry.entry.required.includes(field) && !registry.entry.optional.includes(field)) {
           fail(`registry.project.catalog.field must be declared in registry.entry`);
         }
+
         const catalogModes = nonEmptyUniqueStringList(
           project.catalog.modes,
           "registry.project.catalog.modes",
         );
+
         if (catalogModes.some((mode) => !modes.includes(mode))) {
           fail("registry.project.catalog.modes must be included in registry.project.modes");
         }
+
         registry.project.catalog = { field, modes: catalogModes };
       }
     }
+
     if ("pointers" in value.registry) {
       if (!isRecord(value.registry.pointers)) fail("registry.pointers must be an object");
+
       if (!registry.project) fail("registry.pointers requires registry.project");
       registry.pointers = {
         dir: normalizeWorkspacePath(
@@ -329,6 +394,7 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
         ),
       };
     }
+
     out.registry = registry;
   }
 
@@ -346,6 +412,7 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
     if (!Array.isArray(value.limits)) fail("limits must be an array");
     out.limits = value.limits.map((entry, index) => {
       if (!isRecord(entry)) fail(`limits[${index}] must be an object`);
+
       if (
         typeof entry.maxLines !== "number" ||
         !Number.isInteger(entry.maxLines) ||
@@ -353,6 +420,7 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
       ) {
         fail(`limits[${index}].maxLines must be a positive integer`);
       }
+
       return {
         pattern: text(entry.pattern, `limits[${index}].pattern`),
         maxLines: entry.maxLines,
@@ -381,9 +449,11 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
 
   if ("docsLinks" in value) {
     if (!isRecord(value.docsLinks)) fail("docsLinks must be an object");
+
     if ("enabled" in value.docsLinks && typeof value.docsLinks.enabled !== "boolean") {
       fail("docsLinks.enabled must be a boolean");
     }
+
     out.docsLinks = {
       enabled: value.docsLinks.enabled === true,
       exclude:
@@ -400,11 +470,13 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
 
   if ("packageManager" in value) {
     if (!isRecord(value.packageManager)) fail("packageManager must be an object");
+
     for (const flag of ["enforce", "allowForeignLockfiles"]) {
       if (flag in value.packageManager && typeof value.packageManager[flag] !== "boolean") {
         fail(`packageManager.${flag} must be a boolean`);
       }
     }
+
     out.packageManager = {
       enforce: value.packageManager.enforce === true,
       allowForeignLockfiles: value.packageManager.allowForeignLockfiles === true,
@@ -416,13 +488,16 @@ export function parseWorkspaceConfig(value: unknown): WorkspaceConfig {
 
 export function readRawConfig(repoRoot = "."): unknown {
   let raw: string;
+
   try {
     raw = readWorkspaceText(repoRoot, CONFIG_FILE, "config file");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+
     if (message === `${CONFIG_FILE}: file is missing`) fail(`missing ${CONFIG_FILE}`);
     fail(message);
   }
+
   try {
     return JSON.parse(raw);
   } catch {
@@ -437,9 +512,12 @@ export function loadWorkspaceConfig(repoRoot = "."): WorkspaceConfig {
 export function compareVersions(a: string, b: string): number {
   const pa = a.split(".").map((x) => Number.parseInt(x, 10) || 0);
   const pb = b.split(".").map((x) => Number.parseInt(x, 10) || 0);
+
   for (let i = 0; i < 3; i += 1) {
     const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+
     if (diff !== 0) return diff;
   }
+
   return 0;
 }
