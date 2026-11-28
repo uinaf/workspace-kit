@@ -21,8 +21,6 @@ export type RegistryLifecycleOptions = {
   stderr?: (text: string) => void;
 };
 
-// Fast-forwards across thousands of files print multi-megabyte diffstats;
-// spawnSync's 1 MiB default kills git mid-output with no status.
 const MAX_OUTPUT_BYTES = 256 * 1024 * 1024;
 
 function defaultRun(command: string, args: Array<string>): CommandResult {

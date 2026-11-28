@@ -29,15 +29,13 @@ function packageVersion(packageRoot: string): string {
       return STABLE_VERSION.test(pkg.version) ? pkg.version : "0.0.0";
     }
   } catch {
-    // A malformed or missing package manifest has no usable declared version.
+    return "0.0.0";
   }
 
   return "0.0.0";
 }
 
 function reachableTagVersions(packageRoot: string): Array<string> {
-  // Requiring package-local Git metadata prevents source archives and an
-  // installed package from inheriting tags from a repository around them.
   if (!existsSync(join(packageRoot, ".git"))) {
     throw new Error(
       "could not determine workspace-kit version: use a full Git checkout with release tags",
@@ -94,9 +92,6 @@ export function resolveKitVersion(packageRoot: string): string {
 let sourceVersion: string | undefined;
 
 export function kitVersion(): string {
-  // Pack builds replace this identifier with the release-aware source version.
-  // Direct source execution requires full release history; installed packages
-  // use the baked literal and never need Git.
   if (typeof __WORKSPACE_KIT_VERSION__ === "string") return __WORKSPACE_KIT_VERSION__;
 
   if (sourceVersion) return sourceVersion;

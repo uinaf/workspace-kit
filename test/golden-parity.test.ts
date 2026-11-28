@@ -1,7 +1,3 @@
-// THE migration gate: the kit CLI must reproduce every legacy golden
-// byte-for-byte (normalization identical to capture). Scenario definitions
-// are shared with the capture script via parity/scenarios.ts, so the two
-// runners cannot drift.
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 import { readFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -58,7 +54,6 @@ test("kit CLI reproduces every legacy golden", () => {
   const sink: Sink = {
     emit(name: string, result: RunResult, dir: string): void {
       if (PARITY_EXEMPT.has(name)) {
-        // Usage text is kit-owned; only the exit contract carries over.
         assert.equal(result.status, Number(golden(`${name}.exit`).trim()), name);
         assert.match(result.stderr, /usage:/, name);
 

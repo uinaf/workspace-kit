@@ -78,8 +78,6 @@ function workspacePathList(value: unknown, field: string): Array<string> {
 }
 
 export function portablePathIdentity(path: string): string {
-  // Uppercase collapses Unicode aliases that lowercasing misses (for example,
-  // long s/S and final sigma/sigma) on common case-insensitive filesystems.
   return path.normalize("NFC").toUpperCase().normalize("NFC");
 }
 
@@ -186,8 +184,6 @@ function collectUnknownKeys(
   }
 }
 
-// Unknown keys are tolerated at load (additive schema evolution across
-// staggered kit versions); `config validate` surfaces them as warnings.
 export function unknownConfigKeys(value: unknown): Array<string> {
   const out: Array<string> = [];
   collectUnknownKeys(value, CONFIG_SHAPE, "", out);

@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-// workspace-kit CLI. Default output is parity-locked to the legacy
-// workspace scripts (see parity/): errors one per line on stderr, exit 1;
-// terse "<check> ok" lines on stdout; exit 2 on usage errors.
 import { spawnSync } from "node:child_process";
 import { chdir } from "node:process";
 import {
@@ -289,7 +286,6 @@ function doctorReport(config: WorkspaceConfig): DoctorReport {
     }
   }
 
-  // Soft limits are warnings by design: printed, counted, never fatal.
   const warnings = config.limits ? limitWarnings(config.limits) : [];
 
   return { bad, checks, detail, events, warnings };

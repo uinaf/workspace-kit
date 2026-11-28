@@ -1,8 +1,3 @@
-// Port of the legacy doctor's own checks (required files, alias symlinks,
-// registry shape). Message strings and ordering are
-// parity-locked to parity/goldens. Required files deliberately use
-// filesystem existence instead of git-tracked state. The contract check owns
-// tracked semantics.
 import type { LinkRule, RegistryConfig, WorkspaceConfig } from "../config.ts";
 import {
   assertWorkspaceLinkTarget,
@@ -59,7 +54,7 @@ export function linkErrors(links: Array<LinkRule>): Array<string> {
 
     const stat = workspaceLstat(".", path);
 
-    if (!stat) continue; // missing is the required-list's job
+    if (!stat) continue;
 
     if (!stat.isSymbolicLink()) {
       bad.push(`${path} should be a symlink to ${target}`);
@@ -79,7 +74,7 @@ export function registryErrors(registry: RegistryConfig, repoRoot = "."): Array<
   const bad: Array<string> = [];
   const file = registry.file;
 
-  if (!workspaceLstat(repoRoot, file)) return bad; // missing is the required-list's job
+  if (!workspaceLstat(repoRoot, file)) return bad;
 
   try {
     const parsed: unknown = JSON.parse(readWorkspaceText(repoRoot, file));

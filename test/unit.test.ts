@@ -1,4 +1,3 @@
-// Legacy contracts that the golden parity suite cannot capture.
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 import { execSync } from "node:child_process";
@@ -105,6 +104,5 @@ test("non-reciprocal peers error; different ancestors skip the history check", (
     errors.includes("workspace contracts name different shared ancestors"),
     errors.join("; "),
   );
-  // Early return: the shared-history check must NOT have run.
   assert.ok(!errors.some((e) => e.startsWith("post-split history is shared")));
 });

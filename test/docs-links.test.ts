@@ -131,9 +131,6 @@ test("docs links keeps case collisions broken and reports embedded repositories 
   put(dir, "README.md", "[case](guide.md)\n[embedded](nested)\n");
   put(dir, "Guide.md", "# guide\n");
   track(dir);
-  // On a case-insensitive filesystem this overwrites Guide.md; on a
-  // case-sensitive one it creates a distinct untracked file. Both must stay
-  // broken: staging cannot produce a tree that checks out everywhere.
   put(dir, "guide.md", "# guide\n");
   mkdirSync(join(dir, "nested"), { recursive: true });
   execFileSync("git", ["init", "-q"], { cwd: join(dir, "nested") });
@@ -180,9 +177,6 @@ test("docs links rejects an untracked target below a tracked path that aliases i
   put(dir, "README.md", "[ancestor](guide/sub/file.md)\n");
   put(dir, "Guide", "# tracked file\n");
   track(dir);
-  // Keep `Guide` in the index but clear the working copy so the colliding
-  // directory can exist on a case-insensitive filesystem too; on Linux both
-  // would coexist and git would stage the file.
   rmSync(join(dir, "Guide"));
   put(dir, "guide/sub/file.md", "# collides with tracked Guide\n");
 

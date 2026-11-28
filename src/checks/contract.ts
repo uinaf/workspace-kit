@@ -1,6 +1,3 @@
-// Port of the legacy workspace-contract validator. Message strings and
-// evaluation order are parity-locked to parity/goldens. Regenerate the oracle
-// when changing them.
 import { spawnSync } from "node:child_process";
 import { posix, resolve, win32 } from "node:path";
 import type { HandoffConfig } from "../config.ts";
@@ -136,7 +133,6 @@ export function peerErrors(
   file = "workspace.contract.json",
 ): Array<string> {
   const current = loadContract(currentRoot, file);
-  // The peer's contract file name is protocol, not per-repo config.
   const peer = loadContract(peerRoot, "workspace.contract.json");
 
   const errors = [
@@ -166,8 +162,6 @@ export function peerErrors(
 }
 
 export function isPrivateHandoffPath(path: string, handoff: HandoffConfig): boolean {
-  // Kit-level invariants: never configurable. Raw-path checks run first so
-  // traversal is always blocked regardless of what it would normalize to.
   const portable = path.replaceAll("\\", "/");
 
   if (
@@ -181,8 +175,6 @@ export function isPrivateHandoffPath(path: string, handoff: HandoffConfig): bool
     return true;
   }
 
-  // Normalize candidates and configured rules alike so spelling differences
-  // cannot sidestep the denylist.
   const normalized = normalizePath(path);
 
   if (!normalized) return true;
@@ -206,7 +198,5 @@ function normalizePath(path: string): string {
     .split("/")
     .filter((segment) => segment !== "" && segment !== ".");
 
-  // Treat case aliases conservatively so a path approved on a case-sensitive
-  // host cannot name protected content on a case-insensitive filesystem.
   return segments.join("/").toLowerCase();
 }

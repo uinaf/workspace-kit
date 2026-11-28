@@ -46,9 +46,6 @@ function commit(dir: string, files: Record<string, string>, message: string): st
   return git(dir, "rev-parse", "HEAD");
 }
 
-// The release checkout sits on the verified commit and `gh` talks to a bare remote through
-// fake-gh.ts. `release` follows semantic-release: verifyRelease, then prepare (npm writes the
-// version, then exec), then it tags HEAD and publishes the working tree.
 function fixture() {
   const root = tempDir("release-handoff-");
   const remote = join(root, "remote.git");

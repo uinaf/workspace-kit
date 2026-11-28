@@ -288,6 +288,14 @@ export function ensureWorkspaceDirectory(root: string, path: string): void {
   }
 }
 
+function closeAfterFailure(descriptor: number): void {
+  try {
+    closeSync(descriptor);
+  } catch {
+    return;
+  }
+}
+
 export function writeWorkspaceText(
   root: string,
   path: string,
@@ -355,13 +363,7 @@ export function writeWorkspaceText(
     descriptor = undefined;
     renameSync(temporaryAbsolute, absolute);
   } catch (error) {
-    if (descriptor !== undefined) {
-      try {
-        closeSync(descriptor);
-      } catch {
-        // The primary write error is more useful than a second close error.
-      }
-    }
+    if (descriptor !== undefined) closeAfterFailure(descriptor);
 
     let cleanup = "";
 

@@ -1,5 +1,3 @@
-// Workspace scaffolder. Writes owner-editable structural skeletons and
-// kit-owned validation commands. Existing files remain unchanged.
 import { mkdirSync, realpathSync } from "node:fs";
 import { CONSUMER_PACKAGE_MANAGER } from "./checks/packageManager.ts";
 import { parseWorkspaceConfig } from "./config.ts";
@@ -180,9 +178,6 @@ export function initWorkspace(
   const wiki = existingConfig ? existingConfig.wiki !== undefined : options.wiki === true;
 
   const put = (rel: string, content: string, mode?: number): void => {
-    // lstat-based existence: a pre-existing dangling symlink must count as
-    // occupied, or a normal file write would write THROUGH it to an
-    // attacker-chosen location in a hostile checkout.
     if (workspaceLstat(root, rel)) {
       skipped.push(rel);
 
@@ -296,7 +291,6 @@ pnpm verify
         ...(wiki ? ["docs/"] : []),
       ],
     };
-    // contract: deliberately absent until an origin remote and a peer exist.
   }
 
   if (profile === "runtime") {

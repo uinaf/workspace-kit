@@ -1,7 +1,3 @@
-// Bounded Markdown destination checking for git-tracked *.md files. This is
-// intentionally not a complete CommonMark parser: it covers inline links and
-// images plus one-line reference definitions, while ignoring code spans and
-// backtick/tilde fenced blocks.
 import { spawnSync } from "node:child_process";
 import { posix } from "node:path";
 import { portablePathIdentity } from "../config.ts";
@@ -349,16 +345,6 @@ function pathPart(href: string): string {
   return href;
 }
 
-// Whether git itself lists the target as an untracked, non-ignored path, so
-// the diagnostic can say "untracked" instead of "broken". This is a
-// classification, not a promise that `git add` will succeed: deciding that
-// would mean entering git's check-in pipeline (clean filters execute
-// commands) and re-deriving its path validity rules. The listing is
-// filter-free, literal, and collapses directories to one entry so output is
-// bounded. Portable-identity collisions with tracked paths stay broken: the
-// link is spelled differently from the file git tracks, and no commit of the
-// untracked spelling could check out next to it on a case-insensitive
-// filesystem.
 function isUntrackedTarget(target: string, trackedIdentities: Set<string>): boolean {
   if (target.includes("\0")) return false;
   const identity = portablePathIdentity(target);
@@ -437,7 +423,6 @@ export function docsLinkErrors(config: DocsLinksConfig): Array<string> {
   if (result.status !== 0) return ["could not list tracked files"];
   const tracked = new Set(result.stdout.split("\0").filter(Boolean));
   const trackedIdentities = new Set([...tracked].map(portablePathIdentity));
-  // One git process per distinct target, not per link occurrence.
   const untrackedByTarget = new Map<string, boolean>();
 
   const isUntracked = (target: string): boolean => {
@@ -498,8 +483,6 @@ export function docsLinkErrors(config: DocsLinksConfig): Array<string> {
       if ("broken" in link) {
         bad.push(`${file}: broken link (${link.raw})`);
       } else if (!isTracked(link.target)) {
-        // The rule is deliberate: a present-but-untracked target would break
-        // for everyone else. Name the cause; do not promise a remedy.
         bad.push(
           isUntracked(link.target)
             ? `${file}: untracked link target (${link.raw}); the link resolves only once it is tracked`

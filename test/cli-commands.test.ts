@@ -1,4 +1,3 @@
-// Integration coverage for CLI surfaces outside the golden parity suite.
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 import { execSync, spawnSync } from "node:child_process";
@@ -53,7 +52,7 @@ function commitAll(dir: string): void {
 }
 
 test("contract handoff works without a contract section and blocks ./ paths", () => {
-  const dir = scaffold("personal"); // personal profile has handoff, no contract
+  const dir = scaffold("personal");
   const blocked = kit(dir, "contract", "handoff", "./MEMORY.md");
   assert.equal(blocked.status, 1, "dot-slash bypass must be blocked");
   assert.match(blocked.stderr, /owner-private handoff path: \.\/MEMORY\.md/);
@@ -74,7 +73,6 @@ test("docs links: broken, title-syntax, malformed-escape, and untracked targets"
   commitAll(dir);
   assert.equal(kit(dir, "docs", "links").status, 0);
 
-  // CommonMark title syntax must not be a false positive.
   writeFileSync(
     join(dir, "docs", "guide.md"),
     '# Guide\n\nSee [readme](../AGENTS.md "The Guide").\n',
@@ -82,7 +80,6 @@ test("docs links: broken, title-syntax, malformed-escape, and untracked targets"
   commitAll(dir);
   assert.equal(kit(dir, "docs", "links").status, 0);
 
-  // Malformed percent-escape must be a broken link, not a crash.
   writeFileSync(join(dir, "docs", "guide.md"), "# Guide\n\nSee [x](%zz) and [y](gone.md).\n");
   commitAll(dir);
   const broken = kit(dir, "docs", "links");
@@ -90,7 +87,6 @@ test("docs links: broken, title-syntax, malformed-escape, and untracked targets"
   assert.match(broken.stderr, /broken link \(%zz\)/);
   assert.match(broken.stderr, /broken link \(gone\.md\)/);
 
-  // Gitignored-but-present targets are broken for consumers of the repo.
   writeFileSync(join(dir, ".gitignore"), "tmp/\n");
   mkdirSync(join(dir, "tmp"), { recursive: true });
   writeFileSync(join(dir, "tmp", "local.md"), "# Local\n");

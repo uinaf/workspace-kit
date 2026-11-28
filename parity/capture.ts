@@ -1,7 +1,4 @@
 #!/usr/bin/env bun
-// Regenerates parity/goldens/ by driving the frozen legacy scripts through
-// the shared scenario definitions in parity/scenarios.ts.
-// Local-only: requires bun and git on PATH. CI never runs legacy scripts.
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
@@ -17,7 +14,6 @@ const workRoot = join(parityDir, "..", "tmp", "parity-work");
 const today = utcToday();
 const env = makeEnv();
 
-// Translate the kit's semantic argv into legacy bun script invocations.
 function legacyArgv(command: Array<string>): Array<string> {
   const [tool, mode, ...rest] = command;
 
@@ -42,7 +38,6 @@ const runner: Runner = (command, cwd) => {
 function scrub(name: string, text: string, dir: string): string {
   const normalized = normalize(text, dir, workRoot, today);
 
-  // Shared-history commit ids are deterministic but opaque; assert shape.
   return name === "peer-check-shared"
     ? normalized.replaceAll(/[0-9a-f]{40}/g, "<SHA>")
     : normalized;

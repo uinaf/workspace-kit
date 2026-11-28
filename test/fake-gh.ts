@@ -1,7 +1,3 @@
-// Stands in for `gh api` in release-handoff.test.ts. It serves the GitHub git-data endpoints the
-// release config calls from the bare repository at FIXTURE_REMOTE and applies GitHub's
-// fast-forward rule to ref updates. If the FIXTURE_RACE file exists, main moves to the commit it
-// names just before the version commit is created, once.
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -63,8 +59,6 @@ function list(fields: Fields, key: string): Array<unknown> {
   return value;
 }
 
-// gh api: -f sends strings, -F reads @file and converts booleans, `key[]` appends, and
-// `key[][sub]` fills the last object until `sub` repeats.
 function addField(fields: Fields, field: string, typed: boolean): void {
   const at = field.indexOf("=");
   const key = field.slice(0, at);

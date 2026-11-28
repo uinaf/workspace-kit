@@ -1,5 +1,3 @@
-// Every init profile must produce a verify-green workspace out of the box
-// (contract deliberately deferred until an origin remote exists).
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 import { execSync, spawnSync } from "node:child_process";
@@ -37,7 +35,6 @@ for (const profile of ["personal", "runtime", "work"] as const) {
       assert.ok(lstatSync(join(dir, "CLAUDE.md")).isSymbolicLink());
       assert.equal(readlinkSync(join(dir, "CLAUDE.md")), "AGENTS.md");
 
-      // Scaffolded AGENTS.md is a structural skeleton, never behavioral prose.
       const agents = readFileSync(join(dir, "AGENTS.md"), "utf8");
       assert.match(agents, /TODO/);
       assert.match(agents, /## Skill Ownership/);
