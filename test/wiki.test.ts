@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { test } from "vite-plus/test";
 import { tempDir } from "./temp-dir.ts";
 
-const cli = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "cli.ts");
+const cli = join(import.meta.dirname, "..", "src", "cli.ts");
 
 function kit(cwd: string, ...args: string[]) {
   return spawnSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8" });

@@ -61,7 +61,6 @@ export default defineConfig({
       "typescript/no-unsafe-type-assertion": "off",
       "uinaf/no-comments": "off",
       "unicorn/consistent-function-scoping": "off",
-      "unicorn/prefer-import-meta-properties": "off",
       "vite-plus/prefer-vite-plus-imports": "error",
     },
   },

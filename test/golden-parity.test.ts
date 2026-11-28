@@ -6,8 +6,7 @@ import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 import { readFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import {
   PARITY_EXEMPT,
   buildBase,
@@ -18,7 +17,7 @@ import {
 } from "../parity/scenarios.ts";
 import type { Runner, RunResult, Sink } from "../parity/scenarios.ts";
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const root = join(import.meta.dirname, "..");
 const parityDir = join(root, "parity");
 const fixtureSrc = join(parityDir, "fixtures", "green-personal");
 const legacyDir = join(parityDir, "legacy");

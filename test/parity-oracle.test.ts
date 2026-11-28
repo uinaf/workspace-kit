@@ -1,10 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "vite-plus/test";
 import { existsSync, lstatSync, readFileSync, readlinkSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const root = join(import.meta.dirname, "..");
 const goldens = join(root, "parity", "goldens");
 const fixture = join(root, "parity", "fixtures", "green-personal");
 

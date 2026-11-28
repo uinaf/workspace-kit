@@ -1,7 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 import { gitEnvironmentForRepository } from "./lib/gitProcess.ts";
 
@@ -87,7 +86,7 @@ export function kitVersion(): string {
   // use the baked literal and never need Git.
   if (typeof __WORKSPACE_KIT_VERSION__ === "string") return __WORKSPACE_KIT_VERSION__;
   if (sourceVersion) return sourceVersion;
-  const here = dirname(fileURLToPath(import.meta.url));
+  const here = import.meta.dirname;
   sourceVersion = resolveKitVersion(join(here, ".."));
   return sourceVersion;
 }

@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { test } from "vite-plus/test";
 import { tempDir } from "./temp-dir.ts";
 
-const cli = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "cli.ts");
+const cli = join(import.meta.dirname, "..", "src", "cli.ts");
 const marker =
   "Generated from `projects.json` by `workspace-kit registry pointers`; edit the registry, then rerun it.";
 

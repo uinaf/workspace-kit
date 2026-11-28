@@ -10,11 +10,10 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, relative, resolve, sep } from "node:path";
 import { gitEnvironmentForRepository } from "../src/lib/gitProcess.ts";
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = resolve(import.meta.dirname, "..");
 const npm = "npm";
 const scratch = mkdtempSync(join(tmpdir(), "workspace-kit-package-smoke-"));
 
