@@ -36,6 +36,7 @@ function packageVersion(packageRoot: string): string {
 }
 
 function reachableTagVersions(packageRoot: string): Array<string> {
+  // SAFETY: package-local git metadata only, so archives and installs never inherit a surrounding repo's tags.
   if (!existsSync(join(packageRoot, ".git"))) {
     throw new Error(
       "could not determine workspace-kit version: use a full Git checkout with release tags",

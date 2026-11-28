@@ -78,6 +78,7 @@ function workspacePathList(value: unknown, field: string): Array<string> {
 }
 
 export function portablePathIdentity(path: string): string {
+  // SAFETY: uppercase collapses Unicode aliases lowercasing misses (long s, final sigma) on case-insensitive filesystems.
   return path.normalize("NFC").toUpperCase().normalize("NFC");
 }
 

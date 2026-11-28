@@ -1,3 +1,4 @@
+// SAFETY: message strings and ordering are parity-locked to parity/goldens; regenerate the oracle on change.
 import type { LinkRule, RegistryConfig, WorkspaceConfig } from "../config.ts";
 import {
   assertWorkspaceLinkTarget,
